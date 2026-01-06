@@ -22,15 +22,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Plus } from "lucide-react";
-import { createAppointment } from "@/app/(dashboard)/customers/actions";
+import { createAppointment } from "@/app/(dashboard)/dates/actions";
 import { toast } from "sonner";
-import { Customer } from "@/types/database";
+import { Customer, AppointmentType } from "@/types/database";
+import { cn } from "@/lib/utils";
 
 interface CreateAppointmentDialogProps {
   customers: Pick<Customer, "id" | "name" | "company">[];
+  appointmentTypes?: AppointmentType[];
 }
 
-export function CreateAppointmentDialog({ customers }: CreateAppointmentDialogProps) {
+export function CreateAppointmentDialog({ customers, appointmentTypes = [] }: CreateAppointmentDialogProps) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
@@ -51,13 +53,11 @@ export function CreateAppointmentDialog({ customers }: CreateAppointmentDialogPr
     });
   };
 
-  // Default to tomorrow 9 AM - 10 AM
+  // Default to tomorrow 9 AM
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   tomorrow.setHours(9, 0, 0, 0);
   const defaultStart = tomorrow.toISOString().slice(0, 16);
-  tomorrow.setHours(10);
-  const defaultEnd = tomorrow.toISOString().slice(0, 16);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -71,7 +71,7 @@ export function CreateAppointmentDialog({ customers }: CreateAppointmentDialogPr
         <DialogHeader>
           <DialogTitle>Schedule Appointment</DialogTitle>
           <DialogDescription>
-            Create a new appointment. All fields except customer are required.
+            Create a new appointment. Only title and start time are required.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -85,26 +85,47 @@ export function CreateAppointmentDialog({ customers }: CreateAppointmentDialogPr
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="customer_id">Customer (optional)</Label>
-            <Select name="customer_id">
-              <SelectTrigger>
-                <SelectValue placeholder="Select a customer" />
-              </SelectTrigger>
-              <SelectContent>
-                {customers.map((customer) => (
-                  <SelectItem key={customer.id} value={customer.id}>
-                    {customer.name}
-                    {customer.company && (
-                      <span className="text-muted-foreground">
-                        {" "}
-                        - {customer.company}
-                      </span>
-                    )}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="customer_id">Person</Label>
+              <Select name="customer_id">
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a person" />
+                </SelectTrigger>
+                <SelectContent>
+                  {customers.map((customer) => (
+                    <SelectItem key={customer.id} value={customer.id}>
+                      {customer.name}
+                      {customer.company && (
+                        <span className="text-muted-foreground">
+                          {" "}
+                          - {customer.company}
+                        </span>
+                      )}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="appointment_type_id">Type</Label>
+              <Select name="appointment_type_id">
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {appointmentTypes.map((type) => (
+                    <SelectItem key={type.id} value={type.id}>
+                      <div className="flex items-center gap-2">
+                        <div className={cn("w-2 h-2 rounded-full", type.color)} />
+                        {type.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -119,13 +140,11 @@ export function CreateAppointmentDialog({ customers }: CreateAppointmentDialogPr
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="end_time">End Time *</Label>
+              <Label htmlFor="end_time">End Time (optional)</Label>
               <Input
                 id="end_time"
                 name="end_time"
                 type="datetime-local"
-                defaultValue={defaultEnd}
-                required
               />
             </div>
           </div>

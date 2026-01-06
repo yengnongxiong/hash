@@ -71,7 +71,7 @@ export function CustomerTable({ initialData }: CustomerTableProps) {
         });
       } else {
         toast.success("Deleted", {
-          description: `${result.count} customer(s) deleted`,
+          description: `${result.count} ${result.count === 1 ? "person" : "people"} deleted`,
         });
       }
     });
@@ -82,8 +82,6 @@ export function CustomerTable({ initialData }: CustomerTableProps) {
       <DataTable
         columns={customerColumns}
         data={data}
-        searchKey="name"
-        searchPlaceholder="Search customers..."
         onRowUpdate={handleRowUpdate}
         onRowDelete={handleRowDelete}
       />

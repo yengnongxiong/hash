@@ -20,12 +20,13 @@ export type Database = {
           title: string;
           description: string | null;
           start_time: string;
-          end_time: string;
+          end_time: string | null;
           location: string | null;
           status: "scheduled" | "completed" | "cancelled";
           created_by: string | null;
           created_at: string;
           updated_at: string;
+          appointment_type_id?: string | null;
         };
         Insert: {
           id?: string;
@@ -34,12 +35,13 @@ export type Database = {
           title: string;
           description?: string | null;
           start_time: string;
-          end_time: string;
+          end_time?: string | null;
           location?: string | null;
           status?: "scheduled" | "completed" | "cancelled";
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
+          appointment_type_id?: string | null;
         };
         Update: {
           id?: string;
@@ -48,12 +50,13 @@ export type Database = {
           title?: string;
           description?: string | null;
           start_time?: string;
-          end_time?: string;
+          end_time?: string | null;
           location?: string | null;
           status?: "scheduled" | "completed" | "cancelled";
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
+          appointment_type_id?: string | null;
         };
         Relationships: [
           {
@@ -66,6 +69,46 @@ export type Database = {
             foreignKeyName: "appointments_customer_id_fkey";
             columns: ["customer_id"];
             referencedRelation: "customers";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "appointments_appointment_type_id_fkey";
+            columns: ["appointment_type_id"];
+            referencedRelation: "appointment_types";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      appointment_types: {
+        Row: {
+          id: string;
+          organization_id: string;
+          name: string;
+          color: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          name: string;
+          color?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          name?: string;
+          color?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "appointment_types_organization_id_fkey";
+            columns: ["organization_id"];
+            referencedRelation: "organizations";
             referencedColumns: ["id"];
           }
         ];
@@ -552,6 +595,20 @@ export type DocumentAuditLog = Tables<"document_audit_log">;
 
 // Phase 2 types - use Tables for database-compatible types
 export type Appointment = Tables<"appointments">;
+
+export interface AppointmentType {
+  id: string;
+  organization_id: string;
+  name: string;
+  color: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type AppointmentWithRelations = Appointment & {
+  customers?: { name: string; company: string | null } | null;
+  appointment_types?: { id: string; name: string; color: string } | null;
+};
 
 export interface DocumentFlag {
   id: string;

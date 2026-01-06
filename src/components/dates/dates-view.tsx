@@ -1,28 +1,20 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import Link from "next/link";
-import { Appointment, Customer } from "@/types/database";
+import { AppointmentWithRelations, AppointmentType, Customer } from "@/types/database";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { CreateAppointmentDialog } from "@/components/customers/appointments/create-appointment-dialog";
+import { AppointmentDetailDialog } from "./appointment-detail-dialog";
+import { AppointmentTypesDialog } from "./appointment-types-dialog";
 import { DatesCalendar } from "./dates-calendar";
 import {
   List,
   Calendar as CalendarIcon,
   Search,
-  FileText,
-  Users,
-  Filter,
+  Settings,
 } from "lucide-react";
 import {
   format,
@@ -34,106 +26,85 @@ import {
 import { formatDistanceToNow } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 
-type AppointmentWithCustomer = Appointment & {
-  customers?: { name: string; company: string | null } | null;
-};
-
-interface DateEntry {
-  id: string;
-  type: "appointment" | "document";
-  title: string;
-  date: Date;
-  endDate?: Date;
-  category: string;
-  entityId: string;
-  entityName?: string;
-  status?: string;
-  location?: string;
-}
-
 interface DatesViewProps {
-  dates: DateEntry[];
-  appointments: AppointmentWithCustomer[];
+  appointments: AppointmentWithRelations[];
   customers: Pick<Customer, "id" | "name" | "company">[];
+  appointmentTypes: AppointmentType[];
 }
-
-const CATEGORY_COLORS: Record<string, string> = {
-  appointment: "bg-blue-500",
-  due_date: "bg-red-500",
-  expiration: "bg-orange-500",
-  invoice_date: "bg-purple-500",
-  effective: "bg-green-500",
-  transaction: "bg-indigo-500",
-  other: "bg-gray-500",
-};
-
-const CATEGORY_LABELS: Record<string, string> = {
-  appointment: "Appointment",
-  due_date: "Due Date",
-  expiration: "Expiration",
-  invoice_date: "Invoice Date",
-  effective: "Effective Date",
-  transaction: "Transaction",
-  other: "Other",
-};
 
 type TimeFilter = "all" | "overdue" | "today" | "upcoming" | "past";
-type TypeFilter = "all" | "appointment" | "document";
 
-export function DatesView({ dates, appointments, customers }: DatesViewProps) {
+export function DatesView({ appointments, customers, appointmentTypes }: DatesViewProps) {
   const [view, setView] = useState<"table" | "calendar">("table");
   const [search, setSearch] = useState("");
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
-  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+  const [selectedAppointment, setSelectedAppointment] = useState<AppointmentWithRelations | null>(null);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
 
-  const filteredDates = useMemo(() => {
-    return dates.filter((entry) => {
+  const filteredAppointments = useMemo(() => {
+    return appointments.filter((apt) => {
       // Search filter
       if (search) {
         const searchLower = search.toLowerCase();
         const matchesSearch =
-          entry.title.toLowerCase().includes(searchLower) ||
-          entry.entityName?.toLowerCase().includes(searchLower) ||
-          entry.category.toLowerCase().includes(searchLower);
+          apt.title.toLowerCase().includes(searchLower) ||
+          apt.customers?.name?.toLowerCase().includes(searchLower) ||
+          apt.customers?.company?.toLowerCase().includes(searchLower) ||
+          apt.location?.toLowerCase().includes(searchLower) ||
+          apt.description?.toLowerCase().includes(searchLower) ||
+          apt.appointment_types?.name?.toLowerCase().includes(searchLower);
         if (!matchesSearch) return false;
       }
 
       // Time filter
       const today = startOfDay(new Date());
-      const entryDate = startOfDay(entry.date);
+      const aptDate = startOfDay(new Date(apt.start_time));
 
       switch (timeFilter) {
         case "overdue":
-          if (!isPast(entryDate) || isToday(entryDate)) return false;
+          if (!isPast(aptDate) || isToday(aptDate)) return false;
           break;
         case "today":
-          if (!isToday(entryDate)) return false;
+          if (!isToday(aptDate)) return false;
           break;
         case "upcoming":
-          if (!isFuture(entryDate) && !isToday(entryDate)) return false;
+          if (!isFuture(aptDate) && !isToday(aptDate)) return false;
           break;
         case "past":
-          if (!isPast(entryDate)) return false;
+          if (!isPast(aptDate)) return false;
           break;
-      }
-
-      // Type filter
-      if (typeFilter !== "all" && entry.type !== typeFilter) {
-        return false;
       }
 
       return true;
     });
-  }, [dates, search, timeFilter, typeFilter]);
+  }, [appointments, search, timeFilter]);
 
   // Stats
-  const overdueCount = dates.filter(
-    (d) => isPast(startOfDay(d.date)) && !isToday(d.date)
+  const overdueCount = appointments.filter(
+    (apt) => isPast(startOfDay(new Date(apt.start_time))) && !isToday(new Date(apt.start_time)) && apt.status === "scheduled"
   ).length;
-  const todayCount = dates.filter((d) => isToday(d.date)).length;
-  const upcomingCount = dates.filter(
-    (d) => isFuture(startOfDay(d.date)) || isToday(d.date)
+  const todayCount = appointments.filter((apt) => isToday(new Date(apt.start_time))).length;
+  const upcomingCount = appointments.filter(
+    (apt) => isFuture(startOfDay(new Date(apt.start_time))) || isToday(new Date(apt.start_time))
   ).length;
+
+  // Convert appointments to date entries for calendar
+  const calendarDates = useMemo(() => {
+    return filteredAppointments.map((apt) => ({
+      id: apt.id,
+      title: apt.title,
+      date: new Date(apt.start_time),
+      endDate: apt.end_time ? new Date(apt.end_time) : undefined,
+      color: apt.appointment_types?.color || "bg-blue-500",
+      entityName: apt.customers?.name,
+      location: apt.location || undefined,
+    }));
+  }, [filteredAppointments]);
+
+  const handleViewAppointment = (apt: AppointmentWithRelations) => {
+    setSelectedAppointment(apt);
+    setDetailDialogOpen(true);
+  };
 
   return (
     <div className="space-y-4">
@@ -185,27 +156,12 @@ export function DatesView({ dates, appointments, customers }: DatesViewProps) {
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search dates..."
+            placeholder="Search appointments..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
           />
         </div>
-
-        {/* Type Filter */}
-        <Select
-          value={typeFilter}
-          onValueChange={(v) => setTypeFilter(v as TypeFilter)}
-        >
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="appointment">Appointments</SelectItem>
-            <SelectItem value="document">Documents</SelectItem>
-          </SelectContent>
-        </Select>
 
         {/* View Toggle */}
         <Tabs value={view} onValueChange={(v) => setView(v as "table" | "calendar")}>
@@ -221,116 +177,136 @@ export function DatesView({ dates, appointments, customers }: DatesViewProps) {
           </TabsList>
         </Tabs>
 
+        {/* Manage Types */}
+        <AppointmentTypesDialog appointmentTypes={appointmentTypes} />
+
         {/* Create Appointment */}
-        <CreateAppointmentDialog customers={customers} />
+        <CreateAppointmentDialog customers={customers} appointmentTypes={appointmentTypes} />
       </div>
 
       {/* Results count */}
       <p className="text-sm text-muted-foreground">
-        {filteredDates.length} of {dates.length} dates
+        {filteredAppointments.length} of {appointments.length} appointments
         {timeFilter !== "all" && ` (${timeFilter})`}
       </p>
 
       {/* Content */}
       {view === "table" ? (
         <div className="border rounded-lg overflow-hidden">
-          {filteredDates.length === 0 ? (
+          {filteredAppointments.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <CalendarIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p className="font-medium">No dates found</p>
-              <p className="text-sm">Try adjusting your filters</p>
+              <p className="font-medium">No appointments found</p>
+              <p className="text-sm">Try adjusting your filters or create a new appointment</p>
             </div>
           ) : (
             <table className="w-full">
               <thead className="bg-muted/50">
                 <tr>
-                  <th className="text-left p-3 text-sm font-medium">Date</th>
+                  <th className="text-left p-3 text-sm font-medium">Date & Time</th>
                   <th className="text-left p-3 text-sm font-medium">Title</th>
+                  <th className="text-left p-3 text-sm font-medium">Person</th>
                   <th className="text-left p-3 text-sm font-medium">Type</th>
-                  <th className="text-left p-3 text-sm font-medium">Category</th>
                   <th className="text-left p-3 text-sm font-medium">Status</th>
+                  <th className="text-left p-3 text-sm font-medium">Created</th>
+                  <th className="text-left p-3 text-sm font-medium">Updated</th>
                   <th className="w-20 p-3"></th>
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {filteredDates.map((entry) => {
-                  const isOverdue = isPast(startOfDay(entry.date)) && !isToday(entry.date);
-                  const isTodayDate = isToday(entry.date);
+                {filteredAppointments.map((apt) => {
+                  const startDate = new Date(apt.start_time);
+                  const isOverdue = isPast(startOfDay(startDate)) && !isToday(startDate) && apt.status === "scheduled";
+                  const isTodayDate = isToday(startDate);
+                  const typeColor = apt.appointment_types?.color || "bg-blue-500";
 
                   return (
                     <tr
-                      key={entry.id}
+                      key={apt.id}
                       className={cn(
-                        "hover:bg-muted/30",
+                        "hover:bg-muted/30 cursor-pointer",
                         isOverdue && "bg-red-500/5"
                       )}
+                      onClick={() => handleViewAppointment(apt)}
                     >
                       <td className="p-3">
                         <div className="flex items-center gap-2">
-                          <div
-                            className={cn(
-                              "w-2 h-2 rounded-full",
-                              CATEGORY_COLORS[entry.category] || CATEGORY_COLORS.other
-                            )}
-                          />
+                          <div className={cn("w-2 h-2 rounded-full", typeColor)} />
                           <div>
                             <p className={cn("font-medium text-sm", isOverdue && "text-red-500")}>
-                              {format(entry.date, "MMM d, yyyy")}
+                              {format(startDate, "MMM d, yyyy")}
                             </p>
-                            {entry.endDate && (
-                              <p className="text-xs text-muted-foreground">
-                                {format(entry.date, "h:mm a")} - {format(entry.endDate, "h:mm a")}
-                              </p>
-                            )}
+                            <p className="text-xs text-muted-foreground">
+                              {format(startDate, "h:mm a")}
+                              {apt.end_time && ` - ${format(new Date(apt.end_time), "h:mm a")}`}
+                            </p>
                           </div>
                         </div>
                       </td>
                       <td className="p-3">
                         <p className="font-medium text-sm truncate max-w-[200px]">
-                          {entry.title}
+                          {apt.title}
                         </p>
-                        {entry.entityName && (
-                          <p className="text-xs text-muted-foreground">
-                            {entry.entityName}
+                        {apt.location && (
+                          <p className="text-xs text-muted-foreground truncate">
+                            {apt.location}
                           </p>
                         )}
                       </td>
-                      <td className="p-3">
-                        <Badge variant="outline" className="gap-1">
-                          {entry.type === "appointment" ? (
-                            <Users className="h-3 w-3" />
-                          ) : (
-                            <FileText className="h-3 w-3" />
-                          )}
-                          {entry.type === "appointment" ? "Appointment" : "Document"}
-                        </Badge>
-                      </td>
                       <td className="p-3 text-sm">
-                        {CATEGORY_LABELS[entry.category] || entry.category}
+                        {apt.customers ? (
+                          <div>
+                            <p>{apt.customers.name}</p>
+                            {apt.customers.company && (
+                              <p className="text-xs text-muted-foreground">{apt.customers.company}</p>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
                       </td>
                       <td className="p-3">
-                        {isOverdue ? (
+                        {apt.appointment_types ? (
+                          <Badge variant="outline" className="gap-1.5">
+                            <div className={cn("w-2 h-2 rounded-full", apt.appointment_types.color)} />
+                            {apt.appointment_types.name}
+                          </Badge>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">-</span>
+                        )}
+                      </td>
+                      <td className="p-3">
+                        {apt.status === "cancelled" ? (
+                          <Badge variant="secondary">Cancelled</Badge>
+                        ) : apt.status === "completed" ? (
+                          <Badge variant="outline">Completed</Badge>
+                        ) : isOverdue ? (
                           <Badge variant="destructive">Overdue</Badge>
                         ) : isTodayDate ? (
                           <Badge variant="default">Today</Badge>
                         ) : (
                           <Badge variant="secondary">
-                            {formatDistanceToNow(entry.date)}
+                            {formatDistanceToNow(startDate)}
                           </Badge>
                         )}
                       </td>
+                      <td className="p-3 text-xs text-muted-foreground">
+                        {formatDistanceToNow(new Date(apt.created_at))}
+                      </td>
+                      <td className="p-3 text-xs text-muted-foreground">
+                        {formatDistanceToNow(new Date(apt.updated_at))}
+                      </td>
                       <td className="p-3">
-                        <Link
-                          href={
-                            entry.type === "appointment"
-                              ? `/dates`
-                              : `/documents/${entry.entityId}`
-                          }
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewAppointment(apt);
+                          }}
                         >
-                          <Button variant="ghost" size="sm">
-                            View
-                          </Button>
-                        </Link>
+                          View
+                        </Button>
                       </td>
                     </tr>
                   );
@@ -340,8 +316,23 @@ export function DatesView({ dates, appointments, customers }: DatesViewProps) {
           )}
         </div>
       ) : (
-        <DatesCalendar dates={filteredDates} />
+        <DatesCalendar
+          dates={calendarDates}
+          onDateClick={(apt) => {
+            const fullApt = appointments.find((a) => a.id === apt.id);
+            if (fullApt) handleViewAppointment(fullApt);
+          }}
+        />
       )}
+
+      {/* Appointment Detail Dialog */}
+      <AppointmentDetailDialog
+        appointment={selectedAppointment}
+        open={detailDialogOpen}
+        onOpenChange={setDetailDialogOpen}
+        customers={customers}
+        appointmentTypes={appointmentTypes}
+      />
     </div>
   );
 }

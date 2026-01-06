@@ -1,23 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { Appointment, Customer } from "@/types/database";
+import { AppointmentWithRelations, AppointmentType, Customer } from "@/types/database";
 import { AppointmentsTable } from "./appointments-table";
 import { AppointmentsCalendar } from "./appointments-calendar";
 import { CreateAppointmentDialog } from "./create-appointment-dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { List, Calendar as CalendarIcon } from "lucide-react";
 
-type AppointmentWithCustomer = Appointment & {
-  customers?: { name: string; company: string | null } | null;
-};
-
 interface AppointmentsViewProps {
-  initialData: AppointmentWithCustomer[];
+  initialData: AppointmentWithRelations[];
   customers: Pick<Customer, "id" | "name" | "company">[];
+  appointmentTypes: AppointmentType[];
 }
 
-export function AppointmentsView({ initialData, customers }: AppointmentsViewProps) {
+export function AppointmentsView({ initialData, customers, appointmentTypes }: AppointmentsViewProps) {
   const [view, setView] = useState<"table" | "calendar">("table");
   const [data, setData] = useState(initialData);
 
@@ -37,7 +34,7 @@ export function AppointmentsView({ initialData, customers }: AppointmentsViewPro
           </TabsList>
         </Tabs>
 
-        <CreateAppointmentDialog customers={customers} />
+        <CreateAppointmentDialog customers={customers} appointmentTypes={appointmentTypes} />
       </div>
 
       {view === "table" ? (

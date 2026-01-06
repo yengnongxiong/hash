@@ -123,7 +123,7 @@ export function AppointmentsTable({ data }: AppointmentsTableProps) {
                 )}
               </TableCell>
               <TableCell>{formatDateTime(appointment.start_time)}</TableCell>
-              <TableCell>{formatDateTime(appointment.end_time)}</TableCell>
+              <TableCell>{appointment.end_time ? formatDateTime(appointment.end_time) : "—"}</TableCell>
               <TableCell>{appointment.location || "—"}</TableCell>
               <TableCell>{getStatusBadge(appointment.status)}</TableCell>
               <TableCell>

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import Link from "next/link";
 import {
   format,
   startOfMonth,
@@ -13,9 +12,8 @@ import {
   addMonths,
   subMonths,
 } from "date-fns";
-import { ChevronLeft, ChevronRight, FileText, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Popover,
   PopoverContent,
@@ -25,32 +23,20 @@ import { cn } from "@/lib/utils";
 
 interface DateEntry {
   id: string;
-  type: "appointment" | "document";
   title: string;
   date: Date;
   endDate?: Date;
-  category: string;
-  entityId: string;
+  color: string;
   entityName?: string;
-  status?: string;
   location?: string;
 }
 
 interface DatesCalendarProps {
   dates: DateEntry[];
+  onDateClick?: (entry: DateEntry) => void;
 }
 
-const CATEGORY_COLORS: Record<string, string> = {
-  appointment: "bg-blue-500",
-  due_date: "bg-red-500",
-  expiration: "bg-orange-500",
-  invoice_date: "bg-purple-500",
-  effective: "bg-green-500",
-  transaction: "bg-indigo-500",
-  other: "bg-gray-500",
-};
-
-export function DatesCalendar({ dates }: DatesCalendarProps) {
+export function DatesCalendar({ dates, onDateClick }: DatesCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const monthStart = startOfMonth(currentMonth);
@@ -121,12 +107,7 @@ export function DatesCalendar({ dates }: DatesCalendarProps) {
           const dayKey = format(day, "yyyy-MM-dd");
           const dayDates = datesByDay.get(dayKey) || [];
           const hasEvents = dayDates.length > 0;
-          const hasOverdue = dayDates.some(
-            (d) =>
-              isPast(d.date) &&
-              !isToday(d.date) &&
-              (d.category === "due_date" || d.category === "expiration")
-          );
+          const isOverdue = hasEvents && isPast(day) && !isToday(day);
 
           return (
             <Popover key={dayKey}>
@@ -137,7 +118,7 @@ export function DatesCalendar({ dates }: DatesCalendarProps) {
                     !isSameMonth(day, currentMonth) && "text-muted-foreground",
                     isToday(day) && "border-primary bg-primary/10",
                     hasEvents && "cursor-pointer hover:bg-muted",
-                    hasOverdue && "border-red-500 bg-red-500/10"
+                    isOverdue && "border-red-500 bg-red-500/10"
                   )}
                   disabled={!hasEvents}
                 >
@@ -149,10 +130,7 @@ export function DatesCalendar({ dates }: DatesCalendarProps) {
                       {dayDates.slice(0, 3).map((d, i) => (
                         <div
                           key={i}
-                          className={cn(
-                            "w-1.5 h-1.5 rounded-full",
-                            CATEGORY_COLORS[d.category] || CATEGORY_COLORS.other
-                          )}
+                          className={cn("w-1.5 h-1.5 rounded-full", d.color)}
                         />
                       ))}
                       {dayDates.length > 3 && (
@@ -172,40 +150,37 @@ export function DatesCalendar({ dates }: DatesCalendarProps) {
                     </p>
                     <div className="space-y-1 max-h-[300px] overflow-y-auto">
                       {dayDates.map((d) => (
-                        <Link
+                        <button
                           key={d.id}
-                          href={
-                            d.type === "appointment"
-                              ? `/dates`
-                              : `/documents/${d.entityId}`
-                          }
-                          className="flex items-start gap-2 p-2 rounded hover:bg-muted transition-colors"
+                          onClick={() => onDateClick?.(d)}
+                          className="w-full flex items-start gap-2 p-2 rounded hover:bg-muted transition-colors text-left"
                         >
                           <div
                             className={cn(
                               "w-2 h-2 rounded-full mt-1.5 shrink-0",
-                              CATEGORY_COLORS[d.category] || CATEGORY_COLORS.other
+                              d.color
                             )}
                           />
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1">
-                              {d.type === "appointment" ? (
-                                <Users className="h-3 w-3 text-muted-foreground" />
-                              ) : (
-                                <FileText className="h-3 w-3 text-muted-foreground" />
-                              )}
-                              <p className="text-sm font-medium truncate">
-                                {d.title}
-                              </p>
-                            </div>
+                            <p className="text-sm font-medium truncate">
+                              {d.title}
+                            </p>
                             <p className="text-xs text-muted-foreground">
-                              {d.entityName || d.category}
+                              {d.entityName || "No person"}
                               {d.endDate && (
                                 <> • {format(d.date, "h:mm a")} - {format(d.endDate, "h:mm a")}</>
                               )}
+                              {!d.endDate && (
+                                <> • {format(d.date, "h:mm a")}</>
+                              )}
                             </p>
+                            {d.location && (
+                              <p className="text-xs text-muted-foreground truncate">
+                                {d.location}
+                              </p>
+                            )}
                           </div>
-                        </Link>
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -214,30 +189,6 @@ export function DatesCalendar({ dates }: DatesCalendarProps) {
             </Popover>
           );
         })}
-      </div>
-
-      {/* Legend */}
-      <div className="flex flex-wrap gap-4 mt-4 pt-4 border-t">
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-blue-500" />
-          <span className="text-xs text-muted-foreground">Appointment</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-red-500" />
-          <span className="text-xs text-muted-foreground">Due Date</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-orange-500" />
-          <span className="text-xs text-muted-foreground">Expiration</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-purple-500" />
-          <span className="text-xs text-muted-foreground">Invoice Date</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-green-500" />
-          <span className="text-xs text-muted-foreground">Effective</span>
-        </div>
       </div>
     </div>
   );
