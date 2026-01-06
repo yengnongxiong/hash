@@ -1,5 +1,25 @@
 # Hash - B2B Document & Customer Management Platform
 
+## Quick Context (For Session Recovery)
+
+**What this is**: B2B SaaS for document/people management with AI OCR. Multi-tenant, Supabase backend.
+
+**User Preferences**:
+- Proactively use MCP tools (Supabase, Playwright, Context7) without asking
+- Use agents (Explore, Plan, feature-dev) for complex tasks
+- Run build after changes to verify: `npm run build`
+- Commit only when explicitly requested
+- Admin email: yengnongxiong@gmail.com
+
+**Key Terminology**:
+- "People" (not "Customers") - renamed for professionalism
+- Person IDs are 6-char alphanumeric (e.g., "A3B7K2"), not sequential
+- Document IDs are sequential DOC-0001 format
+
+**Current State**: All MVP + Phase 2 + Phase 3 complete. App is functional.
+
+---
+
 ## Project Overview
 
 Hash is a B2B SaaS platform for document and customer management with AI-powered OCR extraction. Built for small-to-medium businesses to manage customer relationships, process documents (invoices, contracts, receipts), and collaborate in real-time.
@@ -80,7 +100,7 @@ Region: us-east-1
 |-------|---------|
 | `organizations` | Multi-tenant org data |
 | `users` | User profiles linked to Supabase Auth |
-| `customers` | Customer records with auto-incrementing CUST-#### |
+| `customers` | People records with 6-char alphanumeric IDs (e.g., A3B7K2) |
 | `documents` | Uploaded docs with auto-incrementing DOC-#### |
 | `document_audit_log` | Document activity history |
 | `appointments` | Customer appointments |
@@ -371,8 +391,8 @@ The app runs on `http://localhost:3000`. Test accounts:
 - Email: test@example.com (or use magic link)
 
 Key pages to test:
-- `/customers` - Customer table with gallery view, CSV import/export
-- `/customers/appointments` - Appointments with calendar
+- `/customers` - People table with gallery view, CSV import/export
+- `/customers/appointments` - People appointments with calendar
 - `/documents` - Document list with filters and OCR status
 - `/documents/calendar` - Document dates calendar view
 - `/whiteboard` - Realtime kanban board
@@ -393,8 +413,8 @@ Key pages to test:
 ### Priority 2 (Complete)
 - [x] Document dates calendar - Calendar view of due dates, expirations ✓
 - [x] Advanced search filters - Date ranges, status filters ✓
-- [x] Bulk CSV import - Import customers from CSV ✓
-- [x] CSV export - Export documents and customers ✓
+- [x] Bulk CSV import - Import people from CSV ✓
+- [x] CSV export - Export documents and people ✓
 
 ### Priority 3 (Next Up)
 - [ ] Recommendations bar - Bottom bar with LLM-generated suggestions
