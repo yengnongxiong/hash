@@ -1,0 +1,401 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { Customer } from "@/types/database";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  Building2,
+  Mail,
+  Phone,
+  MapPin,
+  Tag,
+  FileText,
+  Calendar,
+  Pencil,
+  Save,
+  X,
+} from "lucide-react";
+import { updateCustomerField } from "@/app/(dashboard)/customers/actions";
+import { toast } from "sonner";
+import { formatDistanceToNow } from "@/lib/utils/format";
+
+interface CustomerDetailDialogProps {
+  customer: Customer | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onUpdate?: () => void;
+}
+
+function getInitials(name: string): string {
+  return name
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+export function CustomerDetailDialog({
+  customer,
+  open,
+  onOpenChange,
+  onUpdate,
+}: CustomerDetailDialogProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const [editedCustomer, setEditedCustomer] = useState<Partial<Customer>>({});
+
+  if (!customer) return null;
+
+  const handleStartEdit = () => {
+    setEditedCustomer({
+      name: customer.name,
+      company: customer.company,
+      email: customer.email,
+      phone: customer.phone,
+      address: customer.address,
+      tags: customer.tags,
+      notes: customer.notes,
+    });
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    setEditedCustomer({});
+    setIsEditing(false);
+  };
+
+  const handleSave = () => {
+    startTransition(async () => {
+      const fieldsToUpdate = Object.entries(editedCustomer).filter(
+        ([key, value]) => {
+          const originalValue = customer[key as keyof Customer];
+          // Compare arrays properly
+          if (Array.isArray(value) && Array.isArray(originalValue)) {
+            return JSON.stringify(value) !== JSON.stringify(originalValue);
+          }
+          return value !== originalValue;
+        }
+      );
+
+      if (fieldsToUpdate.length === 0) {
+        setIsEditing(false);
+        return;
+      }
+
+      let hasError = false;
+      for (const [field, value] of fieldsToUpdate) {
+        const result = await updateCustomerField(customer.id, field, value);
+        if (result.error) {
+          toast.error(`Failed to update ${field}: ${result.error}`);
+          hasError = true;
+          break;
+        }
+      }
+
+      if (!hasError) {
+        toast.success("Person updated successfully");
+        setIsEditing(false);
+        setEditedCustomer({});
+        onUpdate?.();
+      }
+    });
+  };
+
+  const currentData = isEditing
+    ? { ...customer, ...editedCustomer }
+    : customer;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <div className="flex items-center justify-between">
+            <DialogTitle className="flex items-center gap-3">
+              <Avatar className="h-12 w-12">
+                <AvatarFallback className="bg-primary/10 text-primary text-lg">
+                  {getInitials(currentData.name)}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                {isEditing ? (
+                  <Input
+                    value={editedCustomer.name || ""}
+                    onChange={(e) =>
+                      setEditedCustomer((prev) => ({
+                        ...prev,
+                        name: e.target.value,
+                      }))
+                    }
+                    className="font-semibold text-lg h-8"
+                    placeholder="Name"
+                  />
+                ) : (
+                  <span>{currentData.name}</span>
+                )}
+                {currentData.customer_number && (
+                  <Badge
+                    variant="outline"
+                    className="ml-2 font-mono text-xs"
+                  >
+                    {currentData.customer_number}
+                  </Badge>
+                )}
+              </div>
+            </DialogTitle>
+            {!isEditing ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleStartEdit}
+                className="shrink-0"
+              >
+                <Pencil className="h-4 w-4 mr-1" />
+                Edit
+              </Button>
+            ) : (
+              <div className="flex gap-2 shrink-0">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCancelEdit}
+                  disabled={isPending}
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleSave}
+                  disabled={isPending}
+                >
+                  <Save className="h-4 w-4 mr-1" />
+                  {isPending ? "Saving..." : "Save"}
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogHeader>
+
+        <div className="space-y-4 mt-4">
+          {/* Company */}
+          <div className="space-y-1.5">
+            <Label className="flex items-center gap-2 text-muted-foreground">
+              <Building2 className="h-4 w-4" />
+              Company
+            </Label>
+            {isEditing ? (
+              <Input
+                value={editedCustomer.company || ""}
+                onChange={(e) =>
+                  setEditedCustomer((prev) => ({
+                    ...prev,
+                    company: e.target.value || null,
+                  }))
+                }
+                placeholder="Company name"
+              />
+            ) : (
+              <p className="text-sm pl-6">
+                {currentData.company || (
+                  <span className="text-muted-foreground italic">Not set</span>
+                )}
+              </p>
+            )}
+          </div>
+
+          {/* Email */}
+          <div className="space-y-1.5">
+            <Label className="flex items-center gap-2 text-muted-foreground">
+              <Mail className="h-4 w-4" />
+              Email
+            </Label>
+            {isEditing ? (
+              <Input
+                type="email"
+                value={editedCustomer.email || ""}
+                onChange={(e) =>
+                  setEditedCustomer((prev) => ({
+                    ...prev,
+                    email: e.target.value || null,
+                  }))
+                }
+                placeholder="email@example.com"
+              />
+            ) : (
+              <p className="text-sm pl-6">
+                {currentData.email ? (
+                  <a
+                    href={`mailto:${currentData.email}`}
+                    className="text-primary hover:underline"
+                  >
+                    {currentData.email}
+                  </a>
+                ) : (
+                  <span className="text-muted-foreground italic">Not set</span>
+                )}
+              </p>
+            )}
+          </div>
+
+          {/* Phone */}
+          <div className="space-y-1.5">
+            <Label className="flex items-center gap-2 text-muted-foreground">
+              <Phone className="h-4 w-4" />
+              Phone
+            </Label>
+            {isEditing ? (
+              <Input
+                type="tel"
+                value={editedCustomer.phone || ""}
+                onChange={(e) =>
+                  setEditedCustomer((prev) => ({
+                    ...prev,
+                    phone: e.target.value || null,
+                  }))
+                }
+                placeholder="+1 (555) 000-0000"
+              />
+            ) : (
+              <p className="text-sm pl-6">
+                {currentData.phone ? (
+                  <a
+                    href={`tel:${currentData.phone}`}
+                    className="text-primary hover:underline"
+                  >
+                    {currentData.phone}
+                  </a>
+                ) : (
+                  <span className="text-muted-foreground italic">Not set</span>
+                )}
+              </p>
+            )}
+          </div>
+
+          {/* Address */}
+          <div className="space-y-1.5">
+            <Label className="flex items-center gap-2 text-muted-foreground">
+              <MapPin className="h-4 w-4" />
+              Address
+            </Label>
+            {isEditing ? (
+              <Input
+                value={editedCustomer.address || ""}
+                onChange={(e) =>
+                  setEditedCustomer((prev) => ({
+                    ...prev,
+                    address: e.target.value || null,
+                  }))
+                }
+                placeholder="123 Main St, City, State"
+              />
+            ) : (
+              <p className="text-sm pl-6">
+                {currentData.address || (
+                  <span className="text-muted-foreground italic">Not set</span>
+                )}
+              </p>
+            )}
+          </div>
+
+          {/* Tags */}
+          <div className="space-y-1.5">
+            <Label className="flex items-center gap-2 text-muted-foreground">
+              <Tag className="h-4 w-4" />
+              Tags
+            </Label>
+            {isEditing ? (
+              <Input
+                value={(editedCustomer.tags || []).join(", ")}
+                onChange={(e) =>
+                  setEditedCustomer((prev) => ({
+                    ...prev,
+                    tags: e.target.value
+                      .split(",")
+                      .map((t) => t.trim())
+                      .filter(Boolean),
+                  }))
+                }
+                placeholder="tag1, tag2, tag3"
+              />
+            ) : (
+              <div className="pl-6">
+                {currentData.tags && currentData.tags.length > 0 ? (
+                  <div className="flex flex-wrap gap-1">
+                    {currentData.tags.map((tag) => (
+                      <Badge key={tag} variant="secondary" className="text-xs">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-sm text-muted-foreground italic">
+                    No tags
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Notes */}
+          <div className="space-y-1.5">
+            <Label className="flex items-center gap-2 text-muted-foreground">
+              <FileText className="h-4 w-4" />
+              Notes
+            </Label>
+            {isEditing ? (
+              <Textarea
+                value={editedCustomer.notes || ""}
+                onChange={(e) =>
+                  setEditedCustomer((prev) => ({
+                    ...prev,
+                    notes: e.target.value || null,
+                  }))
+                }
+                placeholder="Add notes about this person..."
+                rows={3}
+              />
+            ) : (
+              <p className="text-sm pl-6 whitespace-pre-wrap">
+                {currentData.notes || (
+                  <span className="text-muted-foreground italic">No notes</span>
+                )}
+              </p>
+            )}
+          </div>
+
+          {/* Timestamps */}
+          <div className="pt-2 border-t">
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <Calendar className="h-3 w-3" />
+                <span>
+                  Created{" "}
+                  {formatDistanceToNow(new Date(currentData.created_at))}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Calendar className="h-3 w-3" />
+                <span>
+                  Updated{" "}
+                  {formatDistanceToNow(new Date(currentData.updated_at))}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}

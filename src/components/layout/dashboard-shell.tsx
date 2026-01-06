@@ -4,11 +4,13 @@ import { useState } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { CommandPalette } from "@/components/layout/command-palette";
+import { SystemAlertBanner } from "@/components/layout/system-alert-banner";
 import { useKeyboardShortcuts } from "@/lib/hooks/use-keyboard-shortcuts";
 import {
   KeyboardShortcutsDialog,
   useShortcutsDialog,
 } from "@/components/layout/keyboard-shortcuts-dialog";
+import { SystemAlert } from "@/types/database";
 
 interface DashboardShellProps {
   user: {
@@ -18,10 +20,12 @@ interface DashboardShellProps {
       name: string;
     } | null;
   } | null;
+  alerts?: SystemAlert[];
+  userId?: string;
   children: React.ReactNode;
 }
 
-export function DashboardShell({ user, children }: DashboardShellProps) {
+export function DashboardShell({ user, alerts = [], userId, children }: DashboardShellProps) {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const { open: shortcutsOpen, setOpen: setShortcutsOpen } = useShortcutsDialog();
 
@@ -30,6 +34,10 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
 
   return (
     <>
+      {/* System Alert Banner */}
+      {alerts.length > 0 && userId && (
+        <SystemAlertBanner alerts={alerts} userId={userId} />
+      )}
       <div className="flex min-h-screen">
         <Sidebar />
         <div className="flex-1 flex flex-col">

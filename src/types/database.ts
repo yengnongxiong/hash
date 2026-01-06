@@ -397,6 +397,131 @@ export type Database = {
           }
         ];
       };
+      system_alerts: {
+        Row: {
+          id: string;
+          organization_id: string | null;
+          created_by: string;
+          alert_type: "info" | "warning" | "maintenance" | "critical";
+          title: string;
+          message: string;
+          starts_at: string;
+          ends_at: string | null;
+          dismissed_by: string[];
+          active: boolean;
+          target_organization_ids: string[];
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id?: string | null;
+          created_by: string;
+          alert_type?: "info" | "warning" | "maintenance" | "critical";
+          title: string;
+          message: string;
+          starts_at?: string;
+          ends_at?: string | null;
+          dismissed_by?: string[];
+          active?: boolean;
+          target_organization_ids?: string[];
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string | null;
+          created_by?: string;
+          alert_type?: "info" | "warning" | "maintenance" | "critical";
+          title?: string;
+          message?: string;
+          starts_at?: string;
+          ends_at?: string | null;
+          dismissed_by?: string[];
+          active?: boolean;
+          target_organization_ids?: string[];
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "system_alerts_organization_id_fkey";
+            columns: ["organization_id"];
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "system_alerts_created_by_fkey";
+            columns: ["created_by"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      admin_verification_codes: {
+        Row: {
+          id: string;
+          email: string;
+          code: string;
+          expires_at: string;
+          used: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          email: string;
+          code: string;
+          expires_at: string;
+          used?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          email?: string;
+          code?: string;
+          expires_at?: string;
+          used?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      admin_sessions: {
+        Row: {
+          id: string;
+          user_id: string;
+          verified_at: string;
+          expires_at: string;
+          ip_address: string | null;
+          user_agent: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          verified_at?: string;
+          expires_at: string;
+          ip_address?: string | null;
+          user_agent?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          verified_at?: string;
+          expires_at?: string;
+          ip_address?: string | null;
+          user_agent?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "admin_sessions_user_id_fkey";
+            columns: ["user_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -482,12 +607,15 @@ export interface ActivityLogEntry {
 export interface SystemAlert {
   id: string;
   organization_id?: string;
+  created_by?: string;
   alert_type: "maintenance" | "warning" | "info" | "critical";
   title: string;
   message: string;
   starts_at?: string;
   ends_at?: string;
   dismissed_by: string[];
+  target_organization_ids: string[];
   active: boolean;
   created_at: string;
+  updated_at?: string;
 }

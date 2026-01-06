@@ -122,7 +122,7 @@ export function CSVImportDialog() {
         const customers = parseCSV(text);
 
         if (customers.length === 0) {
-          toast.error("No valid customers found in CSV");
+          toast.error("No valid people found in CSV");
           return;
         }
 
@@ -134,7 +134,7 @@ export function CSVImportDialog() {
             setErrors(result.errors);
           }
         } else {
-          toast.success(`Imported ${result.imported} customers`, {
+          toast.success(`Imported ${result.imported} people`, {
             description:
               result.errors && result.errors.length > 0
                 ? `${result.errors.length} rows had errors`
@@ -167,7 +167,7 @@ export function CSVImportDialog() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "customers_template.csv";
+    a.download = "people_template.csv";
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -182,9 +182,9 @@ export function CSVImportDialog() {
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Import Customers from CSV</DialogTitle>
+          <DialogTitle>Import People from CSV</DialogTitle>
           <DialogDescription>
-            Upload a CSV file to bulk import customers. The file must have a
+            Upload a CSV file to bulk import people. The file must have a
             &quot;name&quot; column.
           </DialogDescription>
         </DialogHeader>

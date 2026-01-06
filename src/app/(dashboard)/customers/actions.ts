@@ -4,6 +4,19 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+/**
+ * Generates a 6-character random alphanumeric ID
+ * Format: mix of uppercase letters and numbers (e.g., "A3B7K2", "9X4M2P")
+ */
+function generateCustomerId(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // Excluded I, O, 0, 1 to avoid confusion
+  let result = "";
+  for (let i = 0; i < 6; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
 const customerSchema = z.object({
   name: z.string().min(1, "Name is required"),
   company: z.string().optional().nullable(),
@@ -79,8 +92,12 @@ export async function createCustomer(formData: FormData) {
     return { error: result.error.issues[0].message };
   }
 
+  // Generate unique customer ID
+  const customerId = generateCustomerId();
+
   const { error } = await supabase.from("customers").insert({
     ...result.data,
+    customer_number: customerId,
     organization_id: userData.organization_id,
   });
 
@@ -89,6 +106,7 @@ export async function createCustomer(formData: FormData) {
   }
 
   revalidatePath("/customers");
+  revalidatePath("/people");
   return { success: true };
 }
 
@@ -141,6 +159,7 @@ export async function updateCustomerField(
   }
 
   revalidatePath("/customers");
+  revalidatePath("/people");
   return { success: true };
 }
 
@@ -161,6 +180,7 @@ export async function deleteCustomers(customerIds: string[]) {
   }
 
   revalidatePath("/customers");
+  revalidatePath("/people");
   return { success: true, count: customerIds.length };
 }
 
@@ -315,6 +335,7 @@ export async function importCustomersFromCSV(customers: CSVCustomer[]) {
     tags: string[];
     notes: string | null;
     organization_id: string;
+    customer_number: string;
   }> = [];
   const errors: string[] = [];
 
@@ -348,6 +369,7 @@ export async function importCustomersFromCSV(customers: CSVCustomer[]) {
         : [],
       notes: row.notes?.trim() || null,
       organization_id: userData.organization_id,
+      customer_number: generateCustomerId(),
     });
   }
 
@@ -369,6 +391,7 @@ export async function importCustomersFromCSV(customers: CSVCustomer[]) {
   }
 
   revalidatePath("/customers");
+  revalidatePath("/people");
   return {
     success: true,
     imported: validCustomers.length,

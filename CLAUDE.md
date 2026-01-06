@@ -13,11 +13,30 @@ Hash is a B2B SaaS platform for document and customer management with AI-powered
 | Phase 3 Polish | Complete | UX improvements |
 
 ### Recently Completed (This Session)
+- **People Tab Rename** - Renamed "Customers" to "People" throughout the app
+  - Updated sidebar, command palette, keyboard shortcuts
+  - Updated all dialogs, toasts, and labels
+- **Customer ID Format** - Changed from CUST-0001 to 6-character random alphanumeric (e.g., "A3B7K2")
+  - Auto-generated on create and CSV import
+  - Excluded confusing characters (I, O, 0, 1)
+- **Gallery Detail Dialog** - Click any person card in gallery view to open editable detail dialog
+  - Shows all fields with edit capability
+  - Save multiple field changes at once
+- **Admin Panel** - Separate `/admin` route with email 2FA authentication
+  - Email verification via Resend (6-digit code, 10 min expiry, 24-hour session)
+  - System alerts management (create, edit, delete with global/org targeting)
+  - Users overview with role badges and registration dates
+  - Organizations overview with usage statistics
+  - Platform analytics (users, docs, processing stats, document types)
+- **Settings alerts read-only** - Business users can view alerts but not create/edit
+- **Alert banners** - Display active alerts to all users with dismiss functionality
+
+### Previously Completed
 - Advanced document filters (search, status, type, date range)
 - Bulk CSV import for customers with template download
 - Document dates calendar view (/documents/calendar)
 - CSV export for documents
-- Keyboard shortcuts (Cmd+Shift+D/C/O/U/W/S for navigation, ? for help)
+- Keyboard shortcuts (Cmd+Shift+D/C/A/O/U/W/S for navigation, ? for help)
 - Document flags detection after OCR (past due, duplicates, suspicious amounts)
 - Document flags UI with resolve functionality
 - Mobile responsive sidebar with Sheet/drawer pattern
@@ -25,10 +44,11 @@ Hash is a B2B SaaS platform for document and customer management with AI-powered
 - Fixed keyboard shortcuts dialog (?) cross-browser compatibility
 - Fixed accessibility issues in mobile sidebar
 
-### Database Migration Required
-Run the following migration to enable document flags:
+### Database Migrations Required
+Run the following migrations in Supabase SQL Editor:
 ```sql
 -- See migrations/create_document_flags.sql
+-- See migrations/create_system_alerts.sql
 ```
 
 ### Next Up (Suggestions)
@@ -69,7 +89,9 @@ Region: us-east-1
 | `document_dates` | Extracted important dates |
 | `task_recommendations` | LLM-generated suggestions |
 | `activity_log` | Organization-wide activity |
-| `system_alerts` | Maintenance notices |
+| `system_alerts` | Maintenance notices (supports global + per-org targeting) |
+| `admin_verification_codes` | Email 2FA codes for admin access |
+| `admin_sessions` | Verified admin sessions (24-hour validity) |
 
 ### Realtime Enabled Tables
 - `whiteboard_tasks` - Live collaboration on kanban board
@@ -82,16 +104,25 @@ Region: us-east-1
 ```
 src/
 ├── app/
-│   ├── (dashboard)/           # Protected routes
+│   ├── (dashboard)/           # Protected routes (business users)
 │   │   ├── customers/         # Customer management
-│   │   │   └── appointments/  # Customer appointments
+│   │   │   └── appointments/  # Customer appointments (legacy)
+│   │   ├── dates/             # Unified dates view (appointments + document dates)
 │   │   ├── documents/         # Document management
 │   │   │   ├── [id]/          # Document detail
 │   │   │   ├── calendar/      # Dates calendar view
 │   │   │   └── upload/        # Upload page
-│   │   ├── whiteboard/        # Team kanban board
-│   │   ├── settings/          # User settings
+│   │   ├── whiteboard/        # Team kanban board (kanban + gallery views)
+│   │   ├── settings/          # User settings + read-only system alerts
 │   │   └── page.tsx           # Dashboard home
+│   ├── admin/                 # Developer admin panel (email 2FA protected)
+│   │   ├── page.tsx           # Admin dashboard
+│   │   ├── verify/            # 2FA verification page
+│   │   ├── alerts/            # System alerts management
+│   │   ├── users/             # Users overview
+│   │   ├── organizations/     # Organizations overview
+│   │   ├── analytics/         # Platform analytics
+│   │   └── actions.ts         # Admin server actions
 │   ├── auth/                  # Auth callbacks
 │   ├── login/                 # Login page
 │   └── signup/                # Signup page
@@ -122,6 +153,12 @@ src/
 │   │   ├── command-palette.tsx
 │   │   ├── keyboard-shortcuts-dialog.tsx  # Shortcuts help
 │   │   └── dashboard-shell.tsx
+│   ├── admin/                 # Admin panel components
+│   │   ├── admin-dashboard.tsx
+│   │   ├── admin-alerts-manager.tsx
+│   │   └── admin-page-wrapper.tsx
+│   ├── settings/              # Settings components
+│   │   └── system-alerts-manager.tsx  # Read-only alerts view
 │   ├── data-table/            # Reusable table components
 │   └── ui/                    # shadcn/ui components
 ├── contexts/
@@ -132,6 +169,10 @@ src/
 │   │   ├── client.ts          # Browser client
 │   │   ├── server.ts          # Server client
 │   │   └── middleware.ts      # Auth middleware
+│   ├── admin/
+│   │   └── auth.ts            # Admin 2FA auth utilities
+│   ├── email/
+│   │   └── resend.ts          # Resend email service
 │   ├── ocr/
 │   │   ├── mistral.ts         # OCR extraction
 │   │   └── detect-flags.ts    # Document flag detection
@@ -147,22 +188,22 @@ src/
 
 ## Key Features
 
-### Customer Management
-- **Auto-numbering**: CUST-0001, CUST-0002, etc.
+### People Management (formerly Customers)
+- **Auto-ID**: 6-character random alphanumeric (e.g., "A3B7K2", "9X4M2P")
 - **Global search**: Searches across name, company, email, phone, address, notes
-- **Inline editing**: Click any cell to edit
-- **Gallery view**: Card-based grid layout
+- **Inline editing**: Click any cell to edit in table view
+- **Gallery view**: Card-based grid layout with detail dialog on click
 - **Tags**: Array-based tagging system
 - **Appointments**: Linked calendar and table view
-- **Bulk CSV import**: Import customers from CSV with validation
-- **CSV export**: Export filtered customer data
+- **Bulk CSV import**: Import people from CSV with validation
+- **CSV export**: Export filtered people data
 
 ### Document Management
 - **Auto-numbering**: DOC-0001, DOC-0002, etc.
 - **OCR extraction**: Mistral AI extracts structured data
 - **File types**: PDF, images
 - **Status tracking**: pending → processing → completed/failed
-- **Customer linking**: Associate documents with customers
+- **Person linking**: Associate documents with people
 - **Advanced filters**: Search, status, type, date range filters
 - **Calendar view**: View due dates, expirations, important dates
 - **Document flags**: LLM-detected anomalies (past due, duplicates)
@@ -265,6 +306,8 @@ Required in `.env.local`:
 NEXT_PUBLIC_SUPABASE_URL=https://bqvemwrgblkvvmshwvie.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
 MISTRAL_API_KEY=<mistral-key>
+ADMIN_EMAIL=yengnongxiong@gmail.com    # Email allowed to access admin panel
+RESEND_API_KEY=<resend-key>             # Resend.com API key for admin 2FA emails
 ```
 
 ## MCP Tools Usage
@@ -333,6 +376,10 @@ Key pages to test:
 - `/documents` - Document list with filters and OCR status
 - `/documents/calendar` - Document dates calendar view
 - `/whiteboard` - Realtime kanban board
+- `/settings` - User profile + read-only system alerts
+- `/admin` - Admin dashboard (requires email 2FA, ADMIN_EMAIL only)
+- `/admin/alerts` - System alerts management
+- `/admin/analytics` - Platform statistics
 
 ## Future Development Ideas
 

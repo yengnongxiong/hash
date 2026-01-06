@@ -27,12 +27,12 @@ export function CreateCustomerDialog() {
       const result = await createCustomer(formData);
 
       if (result.error) {
-        toast.error("Failed to create customer", {
+        toast.error("Failed to add person", {
           description: result.error,
         });
       } else {
-        toast.success("Customer created", {
-          description: "The customer has been added successfully",
+        toast.success("Person added", {
+          description: "The person has been added successfully",
         });
         setOpen(false);
         router.refresh();
@@ -45,15 +45,15 @@ export function CreateCustomerDialog() {
       <DialogTrigger asChild>
         <Button>
           <Plus className="mr-2 h-4 w-4" />
-          Add Customer
+          Add Person
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px]">
         <form action={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Add New Customer</DialogTitle>
+            <DialogTitle>Add New Person</DialogTitle>
             <DialogDescription>
-              Enter the customer details below. You can edit all fields later.
+              Enter the contact details below. You can edit all fields later.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -145,7 +145,7 @@ export function CreateCustomerDialog() {
               Cancel
             </Button>
             <Button type="submit" disabled={isPending}>
-              {isPending ? "Creating..." : "Create Customer"}
+              {isPending ? "Adding..." : "Add Person"}
             </Button>
           </DialogFooter>
         </form>

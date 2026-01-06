@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Settings } from "lucide-react";
+import { SystemAlertsManager } from "@/components/settings/system-alerts-manager";
+import { SystemAlert } from "@/types/database";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
@@ -14,6 +16,15 @@ export default async function SettingsPage() {
         .eq("id", user.id)
         .single()
     : { data: null };
+
+  // Fetch active system alerts for all users (read-only)
+  const { data: alertsData } = await supabase
+    .from("system_alerts")
+    .select("*")
+    .eq("active", true)
+    .order("created_at", { ascending: false });
+
+  const alerts = (alertsData as SystemAlert[]) || [];
 
   return (
     <div className="space-y-6">
@@ -65,6 +76,9 @@ export default async function SettingsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* System Notices - Read-only for all users */}
+      <SystemAlertsManager alerts={alerts} />
 
       <Card>
         <CardHeader>

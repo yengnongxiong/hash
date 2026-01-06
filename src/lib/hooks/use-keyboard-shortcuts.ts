@@ -32,7 +32,14 @@ export function useKeyboardShortcuts(
         meta: true,
         shift: true,
         action: () => router.push("/customers"),
-        description: "Go to Customers",
+        description: "Go to People",
+      },
+      {
+        key: "a",
+        meta: true,
+        shift: true,
+        action: () => router.push("/dates"),
+        description: "Go to Dates",
       },
       {
         key: "o",
@@ -100,7 +107,8 @@ export function useKeyboardShortcuts(
 export const KEYBOARD_SHORTCUTS = [
   { keys: "⌘ + K", description: "Open command palette" },
   { keys: "⌘ + Shift + D", description: "Go to Dashboard" },
-  { keys: "⌘ + Shift + C", description: "Go to Customers" },
+  { keys: "⌘ + Shift + C", description: "Go to People" },
+  { keys: "⌘ + Shift + A", description: "Go to Dates" },
   { keys: "⌘ + Shift + O", description: "Go to Documents" },
   { keys: "⌘ + Shift + U", description: "Upload Document" },
   { keys: "⌘ + Shift + W", description: "Go to Whiteboard" },

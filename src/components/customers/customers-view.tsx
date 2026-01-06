@@ -47,7 +47,7 @@ export function CustomersView({ initialData }: CustomersViewProps) {
   }, [debouncedSearch, initialData]);
 
   const handleExport = useCallback(() => {
-    exportToCSV(data, "customers", [
+    exportToCSV(data, "people", [
       { key: "customer_number", label: "ID" },
       { key: "name", label: "Name" },
       { key: "company", label: "Company" },

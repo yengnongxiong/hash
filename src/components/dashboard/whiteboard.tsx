@@ -3,6 +3,7 @@
 import { useState, useEffect, useTransition } from "react";
 import { WhiteboardTask } from "@/types/database";
 import { WhiteboardColumn } from "./whiteboard-column";
+import { WhiteboardGallery } from "./whiteboard-gallery";
 import { createClient } from "@/lib/supabase/client";
 import {
   createWhiteboardTask,
@@ -11,6 +12,8 @@ import {
 } from "@/app/(dashboard)/whiteboard/actions";
 import { toast } from "sonner";
 import { DragDropContext, DropResult } from "@hello-pangea/dnd";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Kanban, LayoutGrid } from "lucide-react";
 
 interface WhiteboardProps {
   initialTasks: WhiteboardTask[];
@@ -28,6 +31,7 @@ type ColumnId = (typeof columns)[number]["id"];
 export function Whiteboard({ initialTasks, organizationId }: WhiteboardProps) {
   const [tasks, setTasks] = useState<WhiteboardTask[]>(initialTasks);
   const [isPending, startTransition] = useTransition();
+  const [view, setView] = useState<"kanban" | "gallery">("kanban");
 
   // Set up realtime subscription
   useEffect(() => {
@@ -127,24 +131,67 @@ export function Whiteboard({ initialTasks, organizationId }: WhiteboardProps) {
   const getTasksByColumn = (columnId: ColumnId) =>
     tasks.filter((t) => t.status === columnId);
 
+  const handleMoveTask = async (taskId: string, newStatus: ColumnId) => {
+    // Optimistic update
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t))
+    );
+
+    startTransition(async () => {
+      const result = await updateWhiteboardTaskStatus(taskId, newStatus);
+      if (result.error) {
+        toast.error("Failed to move task", { description: result.error });
+      }
+    });
+  };
+
   return (
-    <DragDropContext onDragEnd={handleDragEnd}>
-      <div
-        className={`grid grid-cols-1 md:grid-cols-3 gap-4 ${
-          isPending ? "opacity-70" : ""
-        }`}
-      >
-        {columns.map((column) => (
-          <WhiteboardColumn
-            key={column.id}
-            id={column.id}
-            title={column.title}
-            tasks={getTasksByColumn(column.id)}
-            onAddTask={(title) => handleAddTask(title, column.id)}
-            onDeleteTask={handleDeleteTask}
-          />
-        ))}
+    <div className="space-y-4">
+      {/* View Toggle */}
+      <div className="flex justify-end">
+        <Tabs value={view} onValueChange={(v) => setView(v as "kanban" | "gallery")}>
+          <TabsList>
+            <TabsTrigger value="kanban" className="gap-1.5">
+              <Kanban className="h-4 w-4" />
+              <span className="hidden sm:inline">Kanban</span>
+            </TabsTrigger>
+            <TabsTrigger value="gallery" className="gap-1.5">
+              <LayoutGrid className="h-4 w-4" />
+              <span className="hidden sm:inline">Board</span>
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
-    </DragDropContext>
+
+      {/* Views */}
+      {view === "kanban" ? (
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <div
+            className={`grid grid-cols-1 md:grid-cols-3 gap-4 ${
+              isPending ? "opacity-70" : ""
+            }`}
+          >
+            {columns.map((column) => (
+              <WhiteboardColumn
+                key={column.id}
+                id={column.id}
+                title={column.title}
+                tasks={getTasksByColumn(column.id)}
+                onAddTask={(title) => handleAddTask(title, column.id)}
+                onDeleteTask={handleDeleteTask}
+              />
+            ))}
+          </div>
+        </DragDropContext>
+      ) : (
+        <WhiteboardGallery
+          tasks={tasks}
+          onAddTask={handleAddTask}
+          onDeleteTask={handleDeleteTask}
+          onMoveTask={handleMoveTask}
+          isPending={isPending}
+        />
+      )}
+    </div>
   );
 }

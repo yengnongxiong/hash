@@ -23,8 +23,8 @@ interface CommandPaletteProps {
 
 const pages = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, keywords: ["home", "overview"] },
-  { name: "Customers", href: "/customers", icon: Users, keywords: ["crm", "contacts"] },
-  { name: "Appointments", href: "/customers/appointments", icon: Calendar, keywords: ["meetings", "schedule"] },
+  { name: "People", href: "/customers", icon: Users, keywords: ["crm", "contacts", "customers", "clients"] },
+  { name: "Dates", href: "/dates", icon: Calendar, keywords: ["appointments", "meetings", "schedule", "due", "calendar"] },
   { name: "Documents", href: "/documents", icon: FileText, keywords: ["files", "pdfs"] },
   { name: "Upload Document", href: "/documents/upload", icon: Upload, keywords: ["new", "add"] },
   { name: "Whiteboard", href: "/whiteboard", icon: Kanban, keywords: ["tasks", "board"] },
@@ -32,7 +32,7 @@ const pages = [
 ];
 
 const actions = [
-  { name: "New Customer", action: "new-customer", icon: Plus, keywords: ["add", "create"] },
+  { name: "New Person", action: "new-customer", icon: Plus, keywords: ["add", "create", "customer", "contact"] },
   { name: "Upload Document", action: "upload-document", icon: Upload, keywords: ["add", "new"] },
 ];
 

@@ -13,7 +13,7 @@ export default async function CustomersPage() {
   if (error) {
     return (
       <div className="p-6">
-        <p className="text-destructive">Error loading customers: {error.message}</p>
+        <p className="text-destructive">Error loading people: {error.message}</p>
       </div>
     );
   }
@@ -22,9 +22,9 @@ export default async function CustomersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Customers</h1>
+          <h1 className="text-2xl font-bold">People</h1>
           <p className="text-muted-foreground">
-            Manage your customer database. Click any cell to edit inline.
+            Manage your contacts and clients. Click any cell to edit inline.
           </p>
         </div>
         <CreateCustomerDialog />
