@@ -11,6 +11,7 @@ import { Search, LayoutGrid, List, Download } from "lucide-react";
 import { getCustomers } from "@/app/(dashboard)/customers/actions";
 import { exportToCSV } from "@/lib/export";
 import { useDebounce } from "@/lib/hooks/use-debounce";
+import { CSVImportDialog } from "./csv-import-dialog";
 
 interface CustomersViewProps {
   initialData: Customer[];
@@ -87,6 +88,9 @@ export function CustomersView({ initialData }: CustomersViewProps) {
             </TabsTrigger>
           </TabsList>
         </Tabs>
+
+        {/* Import */}
+        <CSVImportDialog />
 
         {/* Export */}
         <Button variant="outline" size="sm" onClick={handleExport}>

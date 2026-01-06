@@ -13,12 +13,17 @@ Hash is a B2B SaaS platform for document and customer management with AI-powered
 | Phase 3 Polish | Complete | UX improvements |
 
 ### Recently Completed (This Session)
+- Advanced document filters (search, status, type, date range)
+- Bulk CSV import for customers with template download
+- Document dates calendar view (/documents/calendar)
+- CSV export for documents
 - Keyboard shortcuts (Cmd+Shift+D/C/O/U/W/S for navigation, ? for help)
-- Document flags detection after OCR (past due, duplicates, suspicious amounts, missing data)
+- Document flags detection after OCR (past due, duplicates, suspicious amounts)
 - Document flags UI with resolve functionality
 - Mobile responsive sidebar with Sheet/drawer pattern
-- Mobile responsive document detail page
-- Fixed "Completed Today" dashboard stat
+- Fixed OCR double-logging issue
+- Fixed keyboard shortcuts dialog (?) cross-browser compatibility
+- Fixed accessibility issues in mobile sidebar
 
 ### Database Migration Required
 Run the following migration to enable document flags:
@@ -29,8 +34,8 @@ Run the following migration to enable document flags:
 ### Next Up (Suggestions)
 1. **Email notifications** - Appointment reminders, document alerts
 2. **Team member management** - Invite/remove users from organization
-3. **Bulk CSV import** - Import customers/documents from CSV
-4. **Document dates calendar** - Calendar view of due dates, expirations
+3. **Role-based permissions** - Admin vs member access
+4. **API integrations** - QuickBooks, Xero
 
 ## Tech Stack
 
@@ -82,6 +87,7 @@ src/
 │   │   │   └── appointments/  # Customer appointments
 │   │   ├── documents/         # Document management
 │   │   │   ├── [id]/          # Document detail
+│   │   │   ├── calendar/      # Dates calendar view
 │   │   │   └── upload/        # Upload page
 │   │   ├── whiteboard/        # Team kanban board
 │   │   ├── settings/          # User settings
@@ -94,8 +100,11 @@ src/
 │   │   ├── appointments/      # Appointment components
 │   │   ├── customer-gallery.tsx
 │   │   ├── customer-card.tsx
-│   │   └── customers-view.tsx
+│   │   ├── customers-view.tsx
+│   │   └── csv-import-dialog.tsx      # Bulk CSV import
 │   ├── documents/             # Document components
+│   │   ├── documents-view.tsx         # Main view with filters
+│   │   ├── document-calendar.tsx      # Calendar view component
 │   │   ├── document-list.tsx
 │   │   ├── document-upload.tsx
 │   │   ├── document-flags.tsx         # Flag display component
@@ -145,6 +154,8 @@ src/
 - **Gallery view**: Card-based grid layout
 - **Tags**: Array-based tagging system
 - **Appointments**: Linked calendar and table view
+- **Bulk CSV import**: Import customers from CSV with validation
+- **CSV export**: Export filtered customer data
 
 ### Document Management
 - **Auto-numbering**: DOC-0001, DOC-0002, etc.
@@ -152,6 +163,11 @@ src/
 - **File types**: PDF, images
 - **Status tracking**: pending → processing → completed/failed
 - **Customer linking**: Associate documents with customers
+- **Advanced filters**: Search, status, type, date range filters
+- **Calendar view**: View due dates, expirations, important dates
+- **Document flags**: LLM-detected anomalies (past due, duplicates)
+- **Audit log**: Track document activity history
+- **CSV export**: Export filtered document data
 
 ### Whiteboard
 - **Kanban columns**: To Do, In Progress, Done
@@ -312,9 +328,10 @@ The app runs on `http://localhost:3000`. Test accounts:
 - Email: test@example.com (or use magic link)
 
 Key pages to test:
-- `/customers` - Customer table with gallery view
+- `/customers` - Customer table with gallery view, CSV import/export
 - `/customers/appointments` - Appointments with calendar
-- `/documents` - Document list with OCR status
+- `/documents` - Document list with filters and OCR status
+- `/documents/calendar` - Document dates calendar view
 - `/whiteboard` - Realtime kanban board
 
 ## Future Development Ideas
@@ -326,17 +343,18 @@ Key pages to test:
 - [x] Keyboard shortcuts - Global shortcuts for power users ✓
 - [x] Mobile responsive improvements ✓
 
-### Priority 2 (Next Up)
-- [ ] Recommendations bar - Bottom bar with LLM-generated suggestions
-- [ ] Document dates calendar - Calendar view of due dates, expirations
-- [ ] Advanced search filters - Date ranges, status filters
-- [ ] Dashboard widgets - Customizable widget layout
+### Priority 2 (Complete)
+- [x] Document dates calendar - Calendar view of due dates, expirations ✓
+- [x] Advanced search filters - Date ranges, status filters ✓
+- [x] Bulk CSV import - Import customers from CSV ✓
+- [x] CSV export - Export documents and customers ✓
 
-### Priority 3 (Future)
+### Priority 3 (Next Up)
+- [ ] Recommendations bar - Bottom bar with LLM-generated suggestions
+- [ ] Dashboard widgets - Customizable widget layout
 - [ ] Email notifications - Appointment reminders, document alerts
 - [ ] Team member management - Invite/remove users
 - [ ] Role-based permissions - Admin vs member access
-- [ ] Data import/export (bulk CSV)
 - [ ] API integrations (QuickBooks, Xero)
 - [ ] Custom document templates
 

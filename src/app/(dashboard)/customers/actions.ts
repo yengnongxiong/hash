@@ -272,3 +272,107 @@ export async function deleteAppointment(appointmentId: string) {
   revalidatePath("/customers/appointments");
   return { success: true };
 }
+
+// Bulk CSV import
+interface CSVCustomer {
+  name: string;
+  company?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  tags?: string;
+  notes?: string;
+}
+
+export async function importCustomersFromCSV(customers: CSVCustomer[]) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Not authenticated" };
+  }
+
+  const { data: userData } = await supabase
+    .from("users")
+    .select("organization_id")
+    .eq("id", user.id)
+    .single();
+
+  if (!userData?.organization_id) {
+    return { error: "No organization found" };
+  }
+
+  // Validate and transform customers
+  const validCustomers: Array<{
+    name: string;
+    company: string | null;
+    email: string | null;
+    phone: string | null;
+    address: string | null;
+    tags: string[];
+    notes: string | null;
+    organization_id: string;
+  }> = [];
+  const errors: string[] = [];
+
+  for (let i = 0; i < customers.length; i++) {
+    const row = customers[i];
+    const rowNum = i + 2; // +2 because CSV has header and is 1-indexed
+
+    // Validate name is required
+    if (!row.name || !row.name.trim()) {
+      errors.push(`Row ${rowNum}: Name is required`);
+      continue;
+    }
+
+    // Validate email format if provided
+    if (row.email && row.email.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(row.email.trim())) {
+        errors.push(`Row ${rowNum}: Invalid email format`);
+        continue;
+      }
+    }
+
+    validCustomers.push({
+      name: row.name.trim(),
+      company: row.company?.trim() || null,
+      email: row.email?.trim() || null,
+      phone: row.phone?.trim() || null,
+      address: row.address?.trim() || null,
+      tags: row.tags
+        ? row.tags.split(",").map((t) => t.trim()).filter(Boolean)
+        : [],
+      notes: row.notes?.trim() || null,
+      organization_id: userData.organization_id,
+    });
+  }
+
+  if (validCustomers.length === 0) {
+    return {
+      error: "No valid customers to import",
+      errors,
+      imported: 0,
+    };
+  }
+
+  // Insert valid customers
+  const { error: insertError } = await supabase
+    .from("customers")
+    .insert(validCustomers);
+
+  if (insertError) {
+    return { error: insertError.message, errors, imported: 0 };
+  }
+
+  revalidatePath("/customers");
+  return {
+    success: true,
+    imported: validCustomers.length,
+    errors,
+    total: customers.length,
+  };
+}
