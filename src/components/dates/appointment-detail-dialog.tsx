@@ -68,7 +68,7 @@ export function AppointmentDetailDialog({
   const [status, setStatus] = useState<"scheduled" | "completed" | "cancelled">("scheduled");
   const [appointmentTypeId, setAppointmentTypeId] = useState<string | null>(null);
 
-  // Reset form when appointment changes
+  // Reset form when appointment changes or dialog opens
   useEffect(() => {
     if (appointment) {
       setTitle(appointment.title);
@@ -80,8 +80,11 @@ export function AppointmentDetailDialog({
       setStatus(appointment.status);
       setAppointmentTypeId(appointment.appointment_types?.id || null);
     }
-    setIsEditing(false);
-  }, [appointment]);
+    // Always reset to view mode when dialog opens
+    if (open) {
+      setIsEditing(false);
+    }
+  }, [appointment, open]);
 
   const handleSave = () => {
     if (!appointment) return;

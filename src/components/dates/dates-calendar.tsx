@@ -26,9 +26,10 @@ interface DateEntry {
   title: string;
   date: Date;
   endDate?: Date;
-  color: string;
+  color?: string;
   entityName?: string;
   location?: string;
+  status?: "scheduled" | "completed" | "cancelled";
 }
 
 interface DatesCalendarProps {
@@ -107,7 +108,9 @@ export function DatesCalendar({ dates, onDateClick }: DatesCalendarProps) {
           const dayKey = format(day, "yyyy-MM-dd");
           const dayDates = datesByDay.get(dayKey) || [];
           const hasEvents = dayDates.length > 0;
-          const isOverdue = hasEvents && isPast(day) && !isToday(day);
+          // Only show as overdue if there are scheduled (not cancelled/completed) events in the past
+          const hasOverdueEvents = hasEvents && isPast(day) && !isToday(day) &&
+            dayDates.some((d) => d.status === "scheduled" || !d.status);
 
           return (
             <Popover key={dayKey}>
@@ -118,7 +121,7 @@ export function DatesCalendar({ dates, onDateClick }: DatesCalendarProps) {
                     !isSameMonth(day, currentMonth) && "text-muted-foreground",
                     isToday(day) && "border-primary bg-primary/10",
                     hasEvents && "cursor-pointer hover:bg-muted",
-                    isOverdue && "border-red-500 bg-red-500/10"
+                    hasOverdueEvents && "border-red-500 bg-red-500/10"
                   )}
                   disabled={!hasEvents}
                 >
@@ -130,7 +133,10 @@ export function DatesCalendar({ dates, onDateClick }: DatesCalendarProps) {
                       {dayDates.slice(0, 3).map((d, i) => (
                         <div
                           key={i}
-                          className={cn("w-1.5 h-1.5 rounded-full", d.color)}
+                          className={cn(
+                            "w-1.5 h-1.5 rounded-full",
+                            d.color || "border border-muted-foreground/50"
+                          )}
                         />
                       ))}
                       {dayDates.length > 3 && (
@@ -158,7 +164,7 @@ export function DatesCalendar({ dates, onDateClick }: DatesCalendarProps) {
                           <div
                             className={cn(
                               "w-2 h-2 rounded-full mt-1.5 shrink-0",
-                              d.color
+                              d.color || "border border-muted-foreground/50"
                             )}
                           />
                           <div className="min-w-0 flex-1">

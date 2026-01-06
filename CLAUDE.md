@@ -33,25 +33,23 @@ Hash is a B2B SaaS platform for document and customer management with AI-powered
 | Phase 3 Polish | Complete | UX improvements |
 
 ### Recently Completed (This Session)
-- **People Tab Rename** - Renamed "Customers" to "People" throughout the app
-  - Updated sidebar, command palette, keyboard shortcuts
-  - Updated all dialogs, toasts, and labels
-- **Customer ID Format** - Changed from CUST-0001 to 6-character random alphanumeric (e.g., "A3B7K2")
-  - Auto-generated on create and CSV import
-  - Excluded confusing characters (I, O, 0, 1)
-- **Gallery Detail Dialog** - Click any person card in gallery view to open editable detail dialog
-  - Shows all fields with edit capability
-  - Save multiple field changes at once
-- **Admin Panel** - Separate `/admin` route with email 2FA authentication
-  - Email verification via Resend (6-digit code, 10 min expiry, 24-hour session)
-  - System alerts management (create, edit, delete with global/org targeting)
-  - Users overview with role badges and registration dates
-  - Organizations overview with usage statistics
-  - Platform analytics (users, docs, processing stats, document types)
-- **Settings alerts read-only** - Business users can view alerts but not create/edit
-- **Alert banners** - Display active alerts to all users with dismiss functionality
+- **Dates Tab Enhancements**
+  - Multi-select people when creating dates (checkbox popover)
+  - Renamed "New Appointment" to "New Date"
+  - Sortable columns on all table headers
+  - Search across all columns including formatted dates (e.g., "Jan 7, 2026")
+  - Smart status logic: Completed/Cancelled shown first, then Overdue/Today/Upcoming
+  - Blank circle for dates without a type (instead of default blue)
+  - Calendar UI no longer shows red for cancelled dates
+  - Dialog always opens in view mode first (fixed edit state persistence)
+- **Database**: Added `customer_ids` array column for multi-person dates
 
 ### Previously Completed
+- People Tab Rename - "Customers" to "People" throughout
+- Customer ID Format - 6-char alphanumeric (e.g., "A3B7K2")
+- Gallery Detail Dialog - Click cards to open editable dialog
+- Admin Panel - `/admin` with email 2FA (Resend)
+- System alerts with global/org targeting
 - Advanced document filters (search, status, type, date range)
 - Bulk CSV import for customers with template download
 - Document dates calendar view (/documents/calendar)
@@ -69,6 +67,8 @@ Run the following migrations in Supabase SQL Editor:
 ```sql
 -- See migrations/create_document_flags.sql
 -- See migrations/create_system_alerts.sql
+-- See migrations/update_appointments_and_types.sql
+-- See migrations/add_customer_ids_to_appointments.sql (for multi-person dates)
 ```
 
 ### Next Up (Suggestions)

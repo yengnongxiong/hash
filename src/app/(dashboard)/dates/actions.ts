@@ -25,6 +25,8 @@ export async function createAppointment(formData: FormData) {
   }
 
   const title = formData.get("title") as string;
+  // Support both single customer_id and multiple customer_ids
+  const customerIds = formData.getAll("customer_ids") as string[];
   const customerId = formData.get("customer_id") as string;
   const startTime = formData.get("start_time") as string;
   const endTime = formData.get("end_time") as string;
@@ -36,9 +38,14 @@ export async function createAppointment(formData: FormData) {
     return { error: "Title and start time are required" };
   }
 
+  // Use first customer_id for backward compatibility, store all in customer_ids array
+  const primaryCustomerId = customerIds.length > 0 ? customerIds[0] : (customerId || null);
+  const allCustomerIds = customerIds.length > 0 ? customerIds : (customerId ? [customerId] : []);
+
   const { error } = await supabase.from("appointments").insert({
     organization_id: userData.organization_id,
-    customer_id: customerId || null,
+    customer_id: primaryCustomerId,
+    customer_ids: allCustomerIds.length > 0 ? allCustomerIds : null,
     title,
     start_time: startTime,
     end_time: endTime || null,

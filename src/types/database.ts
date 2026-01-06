@@ -17,6 +17,7 @@ export type Database = {
           id: string;
           organization_id: string;
           customer_id: string | null;
+          customer_ids: string[] | null;
           title: string;
           description: string | null;
           start_time: string;
@@ -32,6 +33,7 @@ export type Database = {
           id?: string;
           organization_id: string;
           customer_id?: string | null;
+          customer_ids?: string[] | null;
           title: string;
           description?: string | null;
           start_time: string;
@@ -47,6 +49,7 @@ export type Database = {
           id?: string;
           organization_id?: string;
           customer_id?: string | null;
+          customer_ids?: string[] | null;
           title?: string;
           description?: string | null;
           start_time?: string;
