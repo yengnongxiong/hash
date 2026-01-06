@@ -10,6 +10,27 @@ Hash is a B2B SaaS platform for document and customer management with AI-powered
 |-------|--------|-------------|
 | MVP (Phases 1-5) | Complete | Core functionality |
 | Phase 2 Enhancements | Complete | Advanced features |
+| Phase 3 Polish | Complete | UX improvements |
+
+### Recently Completed (This Session)
+- Keyboard shortcuts (Cmd+Shift+D/C/O/U/W/S for navigation, ? for help)
+- Document flags detection after OCR (past due, duplicates, suspicious amounts, missing data)
+- Document flags UI with resolve functionality
+- Mobile responsive sidebar with Sheet/drawer pattern
+- Mobile responsive document detail page
+- Fixed "Completed Today" dashboard stat
+
+### Database Migration Required
+Run the following migration to enable document flags:
+```sql
+-- See migrations/create_document_flags.sql
+```
+
+### Next Up (Suggestions)
+1. **Email notifications** - Appointment reminders, document alerts
+2. **Team member management** - Invite/remove users from organization
+3. **Bulk CSV import** - Import customers/documents from CSV
+4. **Document dates calendar** - Calendar view of due dates, expirations
 
 ## Tech Stack
 
@@ -77,15 +98,20 @@ src/
 │   ├── documents/             # Document components
 │   │   ├── document-list.tsx
 │   │   ├── document-upload.tsx
+│   │   ├── document-flags.tsx         # Flag display component
+│   │   ├── document-flags-wrapper.tsx # Client wrapper for flags
+│   │   ├── document-audit-log.tsx     # Activity timeline
 │   │   └── extracted-data-view.tsx
 │   ├── dashboard/             # Dashboard components
+│   │   ├── activity-feed.tsx  # Realtime activity stream
 │   │   ├── whiteboard.tsx
 │   │   ├── whiteboard-column.tsx
 │   │   └── whiteboard-task.tsx
 │   ├── layout/                # Layout components
-│   │   ├── sidebar.tsx        # Collapsible sidebar
-│   │   ├── header.tsx         # Theme toggle, search
+│   │   ├── sidebar.tsx        # Collapsible + mobile drawer
+│   │   ├── header.tsx         # Theme toggle, search, mobile menu
 │   │   ├── command-palette.tsx
+│   │   ├── keyboard-shortcuts-dialog.tsx  # Shortcuts help
 │   │   └── dashboard-shell.tsx
 │   ├── data-table/            # Reusable table components
 │   └── ui/                    # shadcn/ui components
@@ -98,9 +124,11 @@ src/
 │   │   ├── server.ts          # Server client
 │   │   └── middleware.ts      # Auth middleware
 │   ├── ocr/
-│   │   └── mistral.ts         # OCR extraction
+│   │   ├── mistral.ts         # OCR extraction
+│   │   └── detect-flags.ts    # Document flag detection
 │   ├── hooks/
-│   │   └── use-debounce.ts
+│   │   ├── use-debounce.ts
+│   │   └── use-keyboard-shortcuts.ts  # Global keyboard shortcuts
 │   ├── export.ts              # CSV export utility
 │   └── utils/
 │       └── format.ts          # Formatting helpers
@@ -291,28 +319,26 @@ Key pages to test:
 
 ## Future Development Ideas
 
-### Priority 1 (Pending from Phase 2)
-- [ ] Document flags UI - Display LLM-detected anomalies (past due, duplicates)
-- [ ] Audit log timeline - Visual document history in detail page
-- [ ] Activity feed - Dashboard realtime activity stream
-- [ ] Recommendations bar - Bottom bar with LLM-generated suggestions
+### Priority 1 (Complete)
+- [x] Document flags UI - Display LLM-detected anomalies (past due, duplicates) ✓
+- [x] Audit log timeline - Visual document history in detail page ✓
+- [x] Activity feed - Dashboard realtime activity stream ✓
+- [x] Keyboard shortcuts - Global shortcuts for power users ✓
+- [x] Mobile responsive improvements ✓
 
-### Priority 2 (Future Enhancements)
+### Priority 2 (Next Up)
+- [ ] Recommendations bar - Bottom bar with LLM-generated suggestions
 - [ ] Document dates calendar - Calendar view of due dates, expirations
-- [ ] Bulk operations toolbar - Multi-select actions
 - [ ] Advanced search filters - Date ranges, status filters
 - [ ] Dashboard widgets - Customizable widget layout
+
+### Priority 3 (Future)
 - [ ] Email notifications - Appointment reminders, document alerts
 - [ ] Team member management - Invite/remove users
 - [ ] Role-based permissions - Admin vs member access
-
-### Priority 3 (Nice to Have)
-- [ ] Mobile responsive improvements
-- [ ] Keyboard shortcuts guide
 - [ ] Data import/export (bulk CSV)
 - [ ] API integrations (QuickBooks, Xero)
 - [ ] Custom document templates
-- [ ] Audit compliance reports
 
 ## Troubleshooting
 

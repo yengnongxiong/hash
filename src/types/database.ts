@@ -184,6 +184,7 @@ export type Database = {
         Row: {
           id: string;
           organization_id: string;
+          customer_number: string | null;
           name: string;
           company: string | null;
           email: string | null;
@@ -197,6 +198,7 @@ export type Database = {
         Insert: {
           id?: string;
           organization_id: string;
+          customer_number?: string | null;
           name: string;
           company?: string | null;
           email?: string | null;
@@ -210,6 +212,7 @@ export type Database = {
         Update: {
           id?: string;
           organization_id?: string;
+          customer_number?: string | null;
           name?: string;
           company?: string | null;
           email?: string | null;
@@ -234,6 +237,7 @@ export type Database = {
           id: string;
           organization_id: string;
           customer_id: string | null;
+          document_number: string | null;
           file_url: string;
           file_name: string;
           file_type: string | null;
@@ -250,6 +254,7 @@ export type Database = {
           id?: string;
           organization_id: string;
           customer_id?: string | null;
+          document_number?: string | null;
           file_url: string;
           file_name: string;
           file_type?: string | null;
@@ -266,6 +271,7 @@ export type Database = {
           id?: string;
           organization_id?: string;
           customer_id?: string | null;
+          document_number?: string | null;
           file_url?: string;
           file_name?: string;
           file_type?: string | null;
@@ -339,6 +345,58 @@ export type Database = {
           }
         ];
       };
+      document_flags: {
+        Row: {
+          id: string;
+          document_id: string;
+          flag_type: "past_due" | "duplicate_invoice" | "suspicious_amount" | "missing_data" | "other";
+          severity: "info" | "warning" | "critical";
+          message: string;
+          details: Json;
+          resolved: boolean;
+          resolved_by: string | null;
+          resolved_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          document_id: string;
+          flag_type: "past_due" | "duplicate_invoice" | "suspicious_amount" | "missing_data" | "other";
+          severity?: "info" | "warning" | "critical";
+          message: string;
+          details?: Json;
+          resolved?: boolean;
+          resolved_by?: string | null;
+          resolved_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          document_id?: string;
+          flag_type?: "past_due" | "duplicate_invoice" | "suspicious_amount" | "missing_data" | "other";
+          severity?: "info" | "warning" | "critical";
+          message?: string;
+          details?: Json;
+          resolved?: boolean;
+          resolved_by?: string | null;
+          resolved_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "document_flags_document_id_fkey";
+            columns: ["document_id"];
+            referencedRelation: "documents";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "document_flags_resolved_by_fkey";
+            columns: ["resolved_by"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -363,8 +421,8 @@ export type UpdateTables<T extends keyof Database["public"]["Tables"]> =
 // Convenience type aliases
 export type Organization = Tables<"organizations">;
 export type User = Tables<"users">;
-export type Customer = Tables<"customers"> & { customer_number?: string };
-export type Document = Tables<"documents"> & { document_number?: string };
+export type Customer = Tables<"customers">;
+export type Document = Tables<"documents">;
 export type DocumentAuditLog = Tables<"document_audit_log">;
 
 // Phase 2 types - use Tables for database-compatible types

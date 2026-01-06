@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOCRProvider } from "@/lib/ocr/provider";
 import { revalidatePath } from "next/cache";
+import { detectDocumentFlags, saveDocumentFlags } from "@/lib/ocr/detect-flags";
+import { ExtractedDocumentData } from "@/lib/ocr/types";
 
 export async function uploadDocument(formData: FormData) {
   const supabase = await createClient();
@@ -177,6 +179,14 @@ async function processDocumentOCR(documentId: string) {
       })
       .eq("id", documentId);
 
+    // Remove any previous ocr_failed entries since OCR now succeeded
+    // This prevents confusing double-logging in the activity feed
+    await adminClient
+      .from("document_audit_log")
+      .delete()
+      .eq("document_id", documentId)
+      .eq("action", "ocr_failed");
+
     // Create audit log entry
     await adminClient.from("document_audit_log").insert({
       document_id: documentId,
@@ -186,6 +196,29 @@ async function processDocumentOCR(documentId: string) {
         documentType: result.extractedData.documentType,
       },
     });
+
+    // Detect and save document flags
+    try {
+      const flags = await detectDocumentFlags(
+        documentId,
+        result.extractedData as ExtractedDocumentData
+      );
+      if (flags.length > 0) {
+        await saveDocumentFlags(documentId, flags);
+        // Log flag detection
+        await adminClient.from("document_audit_log").insert({
+          document_id: documentId,
+          action: "flags_detected",
+          details: {
+            flagCount: flags.length,
+            flags: flags.map((f) => ({ type: f.flag_type, severity: f.severity })),
+          },
+        });
+      }
+    } catch (flagError) {
+      console.error("Flag detection error:", flagError);
+      // Don't fail the whole process if flag detection fails
+    }
   } catch (error) {
     console.error("OCR processing error:", error);
 
@@ -280,6 +313,20 @@ export async function retryDocumentOCR(documentId: string) {
     return { error: "Document not found" };
   }
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // Log retry action
+  if (user) {
+    await supabase.from("document_audit_log").insert({
+      document_id: documentId,
+      user_id: user.id,
+      action: "ocr_retry",
+      details: {},
+    });
+  }
+
   // Reset status and trigger reprocessing
   await supabase
     .from("documents")
@@ -292,4 +339,71 @@ export async function retryDocumentOCR(documentId: string) {
 
   revalidatePath("/documents");
   return { success: true };
+}
+
+export async function logDocumentView(documentId: string) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return;
+
+  // Only log view once per session (check if viewed in last 5 minutes)
+  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+
+  const { data: recentView } = await supabase
+    .from("document_audit_log")
+    .select("id")
+    .eq("document_id", documentId)
+    .eq("user_id", user.id)
+    .eq("action", "viewed")
+    .gte("created_at", fiveMinutesAgo)
+    .limit(1);
+
+  if (recentView && recentView.length > 0) {
+    return; // Already logged recently
+  }
+
+  await supabase.from("document_audit_log").insert({
+    document_id: documentId,
+    user_id: user.id,
+    action: "viewed",
+    details: {},
+  });
+}
+
+export async function getDocumentAuditLog(documentId: string) {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("document_audit_log")
+    .select("*, users(name, email)")
+    .eq("document_id", documentId)
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  if (error) {
+    return [];
+  }
+
+  return data || [];
+}
+
+export async function getDocumentFlags(documentId: string) {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("document_flags")
+    .select("*, resolved_by_user:users!document_flags_resolved_by_fkey(name, email)")
+    .eq("document_id", documentId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Error fetching document flags:", error);
+    return [];
+  }
+
+  return data || [];
 }

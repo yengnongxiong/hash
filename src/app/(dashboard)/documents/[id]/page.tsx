@@ -1,12 +1,16 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Download, Trash2, RotateCw } from "lucide-react";
+import { ArrowLeft, Download, History, RotateCw } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { DocumentPreview } from "@/components/documents/document-preview";
 import { ExtractedDataView } from "@/components/documents/extracted-data-view";
 import { ProcessingStatus } from "@/components/documents/processing-status";
+import { DocumentAuditLog } from "@/components/documents/document-audit-log";
+import { DocumentFlagsWrapper } from "@/components/documents/document-flags-wrapper";
 import { formatDistanceToNow, formatFileSize } from "@/lib/utils/format";
+import { logDocumentView, getDocumentAuditLog, getDocumentFlags } from "../actions";
 
 interface DocumentDetailPageProps {
   params: Promise<{ id: string }>;
@@ -28,30 +32,46 @@ export default async function DocumentDetailPage({
     notFound();
   }
 
+  // Log document view
+  await logDocumentView(id);
+
+  // Fetch audit log and flags
+  const [auditLogs, flags] = await Promise.all([
+    getDocumentAuditLog(id),
+    getDocumentFlags(id),
+  ]);
+
   const isProcessing = document.status === "processing";
   const isFailed = document.status === "failed";
   const isCompleted = document.status === "completed";
 
   return (
-    <div className="h-[calc(100vh-8rem)] flex flex-col">
+    <div className="min-h-[calc(100vh-8rem)] flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between pb-4 border-b mb-4">
-        <div className="flex items-center gap-4">
-          <Link href="/documents">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b mb-4 gap-3">
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+          <Link href="/documents" className="shrink-0">
             <Button variant="ghost" size="icon">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
-          <div>
-            <h1 className="text-xl font-bold">{document.file_name}</h1>
-            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-lg sm:text-xl font-bold truncate">{document.file_name}</h1>
+              {document.document_number && (
+                <Badge variant="outline" className="font-mono text-xs">
+                  {document.document_number}
+                </Badge>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:text-sm text-muted-foreground">
               <span>{formatFileSize(document.file_size || 0)}</span>
-              <span>•</span>
+              <span className="hidden sm:inline">•</span>
               <span>Uploaded {formatDistanceToNow(new Date(document.created_at))}</span>
               {document.customers && (
                 <>
-                  <span>•</span>
-                  <span>
+                  <span className="hidden sm:inline">•</span>
+                  <span className="basis-full sm:basis-auto">
                     Linked to {document.customers.name}
                     {document.customers.company && ` (${document.customers.company})`}
                   </span>
@@ -109,14 +129,14 @@ export default async function DocumentDetailPage({
         </div>
       )}
 
-      {/* Split View */}
-      <div className="flex-1 grid grid-cols-2 gap-4 min-h-0">
+      {/* Split View - 3 columns */}
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 min-h-0">
         {/* Left: Document Preview */}
-        <div className="overflow-hidden rounded-lg border bg-background">
+        <div className="overflow-hidden rounded-lg border bg-background min-h-[300px] lg:min-h-0">
           <div className="p-2 border-b bg-muted/30">
             <h2 className="text-sm font-medium">Original Document</h2>
           </div>
-          <div className="h-[calc(100%-2.5rem)] p-2">
+          <div className="h-[250px] lg:h-[calc(100%-2.5rem)] p-2">
             <DocumentPreview
               fileUrl={document.file_url}
               fileType={document.file_type}
@@ -125,7 +145,7 @@ export default async function DocumentDetailPage({
           </div>
         </div>
 
-        {/* Right: Extracted Data */}
+        {/* Middle: Extracted Data */}
         <div className="overflow-auto rounded-lg border bg-background">
           <div className="p-2 border-b bg-muted/30">
             <h2 className="text-sm font-medium">Extracted Data</h2>
@@ -156,6 +176,18 @@ export default async function DocumentDetailPage({
                 <p>Waiting for processing to start...</p>
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Right: Flags & Activity Log */}
+        <div className="overflow-auto rounded-lg border bg-background">
+          <div className="p-2 border-b bg-muted/30 flex items-center gap-2">
+            <History className="h-4 w-4" />
+            <h2 className="text-sm font-medium">Flags & Activity</h2>
+          </div>
+          <div className="p-4 space-y-4">
+            <DocumentFlagsWrapper documentId={document.id} initialFlags={flags} />
+            <DocumentAuditLog documentId={document.id} initialLogs={auditLogs} />
           </div>
         </div>
       </div>

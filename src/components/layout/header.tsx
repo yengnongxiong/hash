@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { User, LogOut, Settings, Sun, Moon, Search } from "lucide-react";
 import { useTheme } from "@/contexts/theme-context";
+import { MobileSidebar } from "./sidebar";
 
 interface HeaderProps {
   user: {
@@ -37,10 +38,11 @@ export function Header({ user, onOpenCommandPalette }: HeaderProps) {
   }
 
   return (
-    <header className="h-14 border-b px-6 flex items-center justify-between bg-background">
+    <header className="h-14 border-b px-4 md:px-6 flex items-center justify-between bg-background">
       <div className="flex items-center gap-2">
+        <MobileSidebar />
         {user?.organizations?.name && (
-          <span className="text-sm text-muted-foreground">
+          <span className="text-sm text-muted-foreground hidden sm:inline">
             {user.organizations.name}
           </span>
         )}
