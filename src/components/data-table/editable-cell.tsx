@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 interface EditableCellProps<TData> extends CellContext<TData, unknown> {
   type?: "text" | "email" | "phone" | "textarea";
   truncate?: boolean;
-  maxWidth?: string;
 }
 
 export function EditableCell<TData>({
@@ -17,7 +16,6 @@ export function EditableCell<TData>({
   table,
   type = "text",
   truncate = false,
-  maxWidth = "200px",
 }: EditableCellProps<TData>) {
   const initialValue = getValue() as string;
   const [value, setValue] = React.useState(initialValue ?? "");
@@ -78,8 +76,7 @@ export function EditableCell<TData>({
 
   return (
     <div
-      className="cursor-pointer px-2 py-1.5 min-h-[32px] min-w-[60px] hover:bg-muted/50 rounded transition-colors flex items-center overflow-hidden"
-      style={truncate ? { maxWidth } : undefined}
+      className="cursor-pointer px-2 py-1.5 min-h-[32px] hover:bg-muted/50 rounded transition-colors flex items-center overflow-hidden w-full"
       onClick={() => setIsEditing(true)}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -91,7 +88,7 @@ export function EditableCell<TData>({
       role="button"
     >
       {value ? (
-        <span className={truncate ? "truncate block" : ""}>{value}</span>
+        <span className={truncate ? "truncate block w-full" : ""}>{value}</span>
       ) : (
         <span className="text-muted-foreground italic">Empty</span>
       )}
@@ -168,7 +165,7 @@ export function EditableTagsCell<TData>({
 
   return (
     <div
-      className="cursor-pointer px-2 py-1.5 min-h-[32px] max-w-[120px] hover:bg-muted/50 rounded transition-colors flex items-center gap-1 flex-wrap overflow-hidden"
+      className="cursor-pointer px-2 py-1.5 min-h-[32px] hover:bg-muted/50 rounded transition-colors flex items-center gap-1 flex-wrap overflow-hidden w-full"
       onClick={() => setIsEditing(true)}
       tabIndex={0}
       role="button"
@@ -178,13 +175,13 @@ export function EditableTagsCell<TData>({
           {displayTags.map((tag, i) => (
             <span
               key={i}
-              className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary truncate max-w-[50px]"
+              className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary truncate max-w-[60px]"
             >
               {tag}
             </span>
           ))}
           {remainingCount > 0 && (
-            <span className="text-xs text-muted-foreground">+{remainingCount}</span>
+            <span className="text-xs text-muted-foreground shrink-0">+{remainingCount}</span>
           )}
         </>
       ) : (
@@ -257,13 +254,13 @@ export function EditableNotesCell<TData>({
 
   return (
     <div
-      className="cursor-pointer px-2 py-1.5 min-h-[32px] max-w-[150px] hover:bg-muted/50 rounded transition-colors overflow-hidden"
+      className="cursor-pointer px-2 py-1.5 min-h-[32px] hover:bg-muted/50 rounded transition-colors overflow-hidden w-full"
       onClick={() => setIsEditing(true)}
       tabIndex={0}
       role="button"
     >
       {value ? (
-        <span className="line-clamp-1 truncate block">{value}</span>
+        <span className="truncate block w-full">{value}</span>
       ) : (
         <span className="text-muted-foreground italic">No notes</span>
       )}

@@ -180,7 +180,7 @@ export function CSVImportDialog() {
           Import CSV
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg overflow-hidden">
         <DialogHeader>
           <DialogTitle>Import People from CSV</DialogTitle>
           <DialogDescription>
@@ -225,25 +225,25 @@ export function CSVImportDialog() {
 
           {/* Preview */}
           {preview.length > 0 && (
-            <div className="space-y-2">
+            <div className="space-y-2 overflow-hidden">
               <p className="text-sm font-medium">Preview (first 5 rows):</p>
               <div className="border rounded-lg overflow-hidden">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm table-fixed">
                   <thead className="bg-muted/50">
                     <tr>
-                      <th className="p-2 text-left">Name</th>
-                      <th className="p-2 text-left">Company</th>
-                      <th className="p-2 text-left">Email</th>
+                      <th className="p-2 text-left w-1/3">Name</th>
+                      <th className="p-2 text-left w-1/3">Company</th>
+                      <th className="p-2 text-left w-1/3">Email</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
                     {preview.map((row, i) => (
                       <tr key={i}>
-                        <td className="p-2">{row.name}</td>
-                        <td className="p-2 text-muted-foreground">
+                        <td className="p-2 truncate max-w-0">{row.name}</td>
+                        <td className="p-2 text-muted-foreground truncate max-w-0">
                           {row.company || "-"}
                         </td>
-                        <td className="p-2 text-muted-foreground">
+                        <td className="p-2 text-muted-foreground truncate max-w-0">
                           {row.email || "-"}
                         </td>
                       </tr>
@@ -256,14 +256,14 @@ export function CSVImportDialog() {
 
           {/* Errors */}
           {errors.length > 0 && (
-            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
+            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 overflow-hidden">
               <div className="flex items-center gap-2 text-destructive mb-2">
-                <AlertCircle className="h-4 w-4" />
+                <AlertCircle className="h-4 w-4 shrink-0" />
                 <span className="text-sm font-medium">Errors</span>
               </div>
-              <ul className="text-sm text-destructive/90 space-y-1">
+              <ul className="text-sm text-destructive/90 space-y-1 overflow-hidden">
                 {errors.slice(0, 5).map((error, i) => (
-                  <li key={i}>{error}</li>
+                  <li key={i} className="truncate">{error}</li>
                 ))}
                 {errors.length > 5 && (
                   <li>...and {errors.length - 5} more errors</li>

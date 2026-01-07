@@ -75,8 +75,8 @@ export function CustomerCard({ customer, onClick }: CustomerCardProps) {
 
         {customer.tags && customer.tags.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-1">
-            {customer.tags.slice(0, 3).map((tag) => (
-              <Badge key={tag} variant="secondary" className="text-xs">
+            {customer.tags.slice(0, 3).map((tag, index) => (
+              <Badge key={`${tag}-${index}`} variant="secondary" className="text-xs">
                 {tag}
               </Badge>
             ))}

@@ -158,16 +158,16 @@ export function CustomerDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto overflow-x-hidden">
-        <DialogHeader>
-          <div className="flex items-center justify-between">
-            <DialogTitle className="flex items-center gap-3 min-w-0 flex-1">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto overflow-x-hidden w-[calc(100vw-2rem)]">
+        <DialogHeader className="overflow-hidden">
+          <div className="flex items-center justify-between gap-2">
+            <DialogTitle className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
               <Avatar className="h-12 w-12 shrink-0">
                 <AvatarFallback className="bg-primary/10 text-primary text-lg">
                   {getInitials(currentData.name)}
                 </AvatarFallback>
               </Avatar>
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 overflow-hidden">
                 {isEditing ? (
                   <Input
                     value={editedCustomer.name || ""}
@@ -181,7 +181,7 @@ export function CustomerDetailDialog({
                     placeholder="Name"
                   />
                 ) : (
-                  <span className="truncate block">{currentData.name}</span>
+                  <span className="block truncate">{currentData.name}</span>
                 )}
                 {currentData.customer_number && (
                   <Badge
@@ -276,11 +276,11 @@ export function CustomerDetailDialog({
           </VisuallyHidden>
         </DialogHeader>
 
-        <div className="space-y-4 mt-4 overflow-hidden max-w-full">
+        <div className="space-y-4 mt-4 overflow-hidden w-full">
           {/* Company */}
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 overflow-hidden">
             <Label className="flex items-center gap-2 text-muted-foreground">
-              <Building2 className="h-4 w-4" />
+              <Building2 className="h-4 w-4 shrink-0" />
               Company
             </Label>
             {isEditing ? (
@@ -295,7 +295,7 @@ export function CustomerDetailDialog({
                 placeholder="Company name"
               />
             ) : (
-              <p className="text-sm pl-6 truncate w-full">
+              <p className="text-sm pl-6 truncate">
                 {currentData.company || (
                   <span className="text-muted-foreground italic">Not set</span>
                 )}
@@ -304,9 +304,9 @@ export function CustomerDetailDialog({
           </div>
 
           {/* Email */}
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 overflow-hidden">
             <Label className="flex items-center gap-2 text-muted-foreground">
-              <Mail className="h-4 w-4" />
+              <Mail className="h-4 w-4 shrink-0" />
               Email
             </Label>
             {isEditing ? (
@@ -338,9 +338,9 @@ export function CustomerDetailDialog({
           </div>
 
           {/* Phone */}
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 overflow-hidden">
             <Label className="flex items-center gap-2 text-muted-foreground">
-              <Phone className="h-4 w-4" />
+              <Phone className="h-4 w-4 shrink-0" />
               Phone
             </Label>
             {isEditing ? (
@@ -372,9 +372,9 @@ export function CustomerDetailDialog({
           </div>
 
           {/* Address */}
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 overflow-hidden">
             <Label className="flex items-center gap-2 text-muted-foreground">
-              <MapPin className="h-4 w-4" />
+              <MapPin className="h-4 w-4 shrink-0" />
               Address
             </Label>
             {isEditing ? (
@@ -398,9 +398,9 @@ export function CustomerDetailDialog({
           </div>
 
           {/* Tags */}
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 overflow-hidden">
             <Label className="flex items-center gap-2 text-muted-foreground">
-              <Tag className="h-4 w-4" />
+              <Tag className="h-4 w-4 shrink-0" />
               Tags
             </Label>
             {isEditing ? (
@@ -418,7 +418,7 @@ export function CustomerDetailDialog({
                 placeholder="tag1, tag2, tag3"
               />
             ) : (
-              <div className="pl-6">
+              <div className="pl-6 overflow-hidden">
                 {currentData.tags && currentData.tags.length > 0 ? (
                   <div className="flex flex-wrap gap-1 max-h-20 overflow-hidden">
                     {currentData.tags.map((tag, index) => (
@@ -437,9 +437,9 @@ export function CustomerDetailDialog({
           </div>
 
           {/* Notes */}
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 overflow-hidden">
             <Label className="flex items-center gap-2 text-muted-foreground">
-              <FileText className="h-4 w-4" />
+              <FileText className="h-4 w-4 shrink-0" />
               Notes
             </Label>
             {isEditing ? (
@@ -455,7 +455,7 @@ export function CustomerDetailDialog({
                 rows={3}
               />
             ) : (
-              <p className="text-sm pl-6 line-clamp-2">
+              <p className="text-sm pl-6 line-clamp-2 break-all">
                 {currentData.notes || (
                   <span className="text-muted-foreground italic">No notes</span>
                 )}

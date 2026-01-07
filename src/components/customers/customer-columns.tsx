@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 export const customerColumns: ColumnDef<Customer>[] = [
   {
     id: "select",
+    size: 40,
     header: ({ table }) => (
       <Checkbox
         checked={
@@ -40,6 +41,7 @@ export const customerColumns: ColumnDef<Customer>[] = [
   },
   {
     accessorKey: "customer_number",
+    size: 80,
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="ID" />
     ),
@@ -54,41 +56,47 @@ export const customerColumns: ColumnDef<Customer>[] = [
   },
   {
     accessorKey: "name",
+    size: 120,
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Name" />
     ),
-    cell: (props) => <EditableCell {...props} truncate maxWidth="150px" />,
+    cell: (props) => <EditableCell {...props} truncate />,
   },
   {
     accessorKey: "company",
+    size: 100,
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Company" />
     ),
-    cell: (props) => <EditableCell {...props} truncate maxWidth="120px" />,
+    cell: (props) => <EditableCell {...props} truncate />,
   },
   {
     accessorKey: "email",
+    size: 80,
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Email" />
     ),
-    cell: (props) => <EditableCell {...props} type="email" truncate maxWidth="150px" />,
+    cell: (props) => <EditableCell {...props} type="email" truncate />,
   },
   {
     accessorKey: "phone",
+    size: 90,
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Phone" />
     ),
-    cell: (props) => <EditableCell {...props} type="phone" truncate maxWidth="110px" />,
+    cell: (props) => <EditableCell {...props} type="phone" truncate />,
   },
   {
     accessorKey: "address",
+    size: 100,
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Address" />
     ),
-    cell: (props) => <EditableCell {...props} truncate maxWidth="150px" />,
+    cell: (props) => <EditableCell {...props} truncate />,
   },
   {
     accessorKey: "tags",
+    size: 90,
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Tags" />
     ),
@@ -102,6 +110,7 @@ export const customerColumns: ColumnDef<Customer>[] = [
   },
   {
     accessorKey: "notes",
+    size: 100,
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Notes" />
     ),
@@ -109,13 +118,14 @@ export const customerColumns: ColumnDef<Customer>[] = [
   },
   {
     accessorKey: "updated_at",
+    size: 80,
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Last Edited" />
     ),
     cell: ({ getValue }) => {
       const date = getValue() as string;
       return (
-        <span className="text-muted-foreground text-sm">
+        <span className="text-muted-foreground text-sm truncate block">
           {formatDistanceToNow(new Date(date))}
         </span>
       );
@@ -123,6 +133,7 @@ export const customerColumns: ColumnDef<Customer>[] = [
   },
   {
     id: "actions",
+    size: 60,
     header: () => <span className="sr-only">Actions</span>,
     cell: ({ row, table }) => {
       const customer = row.original;
