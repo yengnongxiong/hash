@@ -10,7 +10,7 @@ import { List, Calendar as CalendarIcon } from "lucide-react";
 
 interface AppointmentsViewProps {
   initialData: AppointmentWithRelations[];
-  customers: Pick<Customer, "id" | "name" | "company">[];
+  customers: Pick<Customer, "id" | "name" | "company" | "customer_number">[];
   appointmentTypes: AppointmentType[];
 }
 

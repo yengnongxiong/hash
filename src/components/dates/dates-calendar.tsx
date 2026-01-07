@@ -35,9 +35,10 @@ interface DateEntry {
 interface DatesCalendarProps {
   dates: DateEntry[];
   onDateClick?: (entry: DateEntry) => void;
+  onEmptyDayClick?: (date: Date) => void;
 }
 
-export function DatesCalendar({ dates, onDateClick }: DatesCalendarProps) {
+export function DatesCalendar({ dates, onDateClick, onEmptyDayClick }: DatesCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const monthStart = startOfMonth(currentMonth);
@@ -63,6 +64,11 @@ export function DatesCalendar({ dates, onDateClick }: DatesCalendarProps) {
   const goToPreviousMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
   const goToNextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
   const goToToday = () => setCurrentMonth(new Date());
+
+  // Check if current month has any events
+  const monthHasEvents = useMemo(() => {
+    return dates.some((d) => isSameMonth(d.date, currentMonth));
+  }, [dates, currentMonth]);
 
   return (
     <div className="border rounded-lg p-4">
@@ -120,10 +126,9 @@ export function DatesCalendar({ dates, onDateClick }: DatesCalendarProps) {
                     "aspect-square p-1 text-sm rounded-lg border transition-colors relative",
                     !isSameMonth(day, currentMonth) && "text-muted-foreground",
                     isToday(day) && "border-primary bg-primary/10",
-                    hasEvents && "cursor-pointer hover:bg-muted",
+                    "cursor-pointer hover:bg-muted",
                     hasOverdueEvents && "border-red-500 bg-red-500/10"
                   )}
-                  disabled={!hasEvents}
                 >
                   <span className={cn(isToday(day) && "font-bold text-primary")}>
                     {format(day, "d")}
@@ -148,12 +153,12 @@ export function DatesCalendar({ dates, onDateClick }: DatesCalendarProps) {
                   )}
                 </button>
               </PopoverTrigger>
-              {hasEvents && (
-                <PopoverContent className="w-80 p-2" align="start">
-                  <div className="space-y-2">
-                    <p className="font-medium text-sm">
-                      {format(day, "EEEE, MMMM d, yyyy")}
-                    </p>
+              <PopoverContent className="w-80 p-2" align="start">
+                <div className="space-y-2">
+                  <p className="font-medium text-sm">
+                    {format(day, "EEEE, MMMM d, yyyy")}
+                  </p>
+                  {hasEvents ? (
                     <div className="space-y-1 max-h-[300px] overflow-y-auto">
                       {dayDates.map((d) => (
                         <button
@@ -189,13 +194,35 @@ export function DatesCalendar({ dates, onDateClick }: DatesCalendarProps) {
                         </button>
                       ))}
                     </div>
-                  </div>
-                </PopoverContent>
-              )}
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No dates scheduled</p>
+                  )}
+                  {onEmptyDayClick && (
+                    <button
+                      onClick={() => onEmptyDayClick(day)}
+                      className="w-full mt-2 p-2 text-sm text-center rounded border border-dashed border-muted-foreground/30 hover:bg-muted hover:border-muted-foreground/50 transition-colors"
+                    >
+                      + Add new date
+                    </button>
+                  )}
+                </div>
+              </PopoverContent>
             </Popover>
           );
         })}
       </div>
+
+      {/* Empty month message */}
+      {!monthHasEvents && (
+        <div className="mt-4 text-center py-4 border-t">
+          <p className="text-sm text-muted-foreground">
+            No dates scheduled in {format(currentMonth, "MMMM yyyy")}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Click any day to add a new date
+          </p>
+        </div>
+      )}
     </div>
   );
 }

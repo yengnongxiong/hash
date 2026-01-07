@@ -34,7 +34,7 @@ type SortDirection = "asc" | "desc" | null;
 
 interface DatesViewProps {
   appointments: AppointmentWithRelations[];
-  customers: Pick<Customer, "id" | "name" | "company">[];
+  customers: Pick<Customer, "id" | "name" | "company" | "customer_number">[];
   appointmentTypes: AppointmentType[];
 }
 
@@ -60,6 +60,9 @@ export function DatesView({ appointments, customers, appointmentTypes }: DatesVi
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
+  // State for creating appointment from calendar
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
 
   const filteredAppointments = useMemo(() => {
     return appointments.filter((apt) => {
@@ -209,6 +212,11 @@ export function DatesView({ appointments, customers, appointmentTypes }: DatesVi
   const handleViewAppointment = (apt: AppointmentWithRelations) => {
     setSelectedAppointment(apt);
     setDetailDialogOpen(true);
+  };
+
+  const handleEmptyDayClick = (date: Date) => {
+    setSelectedDate(date);
+    setCreateDialogOpen(true);
   };
 
   return (
@@ -444,6 +452,7 @@ export function DatesView({ appointments, customers, appointmentTypes }: DatesVi
             const fullApt = appointments.find((a) => a.id === apt.id);
             if (fullApt) handleViewAppointment(fullApt);
           }}
+          onEmptyDayClick={handleEmptyDayClick}
         />
       )}
 
@@ -454,6 +463,18 @@ export function DatesView({ appointments, customers, appointmentTypes }: DatesVi
         onOpenChange={setDetailDialogOpen}
         customers={customers}
         appointmentTypes={appointmentTypes}
+      />
+
+      {/* Create Dialog from Calendar */}
+      <CreateAppointmentDialog
+        customers={customers}
+        appointmentTypes={appointmentTypes}
+        open={createDialogOpen}
+        onOpenChange={(open) => {
+          setCreateDialogOpen(open);
+          if (!open) setSelectedDate(undefined);
+        }}
+        defaultDate={selectedDate}
       />
     </div>
   );

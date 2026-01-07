@@ -252,7 +252,7 @@ export default async function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Upcoming Appointments</CardTitle>
-            <Link href="/customers/appointments">
+            <Link href="/people/appointments">
               <Button variant="ghost" size="sm">
                 View all
                 <ArrowRight className="h-4 w-4 ml-1" />
@@ -291,7 +291,7 @@ export default async function DashboardPage() {
               <div className="text-center py-6 text-muted-foreground">
                 <Calendar className="h-10 w-10 mx-auto mb-3 opacity-50" />
                 <p className="text-sm">No upcoming appointments</p>
-                <Link href="/customers/appointments">
+                <Link href="/people/appointments">
                   <Button variant="link" size="sm" className="mt-2">
                     Schedule one
                   </Button>
@@ -394,11 +394,11 @@ export default async function DashboardPage() {
                 </div>
               </Button>
             </Link>
-            <Link href="/customers">
+            <Link href="/people">
               <Button variant="outline" className="w-full justify-start h-auto py-4">
                 <Users className="h-5 w-5 mr-3" />
                 <div className="text-left">
-                  <div className="font-medium">Manage Customers</div>
+                  <div className="font-medium">Manage People</div>
                   <div className="text-xs text-muted-foreground">View and edit</div>
                 </div>
               </Button>

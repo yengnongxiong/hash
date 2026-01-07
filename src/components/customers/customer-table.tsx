@@ -4,7 +4,7 @@ import { useState, useTransition, useEffect } from "react";
 import { Customer } from "@/types/database";
 import { DataTable } from "@/components/data-table/data-table";
 import { customerColumns } from "./customer-columns";
-import { updateCustomerField, deleteCustomers } from "@/app/(dashboard)/customers/actions";
+import { updateCustomerField, deleteCustomers } from "@/app/(dashboard)/people/actions";
 import { toast } from "sonner";
 
 interface CustomerTableProps {

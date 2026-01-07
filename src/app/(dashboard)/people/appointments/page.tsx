@@ -11,7 +11,7 @@ export default async function AppointmentsPage() {
 
   const { data: customers, error: customersError } = await supabase
     .from("customers")
-    .select("id, name, company")
+    .select("id, name, company, customer_number")
     .order("name");
 
   const { data: appointmentTypes } = await supabase

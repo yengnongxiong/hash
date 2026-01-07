@@ -14,7 +14,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { createCustomer } from "@/app/(dashboard)/customers/actions";
+import { createCustomer } from "@/app/(dashboard)/people/actions";
 import { toast } from "sonner";
 
 export function CreateCustomerDialog() {

@@ -105,7 +105,6 @@ export async function createCustomer(formData: FormData) {
     return { error: error.message };
   }
 
-  revalidatePath("/customers");
   revalidatePath("/people");
   return { success: true };
 }
@@ -158,7 +157,6 @@ export async function updateCustomerField(
     return { error: error.message };
   }
 
-  revalidatePath("/customers");
   revalidatePath("/people");
   return { success: true };
 }
@@ -179,7 +177,6 @@ export async function deleteCustomers(customerIds: string[]) {
     return { error: error.message };
   }
 
-  revalidatePath("/customers");
   revalidatePath("/people");
   return { success: true, count: customerIds.length };
 }
@@ -254,7 +251,7 @@ export async function createAppointment(formData: FormData) {
     return { error: error.message };
   }
 
-  revalidatePath("/customers/appointments");
+  revalidatePath("/people/appointments");
   return { success: true };
 }
 
@@ -273,7 +270,7 @@ export async function updateAppointmentStatus(
     return { error: error.message };
   }
 
-  revalidatePath("/customers/appointments");
+  revalidatePath("/people/appointments");
   return { success: true };
 }
 
@@ -289,7 +286,7 @@ export async function deleteAppointment(appointmentId: string) {
     return { error: error.message };
   }
 
-  revalidatePath("/customers/appointments");
+  revalidatePath("/people/appointments");
   return { success: true };
 }
 
@@ -390,7 +387,6 @@ export async function importCustomersFromCSV(customers: CSVCustomer[]) {
     return { error: insertError.message, errors, imported: 0 };
   }
 
-  revalidatePath("/customers");
   revalidatePath("/people");
   return {
     success: true,

@@ -51,7 +51,7 @@ async function DashboardStats() {
       title: "Total Customers",
       value: customersResult.count ?? 0,
       icon: Users,
-      href: "/customers",
+      href: "/people",
       color: "text-blue-600",
       bgColor: "bg-blue-50 dark:bg-blue-950",
     },
@@ -216,7 +216,7 @@ async function RecentCustomers() {
             <p className="text-sm text-muted-foreground mb-4">
               Add your first customer to start managing relationships
             </p>
-            <Link href="/customers">
+            <Link href="/people">
               <Button>
                 <Users className="h-4 w-4 mr-2" />
                 Add Customer
@@ -232,7 +232,7 @@ async function RecentCustomers() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-lg">Recent Customers</CardTitle>
-        <Link href="/customers">
+        <Link href="/people">
           <Button variant="ghost" size="sm">
             View all
             <ArrowRight className="h-4 w-4 ml-1" />
@@ -299,7 +299,7 @@ async function UpcomingAppointments() {
             <p className="text-xs text-muted-foreground mb-3">
               Schedule appointments with your customers
             </p>
-            <Link href="/customers/appointments">
+            <Link href="/people/appointments">
               <Button size="sm" variant="outline">
                 <Calendar className="h-3 w-3 mr-1" />
                 View Calendar
@@ -321,7 +321,7 @@ async function UpcomingAppointments() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-lg">Upcoming Appointments</CardTitle>
-        <Link href="/customers/appointments">
+        <Link href="/people/appointments">
           <Button variant="ghost" size="sm">
             View all
             <ArrowRight className="h-4 w-4 ml-1" />

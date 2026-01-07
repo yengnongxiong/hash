@@ -33,7 +33,11 @@ Hash is a B2B SaaS platform for document and customer management with AI-powered
 | Phase 3 Polish | Complete | UX improvements |
 
 ### Recently Completed (This Session)
+- **URL Rename**: Changed `/customers` to `/people` throughout the app
 - **Dates Tab Enhancements**
+  - Changed "appointment types" to "date types" in Types dialog
+  - Added search functionality to people selector in New Date dialog
+  - Show unique ID (customer_number) next to people names in selector
   - Multi-select people when creating dates (checkbox popover)
   - Renamed "New Appointment" to "New Date"
   - Sortable columns on all table headers
@@ -90,8 +94,8 @@ Run the following migrations in Supabase SQL Editor:
 ## Supabase Configuration
 
 ```
-Project ID: bqvemwrgblkvvmshwvie
-Region: us-east-1
+Project ID: hbsmvvxdyvzbhetofnbu
+Region: us-east-2
 ```
 
 ### Database Tables
@@ -125,8 +129,8 @@ Region: us-east-1
 src/
 ├── app/
 │   ├── (dashboard)/           # Protected routes (business users)
-│   │   ├── customers/         # Customer management
-│   │   │   └── appointments/  # Customer appointments (legacy)
+│   │   ├── people/            # People management (formerly customers)
+│   │   │   └── appointments/  # People appointments
 │   │   ├── dates/             # Unified dates view (appointments + document dates)
 │   │   ├── documents/         # Document management
 │   │   │   ├── [id]/          # Document detail
@@ -246,13 +250,13 @@ src/
 
 ### Server Actions Pattern
 ```typescript
-// src/app/(dashboard)/customers/actions.ts
+// src/app/(dashboard)/people/actions.ts
 "use server";
 
 export async function createCustomer(formData: FormData) {
   const supabase = await createClient();
   // ... validation and insert
-  revalidatePath("/customers");
+  revalidatePath("/people");
   return { success: true };
 }
 ```
@@ -323,7 +327,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
 Required in `.env.local`:
 ```
-NEXT_PUBLIC_SUPABASE_URL=https://bqvemwrgblkvvmshwvie.supabase.co
+NEXT_PUBLIC_SUPABASE_URL=https://hbsmvvxdyvzbhetofnbu.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
 MISTRAL_API_KEY=<mistral-key>
 ADMIN_EMAIL=yengnongxiong@gmail.com    # Email allowed to access admin panel
@@ -382,7 +386,7 @@ npm run build        # Production build
 npm run lint         # ESLint check
 
 # Supabase (if using CLI)
-npx supabase gen types typescript --project-id bqvemwrgblkvvmshwvie > src/types/database.ts
+npx supabase gen types typescript --project-id hbsmvvxdyvzbhetofnbu > src/types/database.ts
 ```
 
 ## Testing Notes
@@ -391,8 +395,9 @@ The app runs on `http://localhost:3000`. Test accounts:
 - Email: test@example.com (or use magic link)
 
 Key pages to test:
-- `/customers` - People table with gallery view, CSV import/export
-- `/customers/appointments` - People appointments with calendar
+- `/people` - People table with gallery view, CSV import/export
+- `/people/appointments` - People appointments with calendar
+- `/dates` - Unified dates/appointments view
 - `/documents` - Document list with filters and OCR status
 - `/documents/calendar` - Document dates calendar view
 - `/whiteboard` - Realtime kanban board

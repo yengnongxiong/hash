@@ -60,7 +60,7 @@ export async function createAppointment(formData: FormData) {
   }
 
   revalidatePath("/dates");
-  revalidatePath("/customers/appointments");
+  revalidatePath("/people/appointments");
   return { success: true };
 }
 
@@ -92,7 +92,7 @@ export async function updateAppointment(
   }
 
   revalidatePath("/dates");
-  revalidatePath("/customers/appointments");
+  revalidatePath("/people/appointments");
   return { success: true };
 }
 
@@ -106,7 +106,7 @@ export async function deleteAppointment(id: string) {
   }
 
   revalidatePath("/dates");
-  revalidatePath("/customers/appointments");
+  revalidatePath("/people/appointments");
   return { success: true };
 }
 

@@ -131,9 +131,9 @@ export function ActivityFeed({ initialActivities = [] }: ActivityFeedProps) {
       case "document":
         return `/documents/${item.entity_id}`;
       case "customer":
-        return `/customers`;
+        return `/people`;
       case "appointment":
-        return `/customers/appointments`;
+        return `/people/appointments`;
       default:
         return "#";
     }

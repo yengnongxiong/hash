@@ -13,7 +13,7 @@ export default async function DatesPage() {
   // Fetch customers for creating new appointments
   const { data: customers } = await supabase
     .from("customers")
-    .select("id, name, company")
+    .select("id, name, company, customer_number")
     .order("name");
 
   // Fetch appointment types for the organization

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, LayoutGrid, List, Download } from "lucide-react";
-import { getCustomers } from "@/app/(dashboard)/customers/actions";
+import { getCustomers } from "@/app/(dashboard)/people/actions";
 import { exportToCSV } from "@/lib/export";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { CSVImportDialog } from "./csv-import-dialog";

@@ -5,9 +5,11 @@ import { Customer } from "@/types/database";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,7 +28,7 @@ import {
   Save,
   X,
 } from "lucide-react";
-import { updateCustomerField } from "@/app/(dashboard)/customers/actions";
+import { updateCustomerField } from "@/app/(dashboard)/people/actions";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "@/lib/utils/format";
 
@@ -186,6 +188,11 @@ export function CustomerDetailDialog({
               </div>
             )}
           </div>
+          <VisuallyHidden>
+            <DialogDescription>
+              View and edit person details including contact information, tags, and notes.
+            </DialogDescription>
+          </VisuallyHidden>
         </DialogHeader>
 
         <div className="space-y-4 mt-4">

@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle, Download } from "lucide-react";
-import { importCustomersFromCSV } from "@/app/(dashboard)/customers/actions";
+import { importCustomersFromCSV } from "@/app/(dashboard)/people/actions";
 import { toast } from "sonner";
 
 interface CSVRow {

@@ -23,7 +23,7 @@ interface CommandPaletteProps {
 
 const pages = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, keywords: ["home", "overview"] },
-  { name: "People", href: "/customers", icon: Users, keywords: ["crm", "contacts", "customers", "clients"] },
+  { name: "People", href: "/people", icon: Users, keywords: ["crm", "contacts", "customers", "clients"] },
   { name: "Dates", href: "/dates", icon: Calendar, keywords: ["appointments", "meetings", "schedule", "due", "calendar"] },
   { name: "Documents", href: "/documents", icon: FileText, keywords: ["files", "pdfs"] },
   { name: "Upload Document", href: "/documents/upload", icon: Upload, keywords: ["new", "add"] },
@@ -117,7 +117,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                   onSelect={() =>
                     runCommand(() => {
                       if (action.action === "new-customer") {
-                        router.push("/customers?new=true");
+                        router.push("/people?new=true");
                       } else if (action.action === "upload-document") {
                         router.push("/documents/upload");
                       }

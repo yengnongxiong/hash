@@ -27,7 +27,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Plus, ChevronDown, X } from "lucide-react";
+import { Plus, ChevronDown, X, Search } from "lucide-react";
 import { createAppointment } from "@/app/(dashboard)/dates/actions";
 import { toast } from "sonner";
 import { Customer, AppointmentType } from "@/types/database";
@@ -35,16 +35,38 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
 interface CreateAppointmentDialogProps {
-  customers: Pick<Customer, "id" | "name" | "company">[];
+  customers: Pick<Customer, "id" | "name" | "company" | "customer_number">[];
   appointmentTypes?: AppointmentType[];
+  // Controlled mode props
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  defaultDate?: Date;
 }
 
-export function CreateAppointmentDialog({ customers, appointmentTypes = [] }: CreateAppointmentDialogProps) {
-  const [open, setOpen] = useState(false);
+export function CreateAppointmentDialog({
+  customers,
+  appointmentTypes = [],
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
+  defaultDate,
+}: CreateAppointmentDialogProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
   const [peoplePopoverOpen, setPeoplePopoverOpen] = useState(false);
+  const [peopleSearch, setPeopleSearch] = useState("");
   const router = useRouter();
+
+  // Support both controlled and uncontrolled modes
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = (value: boolean) => {
+    if (isControlled) {
+      controlledOnOpenChange?.(value);
+    } else {
+      setInternalOpen(value);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -83,23 +105,44 @@ export function CreateAppointmentDialog({ customers, appointmentTypes = [] }: Cr
 
   const selectedCustomers = customers.filter((c) => selectedCustomerIds.includes(c.id));
 
-  // Default to tomorrow 9 AM
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(9, 0, 0, 0);
-  const defaultStart = tomorrow.toISOString().slice(0, 16);
+  // Filter customers based on search
+  const filteredCustomers = customers.filter((customer) => {
+    if (!peopleSearch) return true;
+    const searchLower = peopleSearch.toLowerCase();
+    return (
+      customer.name.toLowerCase().includes(searchLower) ||
+      customer.company?.toLowerCase().includes(searchLower) ||
+      customer.customer_number?.toLowerCase().includes(searchLower)
+    );
+  });
+
+  // Default to provided date at 9 AM, or tomorrow 9 AM
+  const getDefaultStart = () => {
+    if (defaultDate) {
+      const date = new Date(defaultDate);
+      date.setHours(9, 0, 0, 0);
+      return date.toISOString().slice(0, 16);
+    }
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(9, 0, 0, 0);
+    return tomorrow.toISOString().slice(0, 16);
+  };
+  const defaultStart = getDefaultStart();
 
   return (
     <Dialog open={open} onOpenChange={(o) => {
       setOpen(o);
       if (!o) setSelectedCustomerIds([]);
     }}>
-      <DialogTrigger asChild>
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          New Date
-        </Button>
-      </DialogTrigger>
+      {!isControlled && (
+        <DialogTrigger asChild>
+          <Button>
+            <Plus className="h-4 w-4 mr-2" />
+            New Date
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Schedule Date</DialogTitle>
@@ -121,7 +164,10 @@ export function CreateAppointmentDialog({ customers, appointmentTypes = [] }: Cr
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>People</Label>
-              <Popover open={peoplePopoverOpen} onOpenChange={setPeoplePopoverOpen}>
+              <Popover open={peoplePopoverOpen} onOpenChange={(open) => {
+                setPeoplePopoverOpen(open);
+                if (!open) setPeopleSearch("");
+              }}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
@@ -134,12 +180,25 @@ export function CreateAppointmentDialog({ customers, appointmentTypes = [] }: Cr
                     <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[250px] p-0" align="start">
-                  <div className="max-h-[300px] overflow-y-auto p-1">
-                    {customers.length === 0 ? (
-                      <p className="p-2 text-sm text-muted-foreground">No people found</p>
+                <PopoverContent className="w-[280px] p-0" align="start">
+                  <div className="p-2 border-b">
+                    <div className="relative">
+                      <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        placeholder="Search people..."
+                        value={peopleSearch}
+                        onChange={(e) => setPeopleSearch(e.target.value)}
+                        className="pl-8 h-8"
+                      />
+                    </div>
+                  </div>
+                  <div className="max-h-[250px] overflow-y-auto p-1">
+                    {filteredCustomers.length === 0 ? (
+                      <p className="p-2 text-sm text-muted-foreground text-center">
+                        {customers.length === 0 ? "No people found" : "No matches found"}
+                      </p>
                     ) : (
-                      customers.map((customer) => (
+                      filteredCustomers.map((customer) => (
                         <div
                           key={customer.id}
                           className="flex items-center gap-2 p-2 hover:bg-muted rounded cursor-pointer"
@@ -150,7 +209,14 @@ export function CreateAppointmentDialog({ customers, appointmentTypes = [] }: Cr
                             onCheckedChange={() => toggleCustomer(customer.id)}
                           />
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm truncate">{customer.name}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm truncate">{customer.name}</p>
+                              {customer.customer_number && (
+                                <span className="text-xs text-muted-foreground font-mono">
+                                  {customer.customer_number}
+                                </span>
+                              )}
+                            </div>
                             {customer.company && (
                               <p className="text-xs text-muted-foreground truncate">
                                 {customer.company}
@@ -168,6 +234,11 @@ export function CreateAppointmentDialog({ customers, appointmentTypes = [] }: Cr
                   {selectedCustomers.map((customer) => (
                     <Badge key={customer.id} variant="secondary" className="gap-1">
                       {customer.name}
+                      {customer.customer_number && (
+                        <span className="text-muted-foreground font-mono text-[10px]">
+                          {customer.customer_number}
+                        </span>
+                      )}
                       <button
                         type="button"
                         onClick={() => removeCustomer(customer.id)}

@@ -66,7 +66,7 @@ export function AppointmentTypesDialog({ appointmentTypes }: AppointmentTypesDia
       if (result.error) {
         toast.error("Failed to create type", { description: result.error });
       } else {
-        toast.success("Appointment type created");
+        toast.success("Date type created");
         setNewTypeName("");
         setNewTypeColor("bg-blue-500");
         router.refresh();
@@ -97,9 +97,9 @@ export function AppointmentTypesDialog({ appointmentTypes }: AppointmentTypesDia
       </DialogTrigger>
       <DialogContent className="sm:max-w-[450px]">
         <DialogHeader>
-          <DialogTitle>Appointment Types</DialogTitle>
+          <DialogTitle>Date Types</DialogTitle>
           <DialogDescription>
-            Manage appointment types for your organization. Types help categorize and color-code your appointments.
+            Manage date types for your organization. Types help categorize and color-code your dates.
           </DialogDescription>
         </DialogHeader>
 
@@ -109,7 +109,7 @@ export function AppointmentTypesDialog({ appointmentTypes }: AppointmentTypesDia
             <Label>Current Types</Label>
             {appointmentTypes.length === 0 ? (
               <p className="text-sm text-muted-foreground py-4 text-center">
-                No appointment types yet. Create one below.
+                No date types yet. Create one below.
               </p>
             ) : (
               <div className="space-y-2 max-h-[200px] overflow-y-auto">
@@ -136,7 +136,7 @@ export function AppointmentTypesDialog({ appointmentTypes }: AppointmentTypesDia
                         <AlertDialogHeader>
                           <AlertDialogTitle>Delete Type</AlertDialogTitle>
                           <AlertDialogDescription>
-                            Are you sure you want to delete &quot;{type.name}&quot;? Appointments using this type will have their type cleared.
+                            Are you sure you want to delete &quot;{type.name}&quot;? Dates using this type will have their type cleared.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>

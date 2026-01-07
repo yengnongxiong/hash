@@ -31,7 +31,7 @@ export function useKeyboardShortcuts(
         key: "c",
         meta: true,
         shift: true,
-        action: () => router.push("/customers"),
+        action: () => router.push("/people"),
         description: "Go to People",
       },
       {

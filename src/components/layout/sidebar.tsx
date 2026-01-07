@@ -34,7 +34,7 @@ import { useState } from "react";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "People", href: "/customers", icon: Users },
+  { name: "People", href: "/people", icon: Users },
   { name: "Dates", href: "/dates", icon: Calendar },
   { name: "Documents", href: "/documents", icon: FileText },
   { name: "Upload", href: "/documents/upload", icon: Upload },

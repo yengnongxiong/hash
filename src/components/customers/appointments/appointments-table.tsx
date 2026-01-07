@@ -18,7 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, Check, X, Trash } from "lucide-react";
-import { updateAppointmentStatus, deleteAppointment } from "@/app/(dashboard)/customers/actions";
+import { updateAppointmentStatus, deleteAppointment } from "@/app/(dashboard)/people/actions";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
