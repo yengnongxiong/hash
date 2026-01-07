@@ -24,7 +24,7 @@ export default async function CustomersPage() {
         <div>
           <h1 className="text-2xl font-bold">People</h1>
           <p className="text-muted-foreground">
-            Manage your contacts and clients. Click any cell to edit inline.
+            Manage your contacts and clients. View to edit or delete.
           </p>
         </div>
         <CreateCustomerDialog />

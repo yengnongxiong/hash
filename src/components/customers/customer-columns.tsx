@@ -60,7 +60,7 @@ export const customerColumns: ColumnDef<Customer>[] = [
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Name" />
     ),
-    cell: (props) => <EditableCell {...props} truncate />,
+    cell: (props) => <EditableCell {...props} truncate emptyLabel="name" />,
   },
   {
     accessorKey: "company",
@@ -68,7 +68,7 @@ export const customerColumns: ColumnDef<Customer>[] = [
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Company" />
     ),
-    cell: (props) => <EditableCell {...props} truncate />,
+    cell: (props) => <EditableCell {...props} truncate emptyLabel="company" />,
   },
   {
     accessorKey: "email",
@@ -76,7 +76,7 @@ export const customerColumns: ColumnDef<Customer>[] = [
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Email" />
     ),
-    cell: (props) => <EditableCell {...props} type="email" truncate />,
+    cell: (props) => <EditableCell {...props} truncate emptyLabel="email" />,
   },
   {
     accessorKey: "phone",
@@ -84,7 +84,7 @@ export const customerColumns: ColumnDef<Customer>[] = [
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Phone" />
     ),
-    cell: (props) => <EditableCell {...props} type="phone" truncate />,
+    cell: (props) => <EditableCell {...props} truncate emptyLabel="phone" />,
   },
   {
     accessorKey: "address",
@@ -92,7 +92,7 @@ export const customerColumns: ColumnDef<Customer>[] = [
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Address" />
     ),
-    cell: (props) => <EditableCell {...props} truncate />,
+    cell: (props) => <EditableCell {...props} truncate emptyLabel="address" />,
   },
   {
     accessorKey: "tags",
@@ -118,7 +118,7 @@ export const customerColumns: ColumnDef<Customer>[] = [
   },
   {
     accessorKey: "updated_at",
-    size: 80,
+    size: 100,
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Last Edited" />
     ),

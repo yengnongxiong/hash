@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { Customer } from "@/types/database";
 import {
   Dialog,
@@ -77,6 +77,20 @@ export function CustomerDetailDialog({
   const [isPending, startTransition] = useTransition();
   const [editedCustomer, setEditedCustomer] = useState<Partial<Customer>>({});
   const router = useRouter();
+
+  // Reset editing state when dialog closes or customer changes
+  useEffect(() => {
+    if (!open) {
+      setIsEditing(false);
+      setEditedCustomer({});
+    }
+  }, [open]);
+
+  // Also reset when switching to a different customer
+  useEffect(() => {
+    setIsEditing(false);
+    setEditedCustomer({});
+  }, [customer?.id]);
 
   const handleDelete = () => {
     if (!customer) return;
@@ -297,7 +311,7 @@ export function CustomerDetailDialog({
             ) : (
               <p className="text-sm pl-6 truncate">
                 {currentData.company || (
-                  <span className="text-muted-foreground italic">Not set</span>
+                  <span className="text-muted-foreground italic">No company</span>
                 )}
               </p>
             )}
@@ -331,7 +345,7 @@ export function CustomerDetailDialog({
                     {currentData.email}
                   </a>
                 ) : (
-                  <span className="text-muted-foreground italic">Not set</span>
+                  <span className="text-muted-foreground italic">No email</span>
                 )}
               </p>
             )}
@@ -365,7 +379,7 @@ export function CustomerDetailDialog({
                     {currentData.phone}
                   </a>
                 ) : (
-                  <span className="text-muted-foreground italic">Not set</span>
+                  <span className="text-muted-foreground italic">No phone</span>
                 )}
               </p>
             )}
@@ -391,7 +405,7 @@ export function CustomerDetailDialog({
             ) : (
               <p className="text-sm pl-6 truncate">
                 {currentData.address || (
-                  <span className="text-muted-foreground italic">Not set</span>
+                  <span className="text-muted-foreground italic">No address</span>
                 )}
               </p>
             )}

@@ -4,7 +4,8 @@ import { Customer } from "@/types/database";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Building2, Mail, Phone, MapPin } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Building2, Mail, Phone, MapPin, Eye } from "lucide-react";
 import { formatDistanceToNow } from "@/lib/utils/format";
 
 interface CustomerCardProps {
@@ -88,8 +89,22 @@ export function CustomerCard({ customer, onClick }: CustomerCardProps) {
           </div>
         )}
 
-        <div className="mt-3 text-xs text-muted-foreground">
-          Updated {formatDistanceToNow(new Date(customer.updated_at))}
+        <div className="mt-3 flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">
+            Updated {formatDistanceToNow(new Date(customer.updated_at))}
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClick();
+            }}
+          >
+            <Eye className="h-3.5 w-3.5 mr-1" />
+            View
+          </Button>
         </div>
       </CardContent>
     </Card>
