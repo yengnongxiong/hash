@@ -162,83 +162,83 @@ export function AppointmentDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto overflow-x-hidden">
-        <DialogHeader className="pr-8">
-          <div className="flex items-center justify-between gap-2">
-            <DialogTitle className="flex items-center gap-2 min-w-0 flex-1">
-              {isEditing ? (
-                "Edit Date"
-              ) : (
-                <>
-                  <div
-                    className={cn(
-                      "w-3 h-3 rounded-full shrink-0",
-                      appointment.appointment_types?.color || "bg-blue-500"
-                    )}
-                  />
-                  <span className="truncate">{appointment.title}</span>
-                </>
-              )}
-            </DialogTitle>
-            {!isEditing && (
-              <TooltipProvider>
-                <div className="flex items-center gap-1">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setIsEditing(true)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Edit date</p>
-                    </TooltipContent>
-                  </Tooltip>
-                  <AlertDialog>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Delete date</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Delete Date</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Are you sure you want to delete this date? This action cannot be undone.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={handleDelete}
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      >
-                        Delete
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                  </AlertDialog>
-                </div>
-              </TooltipProvider>
+      <DialogContent className="sm:max-w-[550px] max-h-[90vh] flex flex-col">
+        <DialogHeader className="pr-20 shrink-0">
+          <DialogTitle className="flex items-center gap-2 min-w-0">
+            {isEditing ? (
+              "Edit Date"
+            ) : (
+              <>
+                <div
+                  className={cn(
+                    "w-3 h-3 rounded-full shrink-0",
+                    appointment.appointment_types?.color || "border border-muted-foreground"
+                  )}
+                />
+                <span className="truncate">{appointment.title}</span>
+              </>
             )}
-          </div>
+          </DialogTitle>
           <DialogDescription>
             {isEditing ? "Update the date details below." : "View date details."}
           </DialogDescription>
         </DialogHeader>
 
+        {/* Action buttons - positioned absolutely with enough space from close button */}
+        {!isEditing && (
+          <div className="absolute right-14 top-4 flex items-center gap-1 z-10">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setIsEditing(true)}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Edit date</p>
+                </TooltipContent>
+              </Tooltip>
+              <AlertDialog>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Delete date</p>
+                  </TooltipContent>
+                </Tooltip>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Date</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to delete this date? This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDelete}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </TooltipProvider>
+          </div>
+        )}
+
         {isEditing ? (
-          <div className="space-y-4">
+          <div className="space-y-4 overflow-y-auto flex-1">
             <div className="space-y-2">
               <Label htmlFor="edit-title">Title *</Label>
               <Input
@@ -357,9 +357,9 @@ export function AppointmentDetailDialog({
                   <SelectItem value="none">No type</SelectItem>
                   {appointmentTypes.map((type) => (
                     <SelectItem key={type.id} value={type.id}>
-                      <div className="flex items-center gap-2">
-                        <div className={cn("w-2 h-2 rounded-full", type.color)} />
-                        {type.name}
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className={cn("w-2 h-2 rounded-full shrink-0", type.color)} />
+                        <span className="truncate">{type.name}</span>
                       </div>
                     </SelectItem>
                   ))}
@@ -437,7 +437,7 @@ export function AppointmentDetailDialog({
             </div>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-4 overflow-y-auto flex-1">
             {/* Date & Time */}
             <div className="flex items-start gap-3">
               <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
@@ -500,9 +500,11 @@ export function AppointmentDetailDialog({
 
             {/* Description */}
             {appointment.description && (
-              <div className="pt-2 border-t overflow-hidden">
+              <div className="pt-2 border-t">
                 <p className="text-sm text-muted-foreground mb-1">Notes</p>
-                <p className="text-sm line-clamp-3">{appointment.description}</p>
+                <div className="max-h-[150px] overflow-y-auto">
+                  <p className="text-sm break-words whitespace-pre-wrap">{appointment.description}</p>
+                </div>
               </div>
             )}
 

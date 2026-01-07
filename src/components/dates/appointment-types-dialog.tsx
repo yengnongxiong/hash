@@ -116,11 +116,11 @@ export function AppointmentTypesDialog({ appointmentTypes }: AppointmentTypesDia
                 {appointmentTypes.map((type) => (
                   <div
                     key={type.id}
-                    className="flex items-center justify-between p-3 border rounded-lg"
+                    className="flex items-center justify-between gap-2 p-3 border rounded-lg"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className={cn("w-4 h-4 rounded-full", type.color)} />
-                      <span className="font-medium">{type.name}</span>
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className={cn("w-4 h-4 rounded-full shrink-0", type.color)} />
+                      <span className="font-medium truncate">{type.name}</span>
                     </div>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>

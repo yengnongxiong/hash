@@ -232,17 +232,17 @@ export function CreateAppointmentDialog({
               {selectedCustomers.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-2">
                   {selectedCustomers.map((customer) => (
-                    <Badge key={customer.id} variant="secondary" className="gap-1">
-                      {customer.name}
+                    <Badge key={customer.id} variant="secondary" className="gap-1 max-w-full">
+                      <span className="truncate max-w-[100px]">{customer.name}</span>
                       {customer.customer_number && (
-                        <span className="text-muted-foreground font-mono text-[10px]">
+                        <span className="text-muted-foreground font-mono text-[10px] shrink-0">
                           {customer.customer_number}
                         </span>
                       )}
                       <button
                         type="button"
                         onClick={() => removeCustomer(customer.id)}
-                        className="ml-1 hover:text-destructive"
+                        className="ml-1 hover:text-destructive shrink-0"
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -261,9 +261,9 @@ export function CreateAppointmentDialog({
                 <SelectContent>
                   {appointmentTypes.map((type) => (
                     <SelectItem key={type.id} value={type.id}>
-                      <div className="flex items-center gap-2">
-                        <div className={cn("w-2 h-2 rounded-full", type.color)} />
-                        {type.name}
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className={cn("w-2 h-2 rounded-full shrink-0", type.color)} />
+                        <span className="truncate">{type.name}</span>
                       </div>
                     </SelectItem>
                   ))}
