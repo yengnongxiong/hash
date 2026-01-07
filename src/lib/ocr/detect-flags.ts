@@ -228,3 +228,38 @@ export async function getDocumentFlags(documentId: string) {
 
   return data || [];
 }
+
+export async function resolveAllDocumentFlags(
+  documentId: string
+): Promise<{ success: boolean; count: number; error?: string }> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // Get count of unresolved flags first
+  const { count } = await supabase
+    .from("document_flags")
+    .select("*", { count: "exact", head: true })
+    .eq("document_id", documentId)
+    .eq("resolved", false);
+
+  // Resolve all unresolved flags for this document
+  const { error } = await supabase
+    .from("document_flags")
+    .update({
+      resolved: true,
+      resolved_by: user?.id,
+      resolved_at: new Date().toISOString(),
+    })
+    .eq("document_id", documentId)
+    .eq("resolved", false);
+
+  if (error) {
+    console.error("Error resolving all flags:", error);
+    return { success: false, count: 0, error: error.message };
+  }
+
+  return { success: true, count: count || 0 };
+}

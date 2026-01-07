@@ -66,6 +66,15 @@ export async function linkDocumentToCustomer(
 ) {
   const supabase = await createClient();
 
+  // Get current document to check previous customer
+  const { data: document } = await supabase
+    .from("documents")
+    .select("customer_id")
+    .eq("id", documentId)
+    .single();
+
+  const previousCustomerId = document?.customer_id;
+
   const { error } = await supabase
     .from("documents")
     .update({
@@ -78,7 +87,64 @@ export async function linkDocumentToCustomer(
     return { error: error.message };
   }
 
+  // Create audit log for link/unlink action
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (customerId) {
+    // Get customer name for audit log
+    const { data: customer } = await supabase
+      .from("customers")
+      .select("name, company")
+      .eq("id", customerId)
+      .single();
+
+    await supabase.from("document_audit_log").insert({
+      document_id: documentId,
+      user_id: user?.id,
+      action: "linked_customer",
+      details: {
+        customerId,
+        customerName: customer?.name || "Unknown",
+        customerCompany: customer?.company,
+      },
+    });
+  } else if (previousCustomerId) {
+    // Get previous customer name for audit log
+    const { data: previousCustomer } = await supabase
+      .from("customers")
+      .select("name, company")
+      .eq("id", previousCustomerId)
+      .single();
+
+    await supabase.from("document_audit_log").insert({
+      document_id: documentId,
+      user_id: user?.id,
+      action: "unlinked_customer",
+      details: {
+        previousCustomerId,
+        previousCustomerName: previousCustomer?.name || "Unknown",
+      },
+    });
+  }
+
   revalidatePath(`/documents/${documentId}`);
   revalidatePath("/documents");
   return { success: true };
+}
+
+export async function logDocumentDownload(documentId: string) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  await supabase.from("document_audit_log").insert({
+    document_id: documentId,
+    user_id: user?.id,
+    action: "downloaded",
+    details: {},
+  });
 }

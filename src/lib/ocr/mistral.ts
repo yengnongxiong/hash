@@ -4,9 +4,10 @@ import {
   OCRPage,
   ExtractedDocumentData,
   DocumentType,
+  ConfidenceLevel,
 } from "./types";
 
-const EXTRACTION_PROMPT = `You are an expert document analyst. Analyze this document and extract structured information.
+const EXTRACTION_PROMPT = `You are an expert document analyst. Analyze this document and extract structured information with confidence scores.
 
 First, identify the document type (invoice, receipt, contract, or other).
 
@@ -26,9 +27,20 @@ For ALL documents:
 - Any important dates (with type: due_date, invoice_date, expiration, effective, transaction, other)
 - Any monetary amounts (with type: total, subtotal, tax, line_item, other)
 
+IMPORTANT: Also provide confidence scores for each extracted field:
+- "high" = clearly visible, unambiguous, high certainty (>90%)
+- "medium" = partially visible or slightly ambiguous (60-90%)
+- "low" = unclear, estimated, or uncertain (<60%)
+
 Return your analysis as a JSON object with this structure:
 {
   "documentType": "invoice" | "receipt" | "contract" | "other",
+  "documentTypeConfidence": "high" | "medium" | "low",
+  "fieldConfidence": {
+    "invoiceNumber": "high" | "medium" | "low",
+    "vendorName": "high" | "medium" | "low",
+    ...for each extracted field
+  },
   "invoiceNumber": "string or null",
   "vendorName": "string or null",
   "merchantName": "string or null",
@@ -51,7 +63,8 @@ Return your analysis as a JSON object with this structure:
   "amounts": [{"amount": number, "currency": "string", "type": "string", "context": "string"}]
 }
 
-Only include fields that are present in the document. Return null for missing fields.`;
+Only include fields that are present in the document. Return null for missing fields.
+Include fieldConfidence for every non-null field you extract.`;
 
 export class MistralOCRProvider implements OCRProvider {
   name = "mistral";
@@ -262,11 +275,30 @@ export class MistralOCRProvider implements OCRProvider {
   }
 
   private normalizeExtractedData(parsed: Record<string, unknown>): ExtractedDocumentData {
+    // Calculate overall confidence from field confidences
+    const fieldConfidence = parsed.fieldConfidence as Record<string, ConfidenceLevel> | undefined;
+    let overallConfidence: ConfidenceLevel = "high";
+
+    if (fieldConfidence) {
+      const confidenceValues = Object.values(fieldConfidence);
+      const lowCount = confidenceValues.filter(c => c === "low").length;
+      const mediumCount = confidenceValues.filter(c => c === "medium").length;
+
+      if (lowCount > confidenceValues.length * 0.3) {
+        overallConfidence = "low";
+      } else if (mediumCount > confidenceValues.length * 0.3 || lowCount > 0) {
+        overallConfidence = "medium";
+      }
+    }
+
     return {
       documentType: (parsed.documentType as DocumentType) || "other",
+      documentTypeConfidence: (parsed.documentTypeConfidence as ConfidenceLevel) || "high",
       pageCount: 1,
       hasImages: false,
       hasTables: Array.isArray(parsed.lineItems) && parsed.lineItems.length > 0,
+      overallConfidence,
+      fieldConfidence: fieldConfidence || {},
       // Invoice fields
       invoiceNumber: parsed.invoiceNumber as string | undefined,
       vendorName: parsed.vendorName as string | undefined,

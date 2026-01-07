@@ -443,6 +443,49 @@ export type Database = {
           }
         ];
       };
+      document_dates: {
+        Row: {
+          id: string;
+          document_id: string;
+          date_type: string;
+          date_value: string;
+          label: string | null;
+          description: string | null;
+          is_manual: boolean | null;
+          created_at: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          document_id: string;
+          date_type: string;
+          date_value: string;
+          label?: string | null;
+          description?: string | null;
+          is_manual?: boolean | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          document_id?: string;
+          date_type?: string;
+          date_value?: string;
+          label?: string | null;
+          description?: string | null;
+          is_manual?: boolean | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "document_dates_document_id_fkey";
+            columns: ["document_id"];
+            referencedRelation: "documents";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       system_alerts: {
         Row: {
           id: string;
@@ -629,10 +672,13 @@ export interface DocumentFlag {
 export interface DocumentDate {
   id: string;
   document_id: string;
-  date_type: "due_date" | "invoice_date" | "expiration" | "effective" | "transaction" | "other";
+  date_type: "due_date" | "invoice_date" | "expiration" | "effective" | "transaction" | "custom" | "other";
   date_value: string;
+  label?: string;
   description?: string;
+  is_manual: boolean;
   created_at: string;
+  updated_at: string;
 }
 
 export type WhiteboardTask = Tables<"whiteboard_tasks">;

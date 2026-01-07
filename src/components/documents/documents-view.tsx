@@ -9,10 +9,17 @@ import {
   RotateCw,
   ExternalLink,
   Search,
-  Filter,
   X,
   Download,
   Calendar as CalendarIcon,
+  AlertTriangle,
+  Flag,
+  CheckCircle2,
+  Clock,
+  AlertCircle,
+  Loader2,
+  FileImage,
+  FileSpreadsheet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +37,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Calendar } from "@/components/ui/calendar";
 import { ProcessingStatus } from "./processing-status";
 import {
@@ -46,6 +59,8 @@ import { useTransition } from "react";
 
 interface DocumentWithCustomer extends Document {
   customers?: { name: string; company: string | null } | null;
+  flag_count?: number;
+  unresolved_flag_count?: number;
 }
 
 interface DocumentsViewProps {
@@ -54,6 +69,33 @@ interface DocumentsViewProps {
 
 type StatusFilter = "all" | "pending" | "processing" | "completed" | "failed";
 type TypeFilter = "all" | "invoice" | "receipt" | "contract" | "other";
+type FlagFilter = "all" | "has_flags" | "no_flags";
+
+// Helper to get file icon based on type
+function getFileIcon(fileType: string | null) {
+  if (fileType?.startsWith("image/")) {
+    return <FileImage className="h-4 w-4 text-blue-500" />;
+  }
+  if (fileType === "application/pdf") {
+    return <FileText className="h-4 w-4 text-red-500" />;
+  }
+  return <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />;
+}
+
+// Helper to get confidence badge
+function getConfidenceBadge(confidence?: string) {
+  if (!confidence) return null;
+  const colors = {
+    high: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+    medium: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
+    low: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+  };
+  return (
+    <Badge variant="outline" className={cn("text-xs", colors[confidence as keyof typeof colors])}>
+      {confidence}
+    </Badge>
+  );
+}
 
 export function DocumentsView({ documents }: DocumentsViewProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -63,6 +105,7 @@ export function DocumentsView({ documents }: DocumentsViewProps) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+  const [flagFilter, setFlagFilter] = useState<FlagFilter>("all");
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
 
@@ -93,6 +136,14 @@ export function DocumentsView({ documents }: DocumentsViewProps) {
         return false;
       }
 
+      // Flag filter
+      if (flagFilter === "has_flags" && (!doc.unresolved_flag_count || doc.unresolved_flag_count === 0)) {
+        return false;
+      }
+      if (flagFilter === "no_flags" && doc.unresolved_flag_count && doc.unresolved_flag_count > 0) {
+        return false;
+      }
+
       // Date range filter
       if (dateFrom) {
         const docDate = new Date(doc.created_at);
@@ -107,17 +158,24 @@ export function DocumentsView({ documents }: DocumentsViewProps) {
 
       return true;
     });
-  }, [documents, debouncedSearch, statusFilter, typeFilter, dateFrom, dateTo]);
+  }, [documents, debouncedSearch, statusFilter, typeFilter, flagFilter, dateFrom, dateTo]);
+
+  // Count documents with flags
+  const flaggedDocumentsCount = useMemo(() => {
+    return documents.filter(d => d.unresolved_flag_count && d.unresolved_flag_count > 0).length;
+  }, [documents]);
 
   const hasActiveFilters =
     statusFilter !== "all" ||
     typeFilter !== "all" ||
+    flagFilter !== "all" ||
     dateFrom !== undefined ||
     dateTo !== undefined;
 
   const clearFilters = () => {
     setStatusFilter("all");
     setTypeFilter("all");
+    setFlagFilter("all");
     setDateFrom(undefined);
     setDateTo(undefined);
   };
@@ -224,6 +282,37 @@ export function DocumentsView({ documents }: DocumentsViewProps) {
             <SelectItem value="receipt">Receipt</SelectItem>
             <SelectItem value="contract">Contract</SelectItem>
             <SelectItem value="other">Other</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {/* Flag Filter */}
+        <Select
+          value={flagFilter}
+          onValueChange={(v) => setFlagFilter(v as FlagFilter)}
+        >
+          <SelectTrigger className={cn(
+            "w-[150px]",
+            flagFilter === "has_flags" && "border-red-300 dark:border-red-700"
+          )}>
+            <div className="flex items-center gap-2">
+              {flagFilter === "has_flags" && <Flag className="h-3 w-3 text-red-500" />}
+              <SelectValue placeholder="Flags" />
+            </div>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Documents</SelectItem>
+            <SelectItem value="has_flags">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-3 w-3 text-red-500" />
+                Has Flags ({flaggedDocumentsCount})
+              </div>
+            </SelectItem>
+            <SelectItem value="no_flags">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-3 w-3 text-green-500" />
+                No Flags
+              </div>
+            </SelectItem>
           </SelectContent>
         </Select>
 
@@ -353,9 +442,10 @@ export function DocumentsView({ documents }: DocumentsViewProps) {
                 </th>
                 <th className="text-left p-3 text-sm font-medium">ID</th>
                 <th className="text-left p-3 text-sm font-medium">Document</th>
-                <th className="text-left p-3 text-sm font-medium">Customer</th>
+                <th className="text-left p-3 text-sm font-medium">Person</th>
                 <th className="text-left p-3 text-sm font-medium">Type</th>
                 <th className="text-left p-3 text-sm font-medium">Status</th>
+                <th className="text-left p-3 text-sm font-medium">Flags</th>
                 <th className="text-left p-3 text-sm font-medium">Uploaded</th>
                 <th className="w-20 p-3"></th>
               </tr>
@@ -379,9 +469,9 @@ export function DocumentsView({ documents }: DocumentsViewProps) {
                       href={`/documents/${doc.id}`}
                       className="flex items-center gap-2 hover:underline"
                     >
-                      <FileText className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="font-medium text-sm">{doc.file_name}</p>
+                      {getFileIcon(doc.file_type)}
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm truncate max-w-[200px]">{doc.file_name}</p>
                         <p className="text-xs text-muted-foreground">
                           {formatFileSize(doc.file_size || 0)}
                         </p>
@@ -390,7 +480,7 @@ export function DocumentsView({ documents }: DocumentsViewProps) {
                   </td>
                   <td className="p-3 text-sm">
                     {doc.customers ? (
-                      <span>
+                      <span className="truncate max-w-[150px] block">
                         {doc.customers.name}
                         {doc.customers.company && (
                           <span className="text-muted-foreground">
@@ -403,11 +493,48 @@ export function DocumentsView({ documents }: DocumentsViewProps) {
                       <span className="text-muted-foreground">-</span>
                     )}
                   </td>
-                  <td className="p-3 text-sm capitalize">
-                    {doc.document_type || "-"}
+                  <td className="p-3">
+                    <Badge variant="outline" className="capitalize text-xs">
+                      {doc.document_type || "other"}
+                    </Badge>
                   </td>
                   <td className="p-3">
                     <ProcessingStatus status={doc.status} />
+                  </td>
+                  <td className="p-3">
+                    <TooltipProvider>
+                      {doc.unresolved_flag_count && doc.unresolved_flag_count > 0 ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Link href={`/documents/${doc.id}`}>
+                              <Badge
+                                variant="destructive"
+                                className="gap-1 cursor-pointer hover:bg-destructive/90"
+                              >
+                                <AlertTriangle className="h-3 w-3" />
+                                {doc.unresolved_flag_count}
+                              </Badge>
+                            </Link>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{doc.unresolved_flag_count} unresolved flag(s) - click to view</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : doc.status === "completed" ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                              <CheckCircle2 className="h-4 w-4" />
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>No issues detected</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">-</span>
+                      )}
+                    </TooltipProvider>
                   </td>
                   <td className="p-3 text-sm text-muted-foreground">
                     {formatDistanceToNow(new Date(doc.created_at))}

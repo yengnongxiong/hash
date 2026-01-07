@@ -18,11 +18,33 @@ export interface OCRResult {
   error?: string;
 }
 
+/**
+ * Confidence level for extracted fields
+ * high: >90% confident, likely accurate
+ * medium: 60-90% confident, may need review
+ * low: <60% confident, requires human verification
+ */
+export type ConfidenceLevel = "high" | "medium" | "low";
+
+/**
+ * A field value with associated confidence score
+ */
+export interface ConfidentValue<T> {
+  value: T;
+  confidence: ConfidenceLevel;
+  rawText?: string; // Original text from which value was extracted
+}
+
 export interface ExtractedDocumentData {
   documentType?: DocumentType;
+  documentTypeConfidence?: ConfidenceLevel;
   pageCount: number;
   hasImages: boolean;
   hasTables: boolean;
+  // Overall extraction confidence (average of all fields)
+  overallConfidence?: ConfidenceLevel;
+  // Field-level confidence scores
+  fieldConfidence?: Record<string, ConfidenceLevel>;
   // Invoice fields
   invoiceNumber?: string;
   vendorName?: string;

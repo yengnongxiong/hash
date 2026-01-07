@@ -27,6 +27,7 @@ export function DocumentFlagsWrapper({
   // Convert database flags to component format
   const flags = initialFlags.map((flag) => ({
     id: flag.id,
+    document_id: flag.document_id || documentId,
     flag_type: flag.flag_type,
     severity: flag.severity,
     message: flag.message,
