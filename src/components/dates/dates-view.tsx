@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { AppointmentWithRelations, AppointmentType, Customer } from "@/types/database";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,8 @@ import { CreateAppointmentDialog } from "@/components/customers/appointments/cre
 import { AppointmentDetailDialog } from "./appointment-detail-dialog";
 import { AppointmentTypesDialog } from "./appointment-types-dialog";
 import { DatesCalendar } from "./dates-calendar";
+import { DatesCSVImportDialog } from "./csv-import-dialog";
+import { exportToCSV, formatDateTime } from "@/lib/export";
 import {
   List,
   Calendar as CalendarIcon,
@@ -18,6 +20,7 @@ import {
   ArrowUp,
   ArrowUpDown,
   Circle,
+  Download,
 } from "lucide-react";
 import {
   format,
@@ -219,6 +222,27 @@ export function DatesView({ appointments, customers, appointmentTypes }: DatesVi
     setCreateDialogOpen(true);
   };
 
+  const handleExport = useCallback(() => {
+    exportToCSV(sortedAppointments, "dates", [
+      { key: "title", label: "Title" },
+      { key: "start_time", label: "Date", format: (v) => formatDateTime(v as string) },
+      { key: "end_time", label: "End Time", format: (v) => v ? formatDateTime(v as string) : "" },
+      { key: "customers", label: "Person", format: (v) => {
+        const customer = v as AppointmentWithRelations["customers"];
+        return customer?.name || "";
+      }},
+      { key: "appointment_types", label: "Type", format: (v) => {
+        const type = v as AppointmentWithRelations["appointment_types"];
+        return type?.name || "";
+      }},
+      { key: "location", label: "Location", format: (v) => (v as string) || "" },
+      { key: "description", label: "Description", format: (v) => (v as string) || "" },
+      { key: "status", label: "Status" },
+      { key: "created_at", label: "Created", format: (v) => formatDateTime(v as string) },
+      { key: "updated_at", label: "Updated", format: (v) => formatDateTime(v as string) },
+    ]);
+  }, [sortedAppointments]);
+
   return (
     <div className="space-y-4">
       {/* Stats */}
@@ -292,6 +316,15 @@ export function DatesView({ appointments, customers, appointmentTypes }: DatesVi
 
         {/* Manage Types */}
         <AppointmentTypesDialog appointmentTypes={appointmentTypes} />
+
+        {/* Import */}
+        <DatesCSVImportDialog customers={customers} appointmentTypes={appointmentTypes} />
+
+        {/* Export */}
+        <Button variant="outline" size="sm" onClick={handleExport}>
+          <Download className="h-4 w-4 mr-2" />
+          Export
+        </Button>
 
         {/* Create Appointment */}
         <CreateAppointmentDialog customers={customers} appointmentTypes={appointmentTypes} />
@@ -374,7 +407,7 @@ export function DatesView({ appointments, customers, appointmentTypes }: DatesVi
                           </div>
                         </div>
                       </td>
-                      <td className="p-3">
+                      <td className="p-3 max-w-0">
                         <p className="font-medium text-sm truncate">
                           {apt.title}
                         </p>
@@ -384,9 +417,9 @@ export function DatesView({ appointments, customers, appointmentTypes }: DatesVi
                           </p>
                         )}
                       </td>
-                      <td className="p-3 text-sm">
+                      <td className="p-3 text-sm max-w-0">
                         {apt.customers ? (
-                          <div>
+                          <div className="min-w-0">
                             <p className="truncate">{apt.customers.name}</p>
                             {apt.customers.company && (
                               <p className="text-xs text-muted-foreground truncate">{apt.customers.company}</p>
@@ -396,11 +429,11 @@ export function DatesView({ appointments, customers, appointmentTypes }: DatesVi
                           <span className="text-muted-foreground">-</span>
                         )}
                       </td>
-                      <td className="p-3">
+                      <td className="p-3 max-w-0">
                         {apt.appointment_types ? (
-                          <Badge variant="outline" className="gap-1.5">
-                            <div className={cn("w-2 h-2 rounded-full", apt.appointment_types.color)} />
-                            {apt.appointment_types.name}
+                          <Badge variant="outline" className="gap-1.5 max-w-full truncate">
+                            <div className={cn("w-2 h-2 rounded-full shrink-0", apt.appointment_types.color)} />
+                            <span className="truncate">{apt.appointment_types.name}</span>
                           </Badge>
                         ) : (
                           <span className="text-sm text-muted-foreground">-</span>

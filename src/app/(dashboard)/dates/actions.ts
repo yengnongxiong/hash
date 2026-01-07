@@ -168,3 +168,195 @@ export async function deleteAppointmentType(id: string) {
   revalidatePath("/dates");
   return { success: true };
 }
+
+interface CSVDateRow {
+  title: string;
+  date: string;
+  time?: string;
+  end_time?: string;
+  person?: string;
+  type?: string;
+  location?: string;
+  description?: string;
+  status?: string;
+}
+
+export async function importDatesFromCSV(
+  rows: CSVDateRow[],
+  customerMap: Map<string, string>,
+  typeMap: Map<string, string>
+): Promise<{ imported?: number; errors?: string[]; error?: string }> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Not authenticated" };
+  }
+
+  const { data: userData } = await supabase
+    .from("users")
+    .select("organization_id")
+    .eq("id", user.id)
+    .single();
+
+  if (!userData?.organization_id) {
+    return { error: "No organization found" };
+  }
+
+  const errors: string[] = [];
+  const toInsert: {
+    organization_id: string;
+    customer_id: string | null;
+    customer_ids: string[] | null;
+    title: string;
+    start_time: string;
+    end_time: string | null;
+    location: string | null;
+    description: string | null;
+    status: "scheduled" | "completed" | "cancelled";
+    appointment_type_id: string | null;
+    created_by: string;
+  }[] = [];
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const rowNum = i + 2; // Account for header row and 0-indexing
+
+    // Validate required fields
+    if (!row.title?.trim()) {
+      errors.push(`Row ${rowNum}: Title is required`);
+      continue;
+    }
+
+    if (!row.date?.trim()) {
+      errors.push(`Row ${rowNum}: Date is required`);
+      continue;
+    }
+
+    // Parse date and time
+    let startTime: Date;
+    try {
+      // Try to parse the date
+      const dateStr = row.date.trim();
+      const timeStr = row.time?.trim() || "09:00 AM";
+
+      // Parse date (support various formats)
+      const dateParts = dateStr.match(/(\d{1,4})[-/](\d{1,2})[-/](\d{1,4})/);
+      if (dateParts) {
+        // Determine if it's YYYY-MM-DD or MM-DD-YYYY
+        let year: number, month: number, day: number;
+        if (dateParts[1].length === 4) {
+          // YYYY-MM-DD
+          year = parseInt(dateParts[1]);
+          month = parseInt(dateParts[2]) - 1;
+          day = parseInt(dateParts[3]);
+        } else {
+          // MM-DD-YYYY or DD-MM-YYYY (assuming MM-DD-YYYY for US format)
+          month = parseInt(dateParts[1]) - 1;
+          day = parseInt(dateParts[2]);
+          year = parseInt(dateParts[3]);
+        }
+        startTime = new Date(year, month, day);
+      } else {
+        // Try native parsing
+        startTime = new Date(dateStr);
+      }
+
+      if (isNaN(startTime.getTime())) {
+        errors.push(`Row ${rowNum}: Invalid date format "${row.date}"`);
+        continue;
+      }
+
+      // Parse time
+      const timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+      if (timeMatch) {
+        let hours = parseInt(timeMatch[1]);
+        const minutes = parseInt(timeMatch[2]);
+        const period = timeMatch[3]?.toUpperCase();
+
+        if (period === "PM" && hours < 12) hours += 12;
+        if (period === "AM" && hours === 12) hours = 0;
+
+        startTime.setHours(hours, minutes, 0, 0);
+      }
+    } catch {
+      errors.push(`Row ${rowNum}: Invalid date/time format`);
+      continue;
+    }
+
+    // Parse end time if provided
+    let endTime: Date | null = null;
+    if (row.end_time?.trim()) {
+      try {
+        const endTimeStr = row.end_time.trim();
+        const timeMatch = endTimeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+        if (timeMatch) {
+          endTime = new Date(startTime);
+          let hours = parseInt(timeMatch[1]);
+          const minutes = parseInt(timeMatch[2]);
+          const period = timeMatch[3]?.toUpperCase();
+
+          if (period === "PM" && hours < 12) hours += 12;
+          if (period === "AM" && hours === 12) hours = 0;
+
+          endTime.setHours(hours, minutes, 0, 0);
+        }
+      } catch {
+        // Ignore invalid end time
+      }
+    }
+
+    // Look up person by name, company, or ID
+    let customerId: string | null = null;
+    if (row.person?.trim()) {
+      const personLower = row.person.trim().toLowerCase();
+      customerId = customerMap.get(personLower) || null;
+    }
+
+    // Look up type by name
+    let appointmentTypeId: string | null = null;
+    if (row.type?.trim()) {
+      const typeLower = row.type.trim().toLowerCase();
+      appointmentTypeId = typeMap.get(typeLower) || null;
+    }
+
+    // Parse status
+    let status: "scheduled" | "completed" | "cancelled" = "scheduled";
+    if (row.status?.trim()) {
+      const statusLower = row.status.trim().toLowerCase();
+      if (statusLower === "completed") status = "completed";
+      else if (statusLower === "cancelled" || statusLower === "canceled") status = "cancelled";
+    }
+
+    toInsert.push({
+      organization_id: userData.organization_id,
+      customer_id: customerId,
+      customer_ids: customerId ? [customerId] : null,
+      title: row.title.trim(),
+      start_time: startTime.toISOString(),
+      end_time: endTime?.toISOString() || null,
+      location: row.location?.trim() || null,
+      description: row.description?.trim() || null,
+      status,
+      appointment_type_id: appointmentTypeId,
+      created_by: user.id,
+    });
+  }
+
+  if (toInsert.length === 0) {
+    return { imported: 0, errors };
+  }
+
+  const { error } = await supabase.from("appointments").insert(toInsert);
+
+  if (error) {
+    return { error: error.message, errors };
+  }
+
+  revalidatePath("/dates");
+  revalidatePath("/people/appointments");
+  return { imported: toInsert.length, errors };
+}
