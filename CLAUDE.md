@@ -20,6 +20,140 @@
 
 ---
 
+## ⚠️ PARALLEL DEVELOPMENT MODE (READ FIRST)
+
+This project uses **git worktrees** for parallel development with 4 separate Claude Code instances. Each instance has a specific scope and MUST NOT modify files outside its designated area.
+
+### Which Branch Am I On?
+
+Run `git branch --show-current` to identify your branch and scope:
+
+| Branch | Dev Port | Scope |
+|--------|----------|-------|
+| `feature/people` | 3001 | People/Customers management |
+| `feature/dates` | 3002 | Dates/Appointments |
+| `feature/documents` | 3003 | Documents & OCR |
+| `feature/whiteboard` | 3004 | Whiteboard/Kanban |
+| `main` | 3000 | NO DEVELOPMENT - merge target only |
+
+### Start Dev Server on Correct Port
+
+```bash
+# Check your branch first
+git branch --show-current
+
+# Start on your assigned port
+PORT=3001 npm run dev  # people
+PORT=3002 npm run dev  # dates
+PORT=3003 npm run dev  # documents
+PORT=3004 npm run dev  # whiteboard
+```
+
+### Scope Boundaries (STRICTLY ENFORCED)
+
+#### feature/people - People Management
+**CAN modify:**
+- `src/app/(dashboard)/people/**/*`
+- `src/components/customers/**/*`
+- `src/components/data-table/**/*` (shared, be careful)
+
+**CANNOT modify:**
+- `src/app/(dashboard)/dates/**/*`
+- `src/app/(dashboard)/documents/**/*`
+- `src/app/(dashboard)/whiteboard/**/*`
+- `src/components/dates/**/*`
+- `src/components/documents/**/*`
+- `src/components/dashboard/whiteboard*`
+
+---
+
+#### feature/dates - Dates/Appointments
+**CAN modify:**
+- `src/app/(dashboard)/dates/**/*`
+- `src/components/dates/**/*`
+- `src/components/customers/appointments/**/*` (shared with people)
+
+**CANNOT modify:**
+- `src/app/(dashboard)/people/**/*` (except appointments subfolder)
+- `src/app/(dashboard)/documents/**/*`
+- `src/app/(dashboard)/whiteboard/**/*`
+- `src/components/customers/**/*` (except appointments)
+- `src/components/documents/**/*`
+- `src/components/dashboard/whiteboard*`
+
+---
+
+#### feature/documents - Documents & OCR
+**CAN modify:**
+- `src/app/(dashboard)/documents/**/*`
+- `src/components/documents/**/*`
+- `src/lib/ocr/**/*`
+
+**CANNOT modify:**
+- `src/app/(dashboard)/people/**/*`
+- `src/app/(dashboard)/dates/**/*`
+- `src/app/(dashboard)/whiteboard/**/*`
+- `src/components/customers/**/*`
+- `src/components/dates/**/*`
+- `src/components/dashboard/whiteboard*`
+
+---
+
+#### feature/whiteboard - Whiteboard/Kanban
+**CAN modify:**
+- `src/app/(dashboard)/whiteboard/**/*`
+- `src/components/dashboard/whiteboard*.tsx`
+- `src/components/dashboard/activity-feed.tsx`
+
+**CANNOT modify:**
+- `src/app/(dashboard)/people/**/*`
+- `src/app/(dashboard)/dates/**/*`
+- `src/app/(dashboard)/documents/**/*`
+- `src/components/customers/**/*`
+- `src/components/dates/**/*`
+- `src/components/documents/**/*`
+
+---
+
+### Shared Files (COORDINATE BEFORE MODIFYING)
+
+These files may cause merge conflicts. Only modify if absolutely necessary:
+
+| File | Risk Level | Notes |
+|------|------------|-------|
+| `src/types/database.ts` | HIGH | Add types, don't remove/rename |
+| `package.json` | HIGH | Only add deps, don't change versions |
+| `src/components/ui/**/*` | MEDIUM | Add new shadcn components via CLI only |
+| `src/components/layout/**/*` | HIGH | Sidebar, header - avoid changes |
+| `src/lib/utils/**/*` | MEDIUM | Add new utils, don't modify existing |
+| `CLAUDE.md` | DO NOT MODIFY | Changes will cause merge conflicts |
+
+### Database Migrations
+
+To avoid migration conflicts, use this naming convention:
+- **people**: `YYYYMMDD_people_<description>.sql`
+- **dates**: `YYYYMMDD_dates_<description>.sql`
+- **documents**: `YYYYMMDD_documents_<description>.sql`
+- **whiteboard**: `YYYYMMDD_whiteboard_<description>.sql`
+
+### Before You Start Development
+
+1. Confirm your branch: `git branch --show-current`
+2. Start dev server on correct port: `PORT=300X npm run dev`
+3. Only modify files within your scope
+4. Test with Playwright on YOUR port (navigate to `http://localhost:300X`)
+5. Commit frequently with descriptive messages
+6. DO NOT modify CLAUDE.md
+
+### When Development is Complete
+
+1. Run `npm run build` to verify no errors
+2. Commit all changes
+3. Push your branch: `git push -u origin feature/<area>`
+4. Notify the user that your branch is ready for merge
+
+---
+
 ## Project Overview
 
 Hash is a B2B SaaS platform for document and customer management with AI-powered OCR extraction. Built for small-to-medium businesses to manage customer relationships, process documents (invoices, contracts, receipts), and collaborate in real-time.
