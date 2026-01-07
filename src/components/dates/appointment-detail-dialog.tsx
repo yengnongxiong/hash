@@ -33,7 +33,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Pencil, Trash2, X, Calendar, MapPin, User, Clock, Search, ChevronDown } from "lucide-react";
+import { Pencil, Trash2, X, Calendar, MapPin, User, Clock, Search, ChevronDown, Check } from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -46,7 +46,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { format } from "date-fns";
-import { updateAppointment, deleteAppointment } from "@/app/(dashboard)/dates/actions";
+import { updateAppointment, deleteAppointment, updateAppointmentNotes } from "@/app/(dashboard)/dates/actions";
+import { formatDistanceToNow } from "@/lib/utils/format";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -80,6 +81,8 @@ export function AppointmentDetailDialog({
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<"scheduled" | "completed" | "cancelled">("scheduled");
   const [appointmentTypeId, setAppointmentTypeId] = useState<string | null>(null);
+  const [notes, setNotes] = useState("");
+  const [isEditingNotes, setIsEditingNotes] = useState(false);
 
   // Filter customers based on search
   const filteredCustomers = customers.filter((customer) => {
@@ -106,10 +109,12 @@ export function AppointmentDetailDialog({
       setDescription(appointment.description || "");
       setStatus(appointment.status);
       setAppointmentTypeId(appointment.appointment_types?.id || null);
+      setNotes(appointment.notes || "");
     }
     // Always reset to view mode and clear search when dialog opens
     if (open) {
       setIsEditing(false);
+      setIsEditingNotes(false);
       setPeopleSearch("");
       setPeoplePopoverOpen(false);
     }
@@ -151,6 +156,38 @@ export function AppointmentDetailDialog({
       } else {
         toast.success("Date deleted");
         onOpenChange(false);
+        router.refresh();
+      }
+    });
+  };
+
+  // Quick status change handler (for view mode)
+  const handleQuickStatusChange = (newStatus: "scheduled" | "completed" | "cancelled") => {
+    if (!appointment) return;
+
+    startTransition(async () => {
+      const result = await updateAppointment(appointment.id, { status: newStatus });
+      if (result.error) {
+        toast.error("Failed to update status", { description: result.error });
+      } else {
+        toast.success(`Status changed to ${newStatus}`);
+        setStatus(newStatus); // Update local state for immediate feedback
+        router.refresh();
+      }
+    });
+  };
+
+  // Save notes handler
+  const handleSaveNotes = () => {
+    if (!appointment) return;
+
+    startTransition(async () => {
+      const result = await updateAppointmentNotes(appointment.id, notes || null);
+      if (result.error) {
+        toast.error("Failed to save notes", { description: result.error });
+      } else {
+        toast.success("Notes saved");
+        setIsEditingNotes(false);
         router.refresh();
       }
     });
@@ -485,28 +522,134 @@ export function AppointmentDetailDialog({
                   <span className="truncate">{appointment.appointment_types.name}</span>
                 </Badge>
               )}
-              <Badge
-                variant={
-                  appointment.status === "cancelled"
-                    ? "secondary"
-                    : appointment.status === "completed"
-                    ? "outline"
-                    : "default"
-                }
-              >
-                {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
-              </Badge>
+              {/* Clickable status badge */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    className="focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded"
+                    disabled={isPending}
+                  >
+                    <Badge
+                      variant={
+                        status === "cancelled"
+                          ? "secondary"
+                          : status === "completed"
+                          ? "outline"
+                          : "default"
+                      }
+                      className="cursor-pointer hover:opacity-80"
+                    >
+                      {status.charAt(0).toUpperCase() + status.slice(1)}
+                    </Badge>
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-40 p-1" align="start">
+                  <div className="flex flex-col">
+                    <button
+                      className={cn(
+                        "flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-muted text-left",
+                        status === "scheduled" && "font-medium"
+                      )}
+                      onClick={() => handleQuickStatusChange("scheduled")}
+                    >
+                      {status === "scheduled" && <Check className="h-3 w-3" />}
+                      <span className={status === "scheduled" ? "" : "ml-5"}>Scheduled</span>
+                    </button>
+                    <button
+                      className={cn(
+                        "flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-muted text-left",
+                        status === "completed" && "font-medium"
+                      )}
+                      onClick={() => handleQuickStatusChange("completed")}
+                    >
+                      {status === "completed" && <Check className="h-3 w-3" />}
+                      <span className={status === "completed" ? "" : "ml-5"}>Completed</span>
+                    </button>
+                    <button
+                      className={cn(
+                        "flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-muted text-left",
+                        status === "cancelled" && "font-medium"
+                      )}
+                      onClick={() => handleQuickStatusChange("cancelled")}
+                    >
+                      {status === "cancelled" && <Check className="h-3 w-3" />}
+                      <span className={status === "cancelled" ? "" : "ml-5"}>Cancelled</span>
+                    </button>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
 
             {/* Description */}
             {appointment.description && (
               <div className="pt-2 border-t">
-                <p className="text-sm text-muted-foreground mb-1">Notes</p>
+                <p className="text-sm text-muted-foreground mb-1">Description</p>
                 <div className="max-h-[150px] overflow-y-auto">
                   <p className="text-sm break-words whitespace-pre-wrap">{appointment.description}</p>
                 </div>
               </div>
             )}
+
+            {/* Notes with user attribution */}
+            <div className="pt-2 border-t">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-sm text-muted-foreground">Notes</p>
+                {!isEditingNotes && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs"
+                    onClick={() => setIsEditingNotes(true)}
+                  >
+                    {notes ? "Edit" : "Add Note"}
+                  </Button>
+                )}
+              </div>
+              {isEditingNotes ? (
+                <div className="space-y-2">
+                  <Textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Add a note..."
+                    rows={3}
+                    className="text-sm"
+                  />
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setNotes(appointment.notes || "");
+                        setIsEditingNotes(false);
+                      }}
+                      disabled={isPending}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleSaveNotes}
+                      disabled={isPending}
+                    >
+                      {isPending ? "Saving..." : "Save"}
+                    </Button>
+                  </div>
+                </div>
+              ) : notes ? (
+                <div>
+                  <div className="max-h-[100px] overflow-y-auto">
+                    <p className="text-sm break-words whitespace-pre-wrap">{notes}</p>
+                  </div>
+                  {appointment.notes_updated_at && appointment.notes_user && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Updated by {appointment.notes_user.name || appointment.notes_user.email} • {formatDistanceToNow(new Date(appointment.notes_updated_at))}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground italic">No notes yet</p>
+              )}
+            </div>
 
             {/* Timestamps */}
             <div className="pt-2 border-t text-xs text-muted-foreground">

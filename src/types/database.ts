@@ -28,6 +28,9 @@ export type Database = {
           created_at: string;
           updated_at: string;
           appointment_type_id?: string | null;
+          notes: string | null;
+          notes_updated_by: string | null;
+          notes_updated_at: string | null;
         };
         Insert: {
           id?: string;
@@ -44,6 +47,9 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           appointment_type_id?: string | null;
+          notes?: string | null;
+          notes_updated_by?: string | null;
+          notes_updated_at?: string | null;
         };
         Update: {
           id?: string;
@@ -60,6 +66,9 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           appointment_type_id?: string | null;
+          notes?: string | null;
+          notes_updated_by?: string | null;
+          notes_updated_at?: string | null;
         };
         Relationships: [
           {
@@ -611,6 +620,7 @@ export interface AppointmentType {
 export type AppointmentWithRelations = Appointment & {
   customers?: { name: string; company: string | null } | null;
   appointment_types?: { id: string; name: string; color: string } | null;
+  notes_user?: { name: string | null; email: string } | null;
 };
 
 export interface DocumentFlag {

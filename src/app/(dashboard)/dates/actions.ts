@@ -110,6 +110,36 @@ export async function deleteAppointment(id: string) {
   return { success: true };
 }
 
+export async function updateAppointmentNotes(id: string, notes: string | null) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Not authenticated" };
+  }
+
+  const { error } = await supabase
+    .from("appointments")
+    .update({
+      notes: notes || null,
+      notes_updated_by: user.id,
+      notes_updated_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/dates");
+  revalidatePath("/people/appointments");
+  return { success: true };
+}
+
 // Appointment Types
 export async function createAppointmentType(name: string, color: string) {
   const supabase = await createClient();

@@ -1,26 +1,38 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { AppointmentWithRelations, AppointmentType, Customer } from "@/types/database";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { CreateAppointmentDialog } from "@/components/customers/appointments/create-appointment-dialog";
 import { AppointmentDetailDialog } from "./appointment-detail-dialog";
 import { AppointmentTypesDialog } from "./appointment-types-dialog";
 import { DatesCalendar } from "./dates-calendar";
+import { DatesWeekView } from "./dates-week-view";
 import { DatesCSVImportDialog } from "./csv-import-dialog";
 import { exportToCSV, formatDateTime } from "@/lib/export";
+import { updateAppointment } from "@/app/(dashboard)/dates/actions";
+import { toast } from "sonner";
 import {
   List,
   Calendar as CalendarIcon,
+  CalendarDays,
   Search,
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
   Circle,
   Download,
+  Printer,
+  Check,
 } from "lucide-react";
 import {
   format,
@@ -56,7 +68,7 @@ function getComputedStatus(apt: AppointmentWithRelations): string {
 }
 
 export function DatesView({ appointments, customers, appointmentTypes }: DatesViewProps) {
-  const [view, setView] = useState<"table" | "calendar">("table");
+  const [view, setView] = useState<"table" | "week" | "calendar">("table");
   const [search, setSearch] = useState("");
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
   const [selectedAppointment, setSelectedAppointment] = useState<AppointmentWithRelations | null>(null);
@@ -66,6 +78,63 @@ export function DatesView({ appointments, customers, appointmentTypes }: DatesVi
   // State for creating appointment from calendar
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [isPending, startTransition] = useTransition();
+  const router = useRouter();
+
+  // Quick status change handler
+  const handleQuickStatusChange = useCallback((
+    aptId: string,
+    newStatus: "scheduled" | "completed" | "cancelled",
+    e: React.MouseEvent
+  ) => {
+    e.stopPropagation();
+    startTransition(async () => {
+      const result = await updateAppointment(aptId, { status: newStatus });
+      if (result.error) {
+        toast.error("Failed to update status", { description: result.error });
+      } else {
+        toast.success(`Status changed to ${newStatus}`);
+        router.refresh();
+      }
+    });
+  }, [router]);
+
+  // Print handler
+  const handlePrint = useCallback(() => {
+    window.print();
+  }, []);
+
+  // Handle date move (drag-and-drop)
+  const handleDateMove = useCallback(
+    (entryId: string, newDate: Date) => {
+      startTransition(async () => {
+        // Find the appointment to get its end_time and calculate the new end_time
+        const apt = appointments.find((a) => a.id === entryId);
+        if (!apt) return;
+
+        // Calculate new end_time if original had one
+        let newEndTime: string | null = null;
+        if (apt.end_time) {
+          const originalDuration =
+            new Date(apt.end_time).getTime() - new Date(apt.start_time).getTime();
+          newEndTime = new Date(newDate.getTime() + originalDuration).toISOString();
+        }
+
+        const result = await updateAppointment(entryId, {
+          start_time: newDate.toISOString(),
+          end_time: newEndTime,
+        });
+
+        if (result.error) {
+          toast.error("Failed to reschedule date", { description: result.error });
+        } else {
+          toast.success("Date rescheduled");
+          router.refresh();
+        }
+      });
+    },
+    [appointments, router]
+  );
 
   const filteredAppointments = useMemo(() => {
     return appointments.filter((apt) => {
@@ -301,15 +370,19 @@ export function DatesView({ appointments, customers, appointmentTypes }: DatesVi
         </div>
 
         {/* View Toggle */}
-        <Tabs value={view} onValueChange={(v) => setView(v as "table" | "calendar")}>
+        <Tabs value={view} onValueChange={(v) => setView(v as "table" | "week" | "calendar")}>
           <TabsList>
             <TabsTrigger value="table" className="gap-1.5">
               <List className="h-4 w-4" />
               <span className="hidden sm:inline">Table</span>
             </TabsTrigger>
+            <TabsTrigger value="week" className="gap-1.5">
+              <CalendarDays className="h-4 w-4" />
+              <span className="hidden sm:inline">Week</span>
+            </TabsTrigger>
             <TabsTrigger value="calendar" className="gap-1.5">
               <CalendarIcon className="h-4 w-4" />
-              <span className="hidden sm:inline">Calendar</span>
+              <span className="hidden sm:inline">Month</span>
             </TabsTrigger>
           </TabsList>
         </Tabs>
@@ -324,6 +397,12 @@ export function DatesView({ appointments, customers, appointmentTypes }: DatesVi
         <Button variant="outline" size="sm" onClick={handleExport}>
           <Download className="h-4 w-4 mr-2" />
           Export
+        </Button>
+
+        {/* Print */}
+        <Button variant="outline" size="sm" onClick={handlePrint} data-print-hide="true">
+          <Printer className="h-4 w-4 mr-2" />
+          Print
         </Button>
 
         {/* Create Appointment */}
@@ -440,18 +519,62 @@ export function DatesView({ appointments, customers, appointmentTypes }: DatesVi
                         )}
                       </td>
                       <td className="p-3">
-                        {/* Smart status: Option B */}
-                        {computedStatus === "cancelled" ? (
-                          <Badge variant="secondary">Cancelled</Badge>
-                        ) : computedStatus === "completed" ? (
-                          <Badge className="bg-green-500 hover:bg-green-600">Completed</Badge>
-                        ) : computedStatus === "overdue" ? (
-                          <Badge variant="destructive">Overdue</Badge>
-                        ) : computedStatus === "today" ? (
-                          <Badge className="bg-yellow-500 hover:bg-yellow-600 text-black">Today</Badge>
-                        ) : (
-                          <Badge className="bg-blue-500 hover:bg-blue-600">Upcoming</Badge>
-                        )}
+                        {/* Clickable status badge */}
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button
+                              className="focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded"
+                              onClick={(e) => e.stopPropagation()}
+                              disabled={isPending}
+                            >
+                              {computedStatus === "cancelled" ? (
+                                <Badge variant="secondary" className="cursor-pointer hover:opacity-80">Cancelled</Badge>
+                              ) : computedStatus === "completed" ? (
+                                <Badge className="bg-green-500 hover:bg-green-600 cursor-pointer">Completed</Badge>
+                              ) : computedStatus === "overdue" ? (
+                                <Badge variant="destructive" className="cursor-pointer hover:opacity-80">Overdue</Badge>
+                              ) : computedStatus === "today" ? (
+                                <Badge className="bg-yellow-500 hover:bg-yellow-600 text-black cursor-pointer">Today</Badge>
+                              ) : (
+                                <Badge className="bg-blue-500 hover:bg-blue-600 cursor-pointer">Upcoming</Badge>
+                              )}
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-40 p-1" align="start">
+                            <div className="flex flex-col">
+                              <button
+                                className={cn(
+                                  "flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-muted text-left",
+                                  apt.status === "scheduled" && "font-medium"
+                                )}
+                                onClick={(e) => handleQuickStatusChange(apt.id, "scheduled", e)}
+                              >
+                                {apt.status === "scheduled" && <Check className="h-3 w-3" />}
+                                <span className={apt.status === "scheduled" ? "" : "ml-5"}>Scheduled</span>
+                              </button>
+                              <button
+                                className={cn(
+                                  "flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-muted text-left",
+                                  apt.status === "completed" && "font-medium"
+                                )}
+                                onClick={(e) => handleQuickStatusChange(apt.id, "completed", e)}
+                              >
+                                {apt.status === "completed" && <Check className="h-3 w-3" />}
+                                <span className={apt.status === "completed" ? "" : "ml-5"}>Completed</span>
+                              </button>
+                              <button
+                                className={cn(
+                                  "flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-muted text-left",
+                                  apt.status === "cancelled" && "font-medium"
+                                )}
+                                onClick={(e) => handleQuickStatusChange(apt.id, "cancelled", e)}
+                              >
+                                {apt.status === "cancelled" && <Check className="h-3 w-3" />}
+                                <span className={apt.status === "cancelled" ? "" : "ml-5"}>Cancelled</span>
+                              </button>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
                       </td>
                       <td className="p-3 text-xs text-muted-foreground">
                         {formatDistanceToNow(new Date(apt.created_at))}
@@ -478,6 +601,16 @@ export function DatesView({ appointments, customers, appointmentTypes }: DatesVi
             </table>
           )}
         </div>
+      ) : view === "week" ? (
+        <DatesWeekView
+          dates={calendarDates}
+          onDateClick={(apt) => {
+            const fullApt = appointments.find((a) => a.id === apt.id);
+            if (fullApt) handleViewAppointment(fullApt);
+          }}
+          onEmptySlotClick={handleEmptyDayClick}
+          onDateMove={handleDateMove}
+        />
       ) : (
         <DatesCalendar
           dates={calendarDates}
