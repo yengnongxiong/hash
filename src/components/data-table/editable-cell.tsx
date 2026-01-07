@@ -78,7 +78,7 @@ export function EditableCell<TData>({
 
   return (
     <div
-      className="cursor-pointer px-2 py-1.5 min-h-[32px] min-w-[60px] hover:bg-muted/50 rounded transition-colors flex items-center"
+      className="cursor-pointer px-2 py-1.5 min-h-[32px] min-w-[60px] hover:bg-muted/50 rounded transition-colors flex items-center overflow-hidden"
       style={truncate ? { maxWidth } : undefined}
       onClick={() => setIsEditing(true)}
       onKeyDown={(e) => {
@@ -168,7 +168,7 @@ export function EditableTagsCell<TData>({
 
   return (
     <div
-      className="cursor-pointer px-2 py-1.5 min-h-[32px] max-w-[120px] hover:bg-muted/50 rounded transition-colors flex items-center gap-1 flex-wrap"
+      className="cursor-pointer px-2 py-1.5 min-h-[32px] max-w-[120px] hover:bg-muted/50 rounded transition-colors flex items-center gap-1 flex-wrap overflow-hidden"
       onClick={() => setIsEditing(true)}
       tabIndex={0}
       role="button"
@@ -257,7 +257,7 @@ export function EditableNotesCell<TData>({
 
   return (
     <div
-      className="cursor-pointer px-2 py-1.5 min-h-[32px] max-w-[150px] hover:bg-muted/50 rounded transition-colors"
+      className="cursor-pointer px-2 py-1.5 min-h-[32px] max-w-[150px] hover:bg-muted/50 rounded transition-colors overflow-hidden"
       onClick={() => setIsEditing(true)}
       tabIndex={0}
       role="button"

@@ -27,8 +27,27 @@ import {
   Pencil,
   Save,
   X,
+  Trash2,
 } from "lucide-react";
-import { updateCustomerField } from "@/app/(dashboard)/people/actions";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { updateCustomerField, deleteCustomers } from "@/app/(dashboard)/people/actions";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "@/lib/utils/format";
 
@@ -57,6 +76,24 @@ export function CustomerDetailDialog({
   const [isEditing, setIsEditing] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [editedCustomer, setEditedCustomer] = useState<Partial<Customer>>({});
+  const router = useRouter();
+
+  const handleDelete = () => {
+    if (!customer) return;
+
+    startTransition(async () => {
+      const result = await deleteCustomers([customer.id]);
+
+      if (result.error) {
+        toast.error("Failed to delete person", { description: result.error });
+      } else {
+        toast.success("Person deleted");
+        onOpenChange(false);
+        router.refresh();
+        onUpdate?.();
+      }
+    });
+  };
 
   if (!customer) return null;
 
@@ -121,16 +158,16 @@ export function CustomerDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <div className="flex items-center justify-between">
-            <DialogTitle className="flex items-center gap-3">
-              <Avatar className="h-12 w-12">
+            <DialogTitle className="flex items-center gap-3 min-w-0 flex-1">
+              <Avatar className="h-12 w-12 shrink-0">
                 <AvatarFallback className="bg-primary/10 text-primary text-lg">
                   {getInitials(currentData.name)}
                 </AvatarFallback>
               </Avatar>
-              <div>
+              <div className="min-w-0 flex-1">
                 {isEditing ? (
                   <Input
                     value={editedCustomer.name || ""}
@@ -144,12 +181,12 @@ export function CustomerDetailDialog({
                     placeholder="Name"
                   />
                 ) : (
-                  <span>{currentData.name}</span>
+                  <span className="truncate block">{currentData.name}</span>
                 )}
                 {currentData.customer_number && (
                   <Badge
                     variant="outline"
-                    className="ml-2 font-mono text-xs"
+                    className="mt-1 font-mono text-xs"
                   >
                     {currentData.customer_number}
                   </Badge>
@@ -157,15 +194,59 @@ export function CustomerDetailDialog({
               </div>
             </DialogTitle>
             {!isEditing ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleStartEdit}
-                className="shrink-0"
-              >
-                <Pencil className="h-4 w-4 mr-1" />
-                Edit
-              </Button>
+              <TooltipProvider>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleStartEdit}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Edit person</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  <AlertDialog>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Delete person</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Person</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to delete {customer.name}? This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleDelete}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </TooltipProvider>
             ) : (
               <div className="flex gap-2 shrink-0">
                 <Button
@@ -195,7 +276,7 @@ export function CustomerDetailDialog({
           </VisuallyHidden>
         </DialogHeader>
 
-        <div className="space-y-4 mt-4">
+        <div className="space-y-4 mt-4 overflow-hidden max-w-full">
           {/* Company */}
           <div className="space-y-1.5">
             <Label className="flex items-center gap-2 text-muted-foreground">
@@ -214,7 +295,7 @@ export function CustomerDetailDialog({
                 placeholder="Company name"
               />
             ) : (
-              <p className="text-sm pl-6">
+              <p className="text-sm pl-6 truncate w-full">
                 {currentData.company || (
                   <span className="text-muted-foreground italic">Not set</span>
                 )}
@@ -241,11 +322,11 @@ export function CustomerDetailDialog({
                 placeholder="email@example.com"
               />
             ) : (
-              <p className="text-sm pl-6">
+              <p className="text-sm pl-6 truncate">
                 {currentData.email ? (
                   <a
                     href={`mailto:${currentData.email}`}
-                    className="text-primary hover:underline"
+                    className="text-primary hover:underline truncate block"
                   >
                     {currentData.email}
                   </a>
@@ -275,11 +356,11 @@ export function CustomerDetailDialog({
                 placeholder="+1 (555) 000-0000"
               />
             ) : (
-              <p className="text-sm pl-6">
+              <p className="text-sm pl-6 truncate">
                 {currentData.phone ? (
                   <a
                     href={`tel:${currentData.phone}`}
-                    className="text-primary hover:underline"
+                    className="text-primary hover:underline truncate block"
                   >
                     {currentData.phone}
                   </a>
@@ -308,7 +389,7 @@ export function CustomerDetailDialog({
                 placeholder="123 Main St, City, State"
               />
             ) : (
-              <p className="text-sm pl-6 break-words">
+              <p className="text-sm pl-6 truncate">
                 {currentData.address || (
                   <span className="text-muted-foreground italic">Not set</span>
                 )}
@@ -339,9 +420,9 @@ export function CustomerDetailDialog({
             ) : (
               <div className="pl-6">
                 {currentData.tags && currentData.tags.length > 0 ? (
-                  <div className="flex flex-wrap gap-1">
-                    {currentData.tags.map((tag) => (
-                      <Badge key={tag} variant="secondary" className="text-xs">
+                  <div className="flex flex-wrap gap-1 max-h-20 overflow-hidden">
+                    {currentData.tags.map((tag, index) => (
+                      <Badge key={`${tag}-${index}`} variant="secondary" className="text-xs max-w-[120px] truncate">
                         {tag}
                       </Badge>
                     ))}
@@ -374,7 +455,7 @@ export function CustomerDetailDialog({
                 rows={3}
               />
             ) : (
-              <p className="text-sm pl-6 whitespace-pre-wrap break-words">
+              <p className="text-sm pl-6 line-clamp-2">
                 {currentData.notes || (
                   <span className="text-muted-foreground italic">No notes</span>
                 )}

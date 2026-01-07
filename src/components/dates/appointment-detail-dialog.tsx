@@ -33,7 +33,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Pencil, Trash2, X, Calendar, MapPin, User, Clock } from "lucide-react";
+import { Pencil, Trash2, X, Calendar, MapPin, User, Clock, Search, ChevronDown } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Tooltip,
   TooltipContent,
@@ -49,7 +54,7 @@ interface AppointmentDetailDialogProps {
   appointment: AppointmentWithRelations | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  customers: Pick<Customer, "id" | "name" | "company">[];
+  customers: Pick<Customer, "id" | "name" | "company" | "customer_number">[];
   appointmentTypes: AppointmentType[];
 }
 
@@ -67,12 +72,28 @@ export function AppointmentDetailDialog({
   // Form state
   const [title, setTitle] = useState("");
   const [customerId, setCustomerId] = useState<string | null>(null);
+  const [peoplePopoverOpen, setPeoplePopoverOpen] = useState(false);
+  const [peopleSearch, setPeopleSearch] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [location, setLocation] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<"scheduled" | "completed" | "cancelled">("scheduled");
   const [appointmentTypeId, setAppointmentTypeId] = useState<string | null>(null);
+
+  // Filter customers based on search
+  const filteredCustomers = customers.filter((customer) => {
+    if (!peopleSearch) return true;
+    const searchLower = peopleSearch.toLowerCase();
+    return (
+      customer.name.toLowerCase().includes(searchLower) ||
+      customer.company?.toLowerCase().includes(searchLower) ||
+      customer.customer_number?.toLowerCase().includes(searchLower)
+    );
+  });
+
+  // Get selected customer
+  const selectedCustomer = customerId ? customers.find((c) => c.id === customerId) : null;
 
   // Reset form when appointment changes or dialog opens
   useEffect(() => {
@@ -86,9 +107,11 @@ export function AppointmentDetailDialog({
       setStatus(appointment.status);
       setAppointmentTypeId(appointment.appointment_types?.id || null);
     }
-    // Always reset to view mode when dialog opens
+    // Always reset to view mode and clear search when dialog opens
     if (open) {
       setIsEditing(false);
+      setPeopleSearch("");
+      setPeoplePopoverOpen(false);
     }
   }, [appointment, open]);
 
@@ -139,7 +162,7 @@ export function AppointmentDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader className="pr-8">
           <div className="flex items-center justify-between gap-2">
             <DialogTitle className="flex items-center gap-2 min-w-0 flex-1">
@@ -228,23 +251,97 @@ export function AppointmentDetailDialog({
 
             <div className="space-y-2">
               <Label htmlFor="edit-customer">Person</Label>
-              <Select
-                value={customerId || "none"}
-                onValueChange={(v) => setCustomerId(v === "none" ? null : v)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a person" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No person</SelectItem>
-                  {customers.map((customer) => (
-                    <SelectItem key={customer.id} value={customer.id}>
-                      {customer.name}
-                      {customer.company && ` - ${customer.company}`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={peoplePopoverOpen} onOpenChange={(open) => {
+                setPeoplePopoverOpen(open);
+                if (!open) setPeopleSearch("");
+              }}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between font-normal"
+                  >
+                    {selectedCustomer ? (
+                      <span className="truncate">
+                        {selectedCustomer.name}
+                        {selectedCustomer.customer_number && (
+                          <span className="text-muted-foreground ml-2 font-mono text-xs">
+                            {selectedCustomer.customer_number}
+                          </span>
+                        )}
+                      </span>
+                    ) : (
+                      "Select a person"
+                    )}
+                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[280px] p-0" align="start">
+                  <div className="p-2 border-b">
+                    <div className="relative">
+                      <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        placeholder="Search people..."
+                        value={peopleSearch}
+                        onChange={(e) => setPeopleSearch(e.target.value)}
+                        className="pl-8 h-8"
+                      />
+                    </div>
+                  </div>
+                  <div className="max-h-[250px] overflow-y-auto p-1">
+                    {/* No person option */}
+                    <div
+                      className={cn(
+                        "flex items-center gap-2 p-2 hover:bg-muted rounded cursor-pointer",
+                        customerId === null && "bg-muted"
+                      )}
+                      onClick={() => {
+                        setCustomerId(null);
+                        setPeoplePopoverOpen(false);
+                        setPeopleSearch("");
+                      }}
+                    >
+                      <span className="text-sm text-muted-foreground">No person</span>
+                    </div>
+                    {filteredCustomers.length === 0 ? (
+                      <p className="p-2 text-sm text-muted-foreground text-center">
+                        {customers.length === 0 ? "No people found" : "No matches found"}
+                      </p>
+                    ) : (
+                      filteredCustomers.map((customer) => (
+                        <div
+                          key={customer.id}
+                          className={cn(
+                            "flex items-center gap-2 p-2 hover:bg-muted rounded cursor-pointer",
+                            customerId === customer.id && "bg-muted"
+                          )}
+                          onClick={() => {
+                            setCustomerId(customer.id);
+                            setPeoplePopoverOpen(false);
+                            setPeopleSearch("");
+                          }}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm truncate">{customer.name}</p>
+                              {customer.customer_number && (
+                                <span className="text-xs text-muted-foreground font-mono">
+                                  {customer.customer_number}
+                                </span>
+                              )}
+                            </div>
+                            {customer.company && (
+                              <p className="text-xs text-muted-foreground truncate">
+                                {customer.company}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div className="space-y-2">
@@ -359,12 +456,12 @@ export function AppointmentDetailDialog({
 
             {/* Person */}
             {appointment.customers && (
-              <div className="flex items-start gap-3">
-                <User className="h-5 w-5 text-muted-foreground mt-0.5" />
-                <div>
-                  <p className="font-medium">{appointment.customers.name}</p>
+              <div className="flex items-start gap-3 overflow-hidden">
+                <User className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium truncate">{appointment.customers.name}</p>
                   {appointment.customers.company && (
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-muted-foreground truncate">
                       {appointment.customers.company}
                     </p>
                   )}
@@ -374,18 +471,18 @@ export function AppointmentDetailDialog({
 
             {/* Location */}
             {appointment.location && (
-              <div className="flex items-start gap-3">
+              <div className="flex items-start gap-3 overflow-hidden">
                 <MapPin className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
-                <p className="break-words min-w-0">{appointment.location}</p>
+                <p className="truncate min-w-0 flex-1">{appointment.location}</p>
               </div>
             )}
 
             {/* Type & Status */}
             <div className="flex items-center gap-3">
               {appointment.appointment_types && (
-                <Badge variant="outline" className="gap-1.5">
-                  <div className={cn("w-2 h-2 rounded-full", appointment.appointment_types.color)} />
-                  {appointment.appointment_types.name}
+                <Badge variant="outline" className="gap-1.5 max-w-[150px]">
+                  <div className={cn("w-2 h-2 rounded-full shrink-0", appointment.appointment_types.color)} />
+                  <span className="truncate">{appointment.appointment_types.name}</span>
                 </Badge>
               )}
               <Badge
@@ -403,9 +500,9 @@ export function AppointmentDetailDialog({
 
             {/* Description */}
             {appointment.description && (
-              <div className="pt-2 border-t">
+              <div className="pt-2 border-t overflow-hidden">
                 <p className="text-sm text-muted-foreground mb-1">Notes</p>
-                <p className="text-sm whitespace-pre-wrap break-words">{appointment.description}</p>
+                <p className="text-sm line-clamp-3">{appointment.description}</p>
               </div>
             )}
 
