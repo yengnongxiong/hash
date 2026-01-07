@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
-import { WhiteboardTask } from "@/types/database";
+import { useState, useEffect, useTransition, useRef, useCallback } from "react";
+import { WhiteboardTask, User } from "@/types/database";
 import { WhiteboardColumn } from "./whiteboard-column";
 import { WhiteboardGallery } from "./whiteboard-gallery";
+import { TaskDetailDialog } from "./task-detail-dialog";
 import { createClient } from "@/lib/supabase/client";
 import {
   createWhiteboardTask,
@@ -13,11 +14,13 @@ import {
 import { toast } from "sonner";
 import { DragDropContext, DropResult } from "@hello-pangea/dnd";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Kanban, LayoutGrid } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Kanban, LayoutGrid, Search } from "lucide-react";
 
 interface WhiteboardProps {
   initialTasks: WhiteboardTask[];
   organizationId: string;
+  teamMembers?: Pick<User, "id" | "name" | "email">[];
 }
 
 const columns = [
@@ -28,10 +31,52 @@ const columns = [
 
 type ColumnId = (typeof columns)[number]["id"];
 
-export function Whiteboard({ initialTasks, organizationId }: WhiteboardProps) {
+export function Whiteboard({ initialTasks, organizationId, teamMembers = [] }: WhiteboardProps) {
   const [tasks, setTasks] = useState<WhiteboardTask[]>(initialTasks);
   const [isPending, startTransition] = useTransition();
   const [view, setView] = useState<"kanban" | "gallery">("kanban");
+  const [selectedTask, setSelectedTask] = useState<WhiteboardTask | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Cursor glow effect
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const boardRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (boardRef.current) {
+      const rect = boardRef.current.getBoundingClientRect();
+      setMousePos({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      });
+    }
+  }, []);
+
+  // Filter tasks by search query
+  const filteredTasks = tasks.filter((task) => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      task.title.toLowerCase().includes(query) ||
+      task.description?.toLowerCase().includes(query) ||
+      task.labels?.some((label) => label.toLowerCase().includes(query))
+    );
+  });
+
+  // Handle task click
+  const handleTaskClick = (task: WhiteboardTask) => {
+    setSelectedTask(task);
+    setIsDialogOpen(true);
+  };
+
+  // Handle task update from dialog
+  const handleTaskUpdate = (updatedTask: WhiteboardTask) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === updatedTask.id ? updatedTask : t))
+    );
+    setSelectedTask(updatedTask);
+  };
 
   // Set up realtime subscription
   useEffect(() => {
@@ -129,7 +174,7 @@ export function Whiteboard({ initialTasks, organizationId }: WhiteboardProps) {
   };
 
   const getTasksByColumn = (columnId: ColumnId) =>
-    tasks.filter((t) => t.status === columnId);
+    filteredTasks.filter((t) => t.status === columnId);
 
   const handleMoveTask = async (taskId: string, newStatus: ColumnId) => {
     // Optimistic update
@@ -147,8 +192,20 @@ export function Whiteboard({ initialTasks, organizationId }: WhiteboardProps) {
 
   return (
     <div className="space-y-4">
-      {/* View Toggle */}
-      <div className="flex justify-end">
+      {/* Header with Search and View Toggle */}
+      <div className="flex flex-col sm:flex-row gap-3 justify-between">
+        {/* Search */}
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search tasks..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+
+        {/* View Toggle */}
         <Tabs value={view} onValueChange={(v) => setView(v as "kanban" | "gallery")}>
           <TabsList>
             <TabsTrigger value="kanban" className="gap-1.5">
@@ -163,35 +220,60 @@ export function Whiteboard({ initialTasks, organizationId }: WhiteboardProps) {
         </Tabs>
       </div>
 
-      {/* Views */}
-      {view === "kanban" ? (
-        <DragDropContext onDragEnd={handleDragEnd}>
-          <div
-            className={`grid grid-cols-1 md:grid-cols-3 gap-4 ${
-              isPending ? "opacity-70" : ""
-            }`}
-          >
-            {columns.map((column) => (
-              <WhiteboardColumn
-                key={column.id}
-                id={column.id}
-                title={column.title}
-                tasks={getTasksByColumn(column.id)}
-                onAddTask={(title) => handleAddTask(title, column.id)}
-                onDeleteTask={handleDeleteTask}
-              />
-            ))}
-          </div>
-        </DragDropContext>
-      ) : (
-        <WhiteboardGallery
-          tasks={tasks}
-          onAddTask={handleAddTask}
-          onDeleteTask={handleDeleteTask}
-          onMoveTask={handleMoveTask}
-          isPending={isPending}
-        />
-      )}
+      {/* Board with cursor glow effect */}
+      <div
+        ref={boardRef}
+        onMouseMove={handleMouseMove}
+        className="relative rounded-lg overflow-hidden"
+        style={{
+          background: view === "kanban"
+            ? `radial-gradient(800px circle at ${mousePos.x}px ${mousePos.y}px, rgba(120, 119, 198, 0.08), transparent 40%)`
+            : undefined,
+        }}
+      >
+        {/* Views */}
+        {view === "kanban" ? (
+          <DragDropContext onDragEnd={handleDragEnd}>
+            <div
+              className={`grid grid-cols-1 md:grid-cols-3 gap-4 p-1 ${
+                isPending ? "opacity-70" : ""
+              }`}
+            >
+              {columns.map((column) => (
+                <WhiteboardColumn
+                  key={column.id}
+                  id={column.id}
+                  title={column.title}
+                  tasks={getTasksByColumn(column.id)}
+                  onAddTask={(title) => handleAddTask(title, column.id)}
+                  onDeleteTask={handleDeleteTask}
+                  onTaskClick={handleTaskClick}
+                />
+              ))}
+            </div>
+          </DragDropContext>
+        ) : (
+          <WhiteboardGallery
+            tasks={filteredTasks}
+            onAddTask={handleAddTask}
+            onDeleteTask={handleDeleteTask}
+            onMoveTask={handleMoveTask}
+            onTaskClick={handleTaskClick}
+            isPending={isPending}
+            mousePos={mousePos}
+          />
+        )}
+      </div>
+
+      {/* Task Detail Dialog */}
+      <TaskDetailDialog
+        task={selectedTask}
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        onTaskUpdate={handleTaskUpdate}
+        onTaskDelete={handleDeleteTask}
+        teamMembers={teamMembers}
+      />
     </div>
   );
 }

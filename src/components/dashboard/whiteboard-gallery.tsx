@@ -5,17 +5,32 @@ import { WhiteboardTask } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Plus, GripVertical } from "lucide-react";
-import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
+import {
+  Trash2,
+  Plus,
+  GripVertical,
+  Calendar,
+  Paperclip,
+  AlertCircle,
+} from "lucide-react";
+import {
+  DragDropContext,
+  Droppable,
+  Draggable,
+  DropResult,
+} from "@hello-pangea/dnd";
 import { formatDistanceToNow } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
+import { format, isPast, isToday } from "date-fns";
 
 interface WhiteboardGalleryProps {
   tasks: WhiteboardTask[];
   onAddTask: (title: string, status: "todo" | "in_progress" | "done") => void;
   onDeleteTask: (taskId: string) => void;
   onMoveTask: (taskId: string, newStatus: "todo" | "in_progress" | "done") => void;
+  onTaskClick?: (task: WhiteboardTask) => void;
   isPending?: boolean;
+  mousePos?: { x: number; y: number };
 }
 
 const STATUS_CONFIG = {
@@ -24,6 +39,7 @@ const STATUS_CONFIG = {
     color: "bg-yellow-200 dark:bg-yellow-900/50",
     noteColor: "bg-yellow-100 dark:bg-yellow-900/30",
     borderColor: "border-yellow-300 dark:border-yellow-700",
+    dropZoneColor: "bg-yellow-200/30 dark:bg-yellow-900/20",
     rotation: "-rotate-1",
   },
   in_progress: {
@@ -31,6 +47,7 @@ const STATUS_CONFIG = {
     color: "bg-blue-200 dark:bg-blue-900/50",
     noteColor: "bg-blue-100 dark:bg-blue-900/30",
     borderColor: "border-blue-300 dark:border-blue-700",
+    dropZoneColor: "bg-blue-200/30 dark:bg-blue-900/20",
     rotation: "rotate-1",
   },
   done: {
@@ -38,23 +55,38 @@ const STATUS_CONFIG = {
     color: "bg-green-200 dark:bg-green-900/50",
     noteColor: "bg-green-100 dark:bg-green-900/30",
     borderColor: "border-green-300 dark:border-green-700",
+    dropZoneColor: "bg-green-200/30 dark:bg-green-900/20",
     rotation: "-rotate-2",
   },
 } as const;
 
 type StatusKey = keyof typeof STATUS_CONFIG;
 
+const PRIORITY_COLORS = {
+  low: "bg-slate-400",
+  medium: "bg-blue-500",
+  high: "bg-orange-500",
+  urgent: "bg-red-500",
+};
+
 function StickyNote({
   task,
   index,
   onDelete,
+  onClick,
 }: {
   task: WhiteboardTask;
   index: number;
   onDelete: () => void;
+  onClick?: () => void;
 }) {
   const status = task.status as StatusKey;
   const config = STATUS_CONFIG[status] || STATUS_CONFIG.todo;
+  const priority = (task.priority || "medium") as keyof typeof PRIORITY_COLORS;
+
+  const dueDate = task.due_date ? new Date(task.due_date) : null;
+  const isOverdue = dueDate && isPast(dueDate) && !isToday(dueDate) && task.status !== "done";
+  const isDueToday = dueDate && isToday(dueDate);
 
   // Alternate rotation for visual variety
   const rotations = ["-rotate-1", "rotate-1", "-rotate-2", "rotate-2", "rotate-0"];
@@ -66,8 +98,9 @@ function StickyNote({
         <div
           ref={provided.innerRef}
           {...provided.draggableProps}
+          onClick={onClick}
           className={cn(
-            "w-40 h-40 p-3 shadow-md cursor-grab active:cursor-grabbing group relative transition-all duration-200",
+            "w-40 h-40 p-3 shadow-md cursor-pointer active:cursor-grabbing group relative transition-all duration-200",
             config.noteColor,
             config.borderColor,
             "border-2 rounded-sm",
@@ -79,13 +112,21 @@ function StickyNote({
             backgroundColor: task.color !== "#ffffff" ? task.color : undefined,
           }}
         >
+          {/* Priority indicator */}
+          <div
+            className={cn(
+              "absolute top-0 left-0 w-2 h-full rounded-l-sm",
+              PRIORITY_COLORS[priority]
+            )}
+          />
+
           {/* Pin effect */}
           <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-red-500 shadow-md border-2 border-red-600" />
 
           {/* Drag handle */}
           <div
             {...provided.dragHandleProps}
-            className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
+            className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab"
           >
             <GripVertical className="h-4 w-4 text-muted-foreground" />
           </div>
@@ -104,16 +145,34 @@ function StickyNote({
           </Button>
 
           {/* Content */}
-          <div className="h-full flex flex-col">
-            <p className="text-sm font-medium line-clamp-4 flex-1">{task.title}</p>
+          <div className="h-full flex flex-col pl-2">
+            <p className="text-sm font-medium line-clamp-3 flex-1">{task.title}</p>
             {task.description && (
               <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
                 {task.description}
               </p>
             )}
-            <p className="text-[10px] text-muted-foreground mt-auto pt-2">
-              {formatDistanceToNow(new Date(task.created_at))}
-            </p>
+
+            {/* Footer with due date and attachment indicator */}
+            <div className="flex items-center gap-2 mt-auto pt-2">
+              {dueDate && (
+                <div
+                  className={cn(
+                    "flex items-center gap-0.5 text-[9px]",
+                    isOverdue && "text-red-500",
+                    isDueToday && "text-orange-500",
+                    !isOverdue && !isDueToday && "text-muted-foreground"
+                  )}
+                >
+                  {isOverdue && <AlertCircle className="h-2.5 w-2.5" />}
+                  <Calendar className="h-2.5 w-2.5" />
+                  <span>{format(dueDate, "M/d")}</span>
+                </div>
+              )}
+              <p className="text-[9px] text-muted-foreground ml-auto">
+                {formatDistanceToNow(new Date(task.created_at))}
+              </p>
+            </div>
           </div>
         </div>
       )}
@@ -201,7 +260,9 @@ export function WhiteboardGallery({
   onAddTask,
   onDeleteTask,
   onMoveTask,
+  onTaskClick,
   isPending,
+  mousePos = { x: 0, y: 0 },
 }: WhiteboardGalleryProps) {
   const handleDragEnd = (result: DropResult) => {
     const { destination, draggableId } = result;
@@ -218,7 +279,7 @@ export function WhiteboardGallery({
     <DragDropContext onDragEnd={handleDragEnd}>
       <div
         className={cn(
-          "min-h-[calc(100vh-250px)] rounded-lg p-6 transition-opacity",
+          "min-h-[calc(100vh-250px)] rounded-lg p-6 transition-opacity relative",
           "bg-gradient-to-br from-amber-100 via-amber-50 to-orange-100",
           "dark:from-amber-950/30 dark:via-stone-900 dark:to-orange-950/30",
           "border-8 border-amber-800/20 dark:border-amber-900/50",
@@ -227,13 +288,14 @@ export function WhiteboardGallery({
         )}
         style={{
           backgroundImage: `
+            radial-gradient(600px circle at ${mousePos.x}px ${mousePos.y}px, rgba(251, 191, 36, 0.15), transparent 40%),
             radial-gradient(circle at 20% 80%, rgba(245, 158, 11, 0.1) 0%, transparent 50%),
             radial-gradient(circle at 80% 20%, rgba(249, 115, 22, 0.1) 0%, transparent 50%),
             url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h100v100H0z' fill='none'/%3E%3Cpath d='M0 50h100M50 0v100' stroke='%23d4a373' stroke-width='0.5' stroke-opacity='0.2'/%3E%3C/svg%3E")
           `,
         }}
       >
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {(Object.keys(STATUS_CONFIG) as StatusKey[]).map((status) => {
             const config = STATUS_CONFIG[status];
             const statusTasks = getTasksByStatus(status);
@@ -256,24 +318,42 @@ export function WhiteboardGallery({
                   </span>
                 </div>
 
-                {/* Drop zone */}
+                {/* Drop zone - Enhanced for easier drag */}
                 <Droppable droppableId={status}>
                   {(provided, snapshot) => (
                     <div
                       ref={provided.innerRef}
                       {...provided.droppableProps}
                       className={cn(
-                        "min-h-[200px] p-4 rounded-lg transition-colors",
-                        snapshot.isDraggingOver && "bg-accent/30 ring-2 ring-primary/50"
+                        "min-h-[220px] p-4 rounded-lg transition-all duration-200",
+                        "border-2 border-dashed border-transparent",
+                        snapshot.isDraggingOver && [
+                          config.dropZoneColor,
+                          "border-primary/50",
+                          "ring-2 ring-primary/30",
+                          "scale-[1.02]",
+                        ]
                       )}
                     >
-                      <div className="flex flex-wrap gap-4 justify-start">
+                      {/* Drop indicator when dragging */}
+                      {snapshot.isDraggingOver && (
+                        <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                          <div className="bg-primary/10 rounded-lg p-4 border-2 border-dashed border-primary/50">
+                            <p className="text-sm font-medium text-primary">
+                              Drop here
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap gap-4 justify-start relative">
                         {statusTasks.map((task, index) => (
                           <StickyNote
                             key={task.id}
                             task={task}
                             index={index}
                             onDelete={() => onDeleteTask(task.id)}
+                            onClick={() => onTaskClick?.(task)}
                           />
                         ))}
                         {provided.placeholder}

@@ -15,6 +15,7 @@ interface WhiteboardColumnProps {
   tasks: WhiteboardTask[];
   onAddTask: (title: string) => void;
   onDeleteTask: (taskId: string) => void;
+  onTaskClick?: (task: WhiteboardTask) => void;
 }
 
 export function WhiteboardColumn({
@@ -23,6 +24,7 @@ export function WhiteboardColumn({
   tasks,
   onAddTask,
   onDeleteTask,
+  onTaskClick,
 }: WhiteboardColumnProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -60,6 +62,7 @@ export function WhiteboardColumn({
                   task={task}
                   index={index}
                   onDelete={() => onDeleteTask(task.id)}
+                  onClick={() => onTaskClick?.(task)}
                 />
               ))}
               {provided.placeholder}

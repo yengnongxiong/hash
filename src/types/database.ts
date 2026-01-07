@@ -128,6 +128,9 @@ export type Database = {
           color: string;
           assigned_to: string | null;
           created_by: string | null;
+          priority: "low" | "medium" | "high" | "urgent";
+          due_date: string | null;
+          labels: string[];
           created_at: string;
           updated_at: string;
         };
@@ -142,6 +145,9 @@ export type Database = {
           color?: string;
           assigned_to?: string | null;
           created_by?: string | null;
+          priority?: "low" | "medium" | "high" | "urgent";
+          due_date?: string | null;
+          labels?: string[];
           created_at?: string;
           updated_at?: string;
         };
@@ -156,6 +162,9 @@ export type Database = {
           color?: string;
           assigned_to?: string | null;
           created_by?: string | null;
+          priority?: "low" | "medium" | "high" | "urgent";
+          due_date?: string | null;
+          labels?: string[];
           created_at?: string;
           updated_at?: string;
         };
@@ -164,6 +173,83 @@ export type Database = {
             foreignKeyName: "whiteboard_tasks_organization_id_fkey";
             columns: ["organization_id"];
             referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      task_attachments: {
+        Row: {
+          id: string;
+          task_id: string;
+          file_url: string;
+          file_name: string;
+          file_type: string | null;
+          file_size: number | null;
+          uploaded_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          task_id: string;
+          file_url: string;
+          file_name: string;
+          file_type?: string | null;
+          file_size?: number | null;
+          uploaded_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          task_id?: string;
+          file_url?: string;
+          file_name?: string;
+          file_type?: string | null;
+          file_size?: number | null;
+          uploaded_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "task_attachments_task_id_fkey";
+            columns: ["task_id"];
+            referencedRelation: "whiteboard_tasks";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      task_subtasks: {
+        Row: {
+          id: string;
+          task_id: string;
+          title: string;
+          completed: boolean;
+          position: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          task_id: string;
+          title: string;
+          completed?: boolean;
+          position?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          task_id?: string;
+          title?: string;
+          completed?: boolean;
+          position?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "task_subtasks_task_id_fkey";
+            columns: ["task_id"];
+            referencedRelation: "whiteboard_tasks";
             referencedColumns: ["id"];
           }
         ];
@@ -636,6 +722,16 @@ export interface DocumentDate {
 }
 
 export type WhiteboardTask = Tables<"whiteboard_tasks">;
+export type TaskAttachment = Tables<"task_attachments">;
+export type TaskSubtask = Tables<"task_subtasks">;
+
+// Enhanced WhiteboardTask with relations
+export type WhiteboardTaskWithRelations = WhiteboardTask & {
+  attachments?: TaskAttachment[];
+  subtasks?: TaskSubtask[];
+  creator?: Pick<User, "id" | "name" | "email">;
+  assignee?: Pick<User, "id" | "name" | "email">;
+};
 
 export interface TaskRecommendation {
   id: string;

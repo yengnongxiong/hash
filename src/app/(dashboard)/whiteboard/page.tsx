@@ -14,15 +14,26 @@ export default async function WhiteboardPage() {
     .eq("id", user?.id || "")
     .single();
 
-  const { data: tasks, error } = await supabase
-    .from("whiteboard_tasks")
-    .select("*")
-    .order("created_at", { ascending: true });
+  const organizationId = userData?.organization_id || "";
 
-  if (error) {
+  // Fetch tasks and team members in parallel
+  const [tasksResult, membersResult] = await Promise.all([
+    supabase
+      .from("whiteboard_tasks")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("users")
+      .select("id, name, email")
+      .eq("organization_id", organizationId)
+      .order("name"),
+  ]);
+
+  if (tasksResult.error) {
     return (
       <div className="p-6">
-        <p className="text-destructive">Error loading tasks: {error.message}</p>
+        <p className="text-destructive">Error loading tasks: {tasksResult.error.message}</p>
       </div>
     );
   }
@@ -37,8 +48,9 @@ export default async function WhiteboardPage() {
       </div>
 
       <Whiteboard
-        initialTasks={tasks || []}
-        organizationId={userData?.organization_id || ""}
+        initialTasks={tasksResult.data || []}
+        organizationId={organizationId}
+        teamMembers={membersResult.data || []}
       />
     </div>
   );
