@@ -3,6 +3,7 @@
 import { ColumnDef } from "@tanstack/react-table";
 import { Customer } from "@/types/database";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
 import { DataTableColumnHeader } from "@/components/data-table/column-header";
 import {
   EditableCell,
@@ -56,35 +57,35 @@ export const customerColumns: ColumnDef<Customer>[] = [
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Name" />
     ),
-    cell: (props) => <EditableCell {...props} />,
+    cell: (props) => <EditableCell {...props} truncate maxWidth="150px" />,
   },
   {
     accessorKey: "company",
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Company" />
     ),
-    cell: (props) => <EditableCell {...props} />,
+    cell: (props) => <EditableCell {...props} truncate maxWidth="120px" />,
   },
   {
     accessorKey: "email",
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Email" />
     ),
-    cell: (props) => <EditableCell {...props} type="email" />,
+    cell: (props) => <EditableCell {...props} type="email" truncate maxWidth="150px" />,
   },
   {
     accessorKey: "phone",
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Phone" />
     ),
-    cell: (props) => <EditableCell {...props} type="phone" />,
+    cell: (props) => <EditableCell {...props} type="phone" truncate maxWidth="110px" />,
   },
   {
     accessorKey: "address",
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Address" />
     ),
-    cell: (props) => <EditableCell {...props} />,
+    cell: (props) => <EditableCell {...props} truncate maxWidth="150px" />,
   },
   {
     accessorKey: "tags",
@@ -121,17 +122,24 @@ export const customerColumns: ColumnDef<Customer>[] = [
     },
   },
   {
-    accessorKey: "created_at",
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Created" />
-    ),
-    cell: ({ getValue }) => {
-      const date = getValue() as string;
+    id: "actions",
+    header: () => <span className="sr-only">Actions</span>,
+    cell: ({ row, table }) => {
+      const customer = row.original;
       return (
-        <span className="text-muted-foreground text-sm">
-          {formatDistanceToNow(new Date(date))}
-        </span>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            (table.options.meta as { onViewCustomer?: (customer: Customer) => void })?.onViewCustomer?.(customer);
+          }}
+        >
+          View
+        </Button>
       );
     },
+    enableSorting: false,
+    enableHiding: false,
   },
 ];

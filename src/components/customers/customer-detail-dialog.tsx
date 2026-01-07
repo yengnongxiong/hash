@@ -121,7 +121,7 @@ export function CustomerDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-center justify-between">
             <DialogTitle className="flex items-center gap-3">
@@ -308,7 +308,7 @@ export function CustomerDetailDialog({
                 placeholder="123 Main St, City, State"
               />
             ) : (
-              <p className="text-sm pl-6">
+              <p className="text-sm pl-6 break-words">
                 {currentData.address || (
                   <span className="text-muted-foreground italic">Not set</span>
                 )}
@@ -374,7 +374,7 @@ export function CustomerDetailDialog({
                 rows={3}
               />
             ) : (
-              <p className="text-sm pl-6 whitespace-pre-wrap">
+              <p className="text-sm pl-6 whitespace-pre-wrap break-words">
                 {currentData.notes || (
                   <span className="text-muted-foreground italic">No notes</span>
                 )}

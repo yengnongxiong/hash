@@ -32,6 +32,7 @@ interface DataTableProps<TData, TValue> {
   searchPlaceholder?: string;
   onRowUpdate?: (rowIndex: number, columnId: string, value: unknown) => void;
   onRowDelete?: (rows: TData[]) => void;
+  onViewRow?: (row: TData) => void;
   filterableColumns?: {
     id: string;
     title: string;
@@ -46,6 +47,7 @@ export function DataTable<TData, TValue>({
   searchPlaceholder = "Search...",
   onRowUpdate,
   onRowDelete,
+  onViewRow,
   filterableColumns = [],
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
@@ -76,6 +78,9 @@ export function DataTable<TData, TValue>({
     meta: {
       updateData: (rowIndex: number, columnId: string, value: unknown) => {
         onRowUpdate?.(rowIndex, columnId, value);
+      },
+      onViewCustomer: (customer: TData) => {
+        onViewRow?.(customer);
       },
     },
   });

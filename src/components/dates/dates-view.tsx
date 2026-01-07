@@ -305,39 +305,39 @@ export function DatesView({ appointments, customers, appointmentTypes }: DatesVi
 
       {/* Content */}
       {view === "table" ? (
-        <div className="border rounded-lg overflow-hidden">
+        <div className="border rounded-lg overflow-x-auto">
           {sortedAppointments.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <CalendarIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p className="font-medium">No dates found</p>
-              <p className="text-sm">Try adjusting your filters or create a new appointment</p>
+              <p className="text-sm">Try adjusting your filters or create a new date</p>
             </div>
           ) : (
-            <table className="w-full">
+            <table className="w-full table-fixed min-w-[900px]">
               <thead className="bg-muted/50">
                 <tr>
-                  <th className="text-left p-3 text-sm font-medium">
+                  <th className="text-left p-3 text-sm font-medium w-[140px]">
                     <SortableHeader sortKeyName="date">Date & Time</SortableHeader>
                   </th>
-                  <th className="text-left p-3 text-sm font-medium">
+                  <th className="text-left p-3 text-sm font-medium w-[180px]">
                     <SortableHeader sortKeyName="title">Title</SortableHeader>
                   </th>
-                  <th className="text-left p-3 text-sm font-medium">
+                  <th className="text-left p-3 text-sm font-medium w-[130px]">
                     <SortableHeader sortKeyName="person">Person</SortableHeader>
                   </th>
-                  <th className="text-left p-3 text-sm font-medium">
+                  <th className="text-left p-3 text-sm font-medium w-[100px]">
                     <SortableHeader sortKeyName="type">Type</SortableHeader>
                   </th>
-                  <th className="text-left p-3 text-sm font-medium">
+                  <th className="text-left p-3 text-sm font-medium w-[100px]">
                     <SortableHeader sortKeyName="status">Status</SortableHeader>
                   </th>
-                  <th className="text-left p-3 text-sm font-medium">
+                  <th className="text-left p-3 text-sm font-medium w-[80px]">
                     <SortableHeader sortKeyName="created">Created</SortableHeader>
                   </th>
-                  <th className="text-left p-3 text-sm font-medium">
+                  <th className="text-left p-3 text-sm font-medium w-[80px]">
                     <SortableHeader sortKeyName="updated">Updated</SortableHeader>
                   </th>
-                  <th className="w-20 p-3"></th>
+                  <th className="w-[70px] p-3"></th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -375,7 +375,7 @@ export function DatesView({ appointments, customers, appointmentTypes }: DatesVi
                         </div>
                       </td>
                       <td className="p-3">
-                        <p className="font-medium text-sm truncate max-w-[200px]">
+                        <p className="font-medium text-sm truncate">
                           {apt.title}
                         </p>
                         {apt.location && (
@@ -387,9 +387,9 @@ export function DatesView({ appointments, customers, appointmentTypes }: DatesVi
                       <td className="p-3 text-sm">
                         {apt.customers ? (
                           <div>
-                            <p>{apt.customers.name}</p>
+                            <p className="truncate">{apt.customers.name}</p>
                             {apt.customers.company && (
-                              <p className="text-xs text-muted-foreground">{apt.customers.company}</p>
+                              <p className="text-xs text-muted-foreground truncate">{apt.customers.company}</p>
                             )}
                           </div>
                         ) : (

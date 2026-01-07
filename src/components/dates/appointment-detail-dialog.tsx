@@ -108,9 +108,9 @@ export function AppointmentDetailDialog({
       });
 
       if (result.error) {
-        toast.error("Failed to update appointment", { description: result.error });
+        toast.error("Failed to update date", { description: result.error });
       } else {
-        toast.success("Appointment updated");
+        toast.success("Date updated");
         setIsEditing(false);
         router.refresh();
       }
@@ -124,9 +124,9 @@ export function AppointmentDetailDialog({
       const result = await deleteAppointment(appointment.id);
 
       if (result.error) {
-        toast.error("Failed to delete appointment", { description: result.error });
+        toast.error("Failed to delete date", { description: result.error });
       } else {
-        toast.success("Appointment deleted");
+        toast.success("Date deleted");
         onOpenChange(false);
         router.refresh();
       }
@@ -139,21 +139,21 @@ export function AppointmentDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[550px]">
-        <DialogHeader>
-          <div className="flex items-center justify-between">
-            <DialogTitle className="flex items-center gap-2">
+      <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
+        <DialogHeader className="pr-8">
+          <div className="flex items-center justify-between gap-2">
+            <DialogTitle className="flex items-center gap-2 min-w-0 flex-1">
               {isEditing ? (
-                "Edit Appointment"
+                "Edit Date"
               ) : (
                 <>
                   <div
                     className={cn(
-                      "w-3 h-3 rounded-full",
+                      "w-3 h-3 rounded-full shrink-0",
                       appointment.appointment_types?.color || "bg-blue-500"
                     )}
                   />
-                  {appointment.title}
+                  <span className="truncate">{appointment.title}</span>
                 </>
               )}
             </DialogTitle>
@@ -171,7 +171,7 @@ export function AppointmentDetailDialog({
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Edit appointment</p>
+                      <p>Edit date</p>
                     </TooltipContent>
                   </Tooltip>
                   <AlertDialog>
@@ -184,14 +184,14 @@ export function AppointmentDetailDialog({
                         </AlertDialogTrigger>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>Delete appointment</p>
+                        <p>Delete date</p>
                       </TooltipContent>
                     </Tooltip>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Delete Appointment</AlertDialogTitle>
+                      <AlertDialogTitle>Delete Date</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Are you sure you want to delete this appointment? This action cannot be undone.
+                        Are you sure you want to delete this date? This action cannot be undone.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -210,7 +210,7 @@ export function AppointmentDetailDialog({
             )}
           </div>
           <DialogDescription>
-            {isEditing ? "Update the appointment details below." : "View appointment details."}
+            {isEditing ? "Update the date details below." : "View date details."}
           </DialogDescription>
         </DialogHeader>
 
@@ -222,7 +222,7 @@ export function AppointmentDetailDialog({
                 id="edit-title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Appointment title"
+                placeholder="Date title"
               />
             </div>
 
@@ -375,8 +375,8 @@ export function AppointmentDetailDialog({
             {/* Location */}
             {appointment.location && (
               <div className="flex items-start gap-3">
-                <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
-                <p>{appointment.location}</p>
+                <MapPin className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
+                <p className="break-words min-w-0">{appointment.location}</p>
               </div>
             )}
 
@@ -405,7 +405,7 @@ export function AppointmentDetailDialog({
             {appointment.description && (
               <div className="pt-2 border-t">
                 <p className="text-sm text-muted-foreground mb-1">Notes</p>
-                <p className="text-sm whitespace-pre-wrap">{appointment.description}</p>
+                <p className="text-sm whitespace-pre-wrap break-words">{appointment.description}</p>
               </div>
             )}
 
