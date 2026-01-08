@@ -184,11 +184,11 @@ async function processDocumentOCR(documentId: string) {
       throw new Error(result.error || "OCR processing failed");
     }
 
-    // Update document with results
+    // Update document with results - set to pending_review for human approval
     await adminClient
       .from("documents")
       .update({
-        status: "completed",
+        status: "pending_review",
         raw_text: result.rawText,
         document_type: result.extractedData.documentType || "other",
         extracted_data: JSON.parse(JSON.stringify(result.extractedData)),
@@ -364,6 +364,176 @@ export async function retryDocumentOCR(documentId: string) {
 
   revalidatePath("/documents");
   return { success: true };
+}
+
+export async function approveDocument(documentId: string) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Not authenticated" };
+  }
+
+  // Verify document belongs to user's org and is pending_review
+  const { data: document } = await supabase
+    .from("documents")
+    .select("id, status")
+    .eq("id", documentId)
+    .single();
+
+  if (!document) {
+    return { error: "Document not found" };
+  }
+
+  if (document.status !== "pending_review") {
+    return { error: "Document is not pending review" };
+  }
+
+  // Update document status to completed and record approval
+  const { error: updateError } = await supabase
+    .from("documents")
+    .update({
+      status: "completed",
+      approved_by: user.id,
+      approved_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", documentId);
+
+  if (updateError) {
+    return { error: updateError.message };
+  }
+
+  // Create audit log entry
+  await supabase.from("document_audit_log").insert({
+    document_id: documentId,
+    user_id: user.id,
+    action: "approved",
+    details: {},
+  });
+
+  revalidatePath("/documents");
+  revalidatePath(`/documents/${documentId}`);
+  revalidatePath("/documents/review");
+  return { success: true };
+}
+
+export async function rejectDocument(documentId: string) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Not authenticated" };
+  }
+
+  // Verify document belongs to user's org and is pending_review
+  const { data: document } = await supabase
+    .from("documents")
+    .select("id, status")
+    .eq("id", documentId)
+    .single();
+
+  if (!document) {
+    return { error: "Document not found" };
+  }
+
+  if (document.status !== "pending_review") {
+    return { error: "Document is not pending review" };
+  }
+
+  // Update document status to rejected
+  const { error: updateError } = await supabase
+    .from("documents")
+    .update({
+      status: "rejected",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", documentId);
+
+  if (updateError) {
+    return { error: updateError.message };
+  }
+
+  // Create audit log entry
+  await supabase.from("document_audit_log").insert({
+    document_id: documentId,
+    user_id: user.id,
+    action: "rejected",
+    details: {},
+  });
+
+  revalidatePath("/documents");
+  revalidatePath(`/documents/${documentId}`);
+  revalidatePath("/documents/review");
+  return { success: true };
+}
+
+export async function bulkApproveDocuments(documentIds: string[]) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Not authenticated" };
+  }
+
+  if (documentIds.length === 0) {
+    return { error: "No documents selected" };
+  }
+
+  // Verify all documents are pending_review
+  const { data: documents } = await supabase
+    .from("documents")
+    .select("id, status")
+    .in("id", documentIds);
+
+  if (!documents || documents.length === 0) {
+    return { error: "No documents found" };
+  }
+
+  const pendingDocs = documents.filter((d) => d.status === "pending_review");
+  if (pendingDocs.length === 0) {
+    return { error: "No documents pending review" };
+  }
+
+  const pendingIds = pendingDocs.map((d) => d.id);
+
+  // Bulk update documents
+  const { error: updateError } = await supabase
+    .from("documents")
+    .update({
+      status: "completed",
+      approved_by: user.id,
+      approved_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .in("id", pendingIds);
+
+  if (updateError) {
+    return { error: updateError.message };
+  }
+
+  // Create audit log entries for each document
+  const auditEntries = pendingIds.map((docId) => ({
+    document_id: docId,
+    user_id: user.id,
+    action: "approved",
+    details: { bulk: true },
+  }));
+
+  await supabase.from("document_audit_log").insert(auditEntries);
+
+  revalidatePath("/documents");
+  revalidatePath("/documents/review");
+  return { success: true, count: pendingIds.length };
 }
 
 export async function logDocumentView(documentId: string) {

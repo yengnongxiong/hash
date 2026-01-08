@@ -67,7 +67,7 @@ interface DocumentsViewProps {
   documents: DocumentWithCustomer[];
 }
 
-type StatusFilter = "all" | "pending" | "processing" | "completed" | "failed";
+type StatusFilter = "all" | "pending" | "processing" | "pending_review" | "completed" | "failed" | "rejected";
 type TypeFilter = "all" | "invoice" | "receipt" | "contract" | "other";
 type FlagFilter = "all" | "has_flags" | "no_flags";
 
@@ -263,8 +263,10 @@ export function DocumentsView({ documents }: DocumentsViewProps) {
             <SelectItem value="all">All Status</SelectItem>
             <SelectItem value="pending">Pending</SelectItem>
             <SelectItem value="processing">Processing</SelectItem>
+            <SelectItem value="pending_review">Pending Review</SelectItem>
             <SelectItem value="completed">Completed</SelectItem>
             <SelectItem value="failed">Failed</SelectItem>
+            <SelectItem value="rejected">Rejected</SelectItem>
           </SelectContent>
         </Select>
 

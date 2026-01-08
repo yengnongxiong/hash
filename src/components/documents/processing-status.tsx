@@ -1,9 +1,9 @@
 "use client";
 
-import { CheckCircle, Clock, AlertCircle, Loader2 } from "lucide-react";
+import { CheckCircle, Clock, AlertCircle, Loader2, Eye, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type DocumentStatus = "pending" | "processing" | "completed" | "failed";
+type DocumentStatus = "pending" | "processing" | "pending_review" | "completed" | "failed" | "rejected";
 
 interface ProcessingStatusProps {
   status: DocumentStatus;
@@ -23,17 +23,27 @@ const statusConfig: Record<
   processing: {
     icon: Loader2,
     label: "Processing",
-    className: "text-yellow-600 bg-yellow-100",
+    className: "text-yellow-600 bg-yellow-100 dark:bg-yellow-900/30",
+  },
+  pending_review: {
+    icon: Eye,
+    label: "Pending Review",
+    className: "text-purple-600 bg-purple-100 dark:bg-purple-900/30",
   },
   completed: {
     icon: CheckCircle,
     label: "Completed",
-    className: "text-green-600 bg-green-100",
+    className: "text-green-600 bg-green-100 dark:bg-green-900/30",
   },
   failed: {
     icon: AlertCircle,
     label: "Failed",
     className: "text-destructive bg-destructive/10",
+  },
+  rejected: {
+    icon: XCircle,
+    label: "Rejected",
+    className: "text-orange-600 bg-orange-100 dark:bg-orange-900/30",
   },
 };
 

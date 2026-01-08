@@ -291,8 +291,10 @@ export type Database = {
           document_type: "invoice" | "receipt" | "contract" | "other" | null;
           raw_text: string | null;
           extracted_data: Json;
-          status: "pending" | "processing" | "completed" | "failed";
+          status: "pending" | "processing" | "pending_review" | "completed" | "failed" | "rejected";
           uploaded_by: string | null;
+          approved_at: string | null;
+          approved_by: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -308,8 +310,10 @@ export type Database = {
           document_type?: "invoice" | "receipt" | "contract" | "other" | null;
           raw_text?: string | null;
           extracted_data?: Json;
-          status?: "pending" | "processing" | "completed" | "failed";
+          status?: "pending" | "processing" | "pending_review" | "completed" | "failed" | "rejected";
           uploaded_by?: string | null;
+          approved_at?: string | null;
+          approved_by?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -325,8 +329,10 @@ export type Database = {
           document_type?: "invoice" | "receipt" | "contract" | "other" | null;
           raw_text?: string | null;
           extracted_data?: Json;
-          status?: "pending" | "processing" | "completed" | "failed";
+          status?: "pending" | "processing" | "pending_review" | "completed" | "failed" | "rejected";
           uploaded_by?: string | null;
+          approved_at?: string | null;
+          approved_by?: string | null;
           created_at?: string;
           updated_at?: string;
         };
