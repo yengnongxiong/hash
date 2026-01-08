@@ -37,15 +37,16 @@ export function EditableTagsCell<TData>({
   const remainingCount = (tags?.length || 0) - 2;
 
   return (
-    <div className="px-2 py-1.5 min-h-[32px] flex items-center gap-1 flex-wrap overflow-hidden w-full">
+    <div className="px-2 py-1.5 min-h-[32px] flex items-center gap-1 overflow-hidden w-full">
       {tags && tags.length > 0 ? (
         <>
           {displayTags.map((tag, i) => (
             <span
               key={i}
-              className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary truncate max-w-[60px]"
+              className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary shrink-0 max-w-[80px] overflow-hidden"
+              title={tag}
             >
-              {tag}
+              <span className="truncate">{tag}</span>
             </span>
           ))}
           {remainingCount > 0 && (

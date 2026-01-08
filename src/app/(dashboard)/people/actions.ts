@@ -30,20 +30,23 @@ const customerSchema = z.object({
 export async function getCustomers(search?: string) {
   const supabase = await createClient();
 
-  let query = supabase
+  // Use database function for search (supports ID, tags array, and all text fields)
+  if (search && search.trim()) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.rpc as any)("search_customers", { search_term: search.trim() });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data;
+  }
+
+  // No search - return all customers
+  const { data, error } = await supabase
     .from("customers")
     .select("*")
     .order("updated_at", { ascending: false });
-
-  // Global search across multiple columns
-  if (search && search.trim()) {
-    const searchTerm = `%${search.trim()}%`;
-    query = query.or(
-      `name.ilike.${searchTerm},company.ilike.${searchTerm},email.ilike.${searchTerm},phone.ilike.${searchTerm},address.ilike.${searchTerm},notes.ilike.${searchTerm}`
-    );
-  }
-
-  const { data, error } = await query;
 
   if (error) {
     throw new Error(error.message);

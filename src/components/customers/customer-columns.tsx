@@ -8,7 +8,6 @@ import { DataTableColumnHeader } from "@/components/data-table/column-header";
 import {
   EditableCell,
   EditableTagsCell,
-  EditableNotesCell,
 } from "@/components/data-table/editable-cell";
 import { formatDistanceToNow } from "@/lib/utils/format";
 import { Badge } from "@/components/ui/badge";
@@ -109,18 +108,25 @@ export const customerColumns: ColumnDef<Customer>[] = [
     },
   },
   {
-    accessorKey: "notes",
+    accessorKey: "created_at",
     size: 100,
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Notes" />
+      <DataTableColumnHeader column={column} title="Created" />
     ),
-    cell: (props) => <EditableNotesCell {...props} />,
+    cell: ({ getValue }) => {
+      const date = getValue() as string;
+      return (
+        <span className="text-muted-foreground text-sm truncate block">
+          {formatDistanceToNow(new Date(date))}
+        </span>
+      );
+    },
   },
   {
     accessorKey: "updated_at",
     size: 100,
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Last Edited" />
+      <DataTableColumnHeader column={column} title="Updated" />
     ),
     cell: ({ getValue }) => {
       const date = getValue() as string;
