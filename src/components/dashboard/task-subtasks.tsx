@@ -18,9 +18,10 @@ import {
 
 interface TaskSubtasksProps {
   taskId: string;
+  isEditing?: boolean;
 }
 
-export function TaskSubtasks({ taskId }: TaskSubtasksProps) {
+export function TaskSubtasks({ taskId, isEditing = false }: TaskSubtasksProps) {
   const [subtasks, setSubtasks] = useState<TaskSubtask[]>([]);
   const [newSubtask, setNewSubtask] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -140,7 +141,7 @@ export function TaskSubtasks({ taskId }: TaskSubtasksProps) {
             <div
               key={subtask.id}
               className={cn(
-                "flex items-center gap-2 p-2 rounded-md group",
+                "flex items-center gap-2 p-2 rounded-md group min-w-0",
                 "hover:bg-muted/50 transition-colors"
               )}
             >
@@ -150,55 +151,60 @@ export function TaskSubtasks({ taskId }: TaskSubtasksProps) {
                   handleToggleSubtask(subtask.id, checked as boolean)
                 }
                 disabled={loadingId === subtask.id}
+                className="shrink-0"
               />
               <span
                 className={cn(
-                  "flex-1 text-sm",
+                  "flex-1 text-sm min-w-0 break-all",
                   subtask.completed && "line-through text-muted-foreground"
                 )}
               >
                 {subtask.title}
               </span>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={() => handleDeleteSubtask(subtask.id)}
-                disabled={loadingId === subtask.id}
-              >
-                {loadingId === subtask.id ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <Trash2 className="h-3 w-3 text-destructive" />
-                )}
-              </Button>
+              {isEditing && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={() => handleDeleteSubtask(subtask.id)}
+                  disabled={loadingId === subtask.id}
+                >
+                  {loadingId === subtask.id ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-3 w-3 text-destructive" />
+                  )}
+                </Button>
+              )}
             </div>
           ))}
         </div>
       )}
 
-      {/* Add subtask form */}
-      <form onSubmit={handleAddSubtask} className="flex gap-2">
-        <Input
-          value={newSubtask}
-          onChange={(e) => setNewSubtask(e.target.value)}
-          placeholder="Add a subtask..."
-          className="h-8 text-sm"
-          disabled={isPending}
-        />
-        <Button
-          type="submit"
-          size="sm"
-          className="h-8"
-          disabled={isPending || !newSubtask.trim()}
-        >
-          {isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Plus className="h-4 w-4" />
-          )}
-        </Button>
-      </form>
+      {/* Add subtask form - only show in edit mode */}
+      {isEditing && (
+        <form onSubmit={handleAddSubtask} className="flex gap-2">
+          <Input
+            value={newSubtask}
+            onChange={(e) => setNewSubtask(e.target.value)}
+            placeholder="Add a subtask..."
+            className="h-8 text-sm"
+            disabled={isPending}
+          />
+          <Button
+            type="submit"
+            size="sm"
+            className="h-8"
+            disabled={isPending || !newSubtask.trim()}
+          >
+            {isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Plus className="h-4 w-4" />
+            )}
+          </Button>
+        </form>
+      )}
     </div>
   );
 }

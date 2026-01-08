@@ -92,14 +92,15 @@ const PRIORITY_OPTIONS = [
 ];
 
 const COLOR_OPTIONS = [
-  { value: "#ffffff", label: "White" },
-  { value: "#fef3c7", label: "Amber" },
-  { value: "#dcfce7", label: "Green" },
-  { value: "#dbeafe", label: "Blue" },
-  { value: "#f3e8ff", label: "Purple" },
-  { value: "#ffe4e6", label: "Pink" },
-  { value: "#e0e7ff", label: "Indigo" },
-  { value: "#fef9c3", label: "Yellow" },
+  { value: "#3b82f6", label: "Blue" },
+  { value: "#22c55e", label: "Green" },
+  { value: "#a855f7", label: "Purple" },
+  { value: "#ef4444", label: "Red" },
+  { value: "#f97316", label: "Orange" },
+  { value: "#eab308", label: "Yellow" },
+  { value: "#ec4899", label: "Pink" },
+  { value: "#06b6d4", label: "Cyan" },
+  { value: "#64748b", label: "Slate" },
 ];
 
 function getInitials(name: string): string {
@@ -522,7 +523,7 @@ export function TaskDetailDialog({
                 <Palette className="h-3 w-3" />
                 Color
               </Label>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-3">
                 {COLOR_OPTIONS.map((color) => (
                   <button
                     key={color.value}
@@ -531,10 +532,10 @@ export function TaskDetailDialog({
                       setEditedTask((prev) => ({ ...prev, color: color.value }))
                     }
                     className={cn(
-                      "w-8 h-8 rounded-full border-2 transition-all",
+                      "w-10 h-10 rounded-full transition-all shadow-sm",
                       currentTask.color === color.value
-                        ? "ring-2 ring-offset-2 ring-primary border-primary"
-                        : "border-border hover:scale-110"
+                        ? "ring-2 ring-offset-2 ring-offset-background ring-white scale-110"
+                        : "hover:scale-110 hover:shadow-md"
                     )}
                     style={{ backgroundColor: color.value }}
                     title={color.label}
@@ -625,6 +626,7 @@ export function TaskDetailDialog({
           <TaskSubtasks
             taskId={task.id}
             key={`subtasks-${refreshKey}`}
+            isEditing={isEditing}
           />
 
           <Separator />
@@ -634,6 +636,7 @@ export function TaskDetailDialog({
             taskId={task.id}
             key={`attachments-${refreshKey}`}
             onSketchClick={() => setSketchDialogOpen(true)}
+            isEditing={isEditing}
           />
 
           <Separator />

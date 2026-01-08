@@ -27,6 +27,7 @@ import {
 interface TaskAttachmentsProps {
   taskId: string;
   onSketchClick?: () => void;
+  isEditing?: boolean;
 }
 
 function formatFileSize(bytes: number): string {
@@ -51,6 +52,7 @@ function isImageFile(fileType: string | null): boolean {
 export function TaskAttachments({
   taskId,
   onSketchClick,
+  isEditing = false,
 }: TaskAttachmentsProps) {
   const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
   const [isPending, startTransition] = useTransition();
@@ -213,19 +215,21 @@ export function TaskAttachments({
                       <Download className="h-4 w-4" />
                     </a>
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-destructive hover:text-destructive"
-                    onClick={() => handleDelete(attachment.id)}
-                    disabled={deletingId === attachment.id}
-                  >
-                    {deletingId === attachment.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-4 w-4" />
-                    )}
-                  </Button>
+                  {isEditing && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      onClick={() => handleDelete(attachment.id)}
+                      disabled={deletingId === attachment.id}
+                    >
+                      {deletingId === attachment.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </Button>
+                  )}
                 </div>
               </div>
             );
@@ -233,42 +237,44 @@ export function TaskAttachments({
         </div>
       )}
 
-      {/* Upload zone and sketch button */}
-      <div className="flex gap-2">
-        <div
-          {...getRootProps()}
-          className={cn(
-            "flex-1 border-2 border-dashed rounded-lg p-3 text-center cursor-pointer",
-            "transition-colors hover:border-primary/50 hover:bg-muted/50",
-            isDragActive && "border-primary bg-primary/10",
-            isPending && "opacity-50 cursor-not-allowed"
-          )}
-        >
-          <input {...getInputProps()} />
-          <div className="flex flex-col items-center gap-1">
-            <Upload className="h-6 w-6 text-muted-foreground" />
-            {isDragActive ? (
-              <p className="text-xs text-primary">Drop files here</p>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                Drop files or click
-              </p>
+      {/* Upload zone and sketch button - only in edit mode */}
+      {isEditing && (
+        <div className="flex gap-2">
+          <div
+            {...getRootProps()}
+            className={cn(
+              "flex-1 border-2 border-dashed rounded-lg p-3 text-center cursor-pointer",
+              "transition-colors hover:border-primary/50 hover:bg-muted/50",
+              isDragActive && "border-primary bg-primary/10",
+              isPending && "opacity-50 cursor-not-allowed"
             )}
-          </div>
-        </div>
-
-        {/* Sketch button */}
-        {onSketchClick && (
-          <Button
-            variant="outline"
-            className="h-auto flex-col gap-1 py-3 px-4"
-            onClick={onSketchClick}
           >
-            <Pencil className="h-6 w-6" />
-            <span className="text-xs">Sketch</span>
-          </Button>
-        )}
-      </div>
+            <input {...getInputProps()} />
+            <div className="flex flex-col items-center gap-1">
+              <Upload className="h-6 w-6 text-muted-foreground" />
+              {isDragActive ? (
+                <p className="text-xs text-primary">Drop files here</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Drop files or click
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Sketch button */}
+          {onSketchClick && (
+            <Button
+              variant="outline"
+              className="h-auto flex-col gap-1 py-3 px-4"
+              onClick={onSketchClick}
+            >
+              <Pencil className="h-6 w-6" />
+              <span className="text-xs">Sketch</span>
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* Uploading indicators */}
       {uploadingFiles.length > 0 && (
