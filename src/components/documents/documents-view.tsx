@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import Link from "next/link";
+import { useSearchParams, useRouter } from "next/navigation";
 import { format } from "date-fns";
 import {
   FileText,
@@ -20,6 +21,7 @@ import {
   Loader2,
   FileImage,
   FileSpreadsheet,
+  Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,6 +47,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Calendar } from "@/components/ui/calendar";
 import { ProcessingStatus } from "./processing-status";
+import { UploadDialog } from "./upload-dialog";
 import {
   deleteDocuments,
   retryDocumentOCR,
@@ -100,6 +103,18 @@ function getConfidenceBadge(confidence?: string) {
 export function DocumentsView({ documents }: DocumentsViewProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  // Open upload dialog if URL param is present
+  useEffect(() => {
+    if (searchParams.get("upload") === "true") {
+      setUploadDialogOpen(true);
+      // Clear the URL param
+      router.replace("/documents", { scroll: false });
+    }
+  }, [searchParams, router]);
 
   // Filters
   const [search, setSearch] = useState("");
@@ -374,12 +389,21 @@ export function DocumentsView({ documents }: DocumentsViewProps) {
           </Button>
         )}
 
+        {/* Upload */}
+        <Button onClick={() => setUploadDialogOpen(true)}>
+          <Upload className="h-4 w-4 mr-2" />
+          Upload
+        </Button>
+
         {/* Export */}
         <Button variant="outline" size="sm" onClick={handleExport}>
           <Download className="h-4 w-4 mr-2" />
           Export
         </Button>
       </div>
+
+      {/* Upload Dialog */}
+      <UploadDialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen} />
 
       {/* Results info */}
       <div className="flex items-center justify-between">

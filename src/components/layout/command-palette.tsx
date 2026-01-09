@@ -26,7 +26,6 @@ const pages = [
   { name: "People", href: "/people", icon: Users, keywords: ["crm", "contacts", "customers", "clients"] },
   { name: "Dates", href: "/dates", icon: Calendar, keywords: ["appointments", "meetings", "schedule", "due", "calendar"] },
   { name: "Documents", href: "/documents", icon: FileText, keywords: ["files", "pdfs"] },
-  { name: "Upload Document", href: "/documents/upload", icon: Upload, keywords: ["new", "add"] },
   { name: "Whiteboard", href: "/whiteboard", icon: Kanban, keywords: ["tasks", "board"] },
   { name: "Settings", href: "/settings", icon: Settings, keywords: ["preferences", "config"] },
 ];
@@ -119,7 +118,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                       if (action.action === "new-customer") {
                         router.push("/people?new=true");
                       } else if (action.action === "upload-document") {
-                        router.push("/documents/upload");
+                        router.push("/documents?upload=true");
                       }
                     })
                   }
