@@ -1,7 +1,7 @@
 export interface ExportColumn<T> {
   key: keyof T;
   label: string;
-  format?: (value: unknown) => string;
+  format?: (value: unknown, row: T) => string;
 }
 
 export function exportToCSV<T extends Record<string, unknown>>(
@@ -30,7 +30,7 @@ export function exportToCSV<T extends Record<string, unknown>>(
           }
           return acc;
         },
-        {} as Record<string, (value: unknown) => string>
+        {} as Record<string, (value: unknown, row: T) => string>
       )
     : {};
 
@@ -41,7 +41,7 @@ export function exportToCSV<T extends Record<string, unknown>>(
         .map((key) => {
           const value = row[key];
           const formatter = formatters[key as string];
-          const str = formatter ? formatter(value) : String(value ?? "");
+          const str = formatter ? formatter(value, row) : String(value ?? "");
           // Escape quotes and wrap in quotes if contains comma, newline, or quote
           if (str.includes(",") || str.includes("\n") || str.includes('"')) {
             return `"${str.replace(/"/g, '""')}"`;

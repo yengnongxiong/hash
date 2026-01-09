@@ -287,7 +287,7 @@ interface CSVDateRow {
   date: string;
   time?: string;
   end_time?: string;
-  person?: string;
+  people?: string;
   type?: string;
   location?: string;
   description?: string;
@@ -422,11 +422,21 @@ export async function importDatesFromCSV(
       }
     }
 
-    // Look up person by name, company, or ID
+    // Look up people by name, company, or ID (supports multiple, semicolon-separated)
     let customerId: string | null = null;
-    if (row.person?.trim()) {
-      const personLower = row.person.trim().toLowerCase();
-      customerId = customerMap.get(personLower) || null;
+    let customerIds: string[] = [];
+    if (row.people?.trim()) {
+      // Split by semicolon for multiple people
+      const peopleNames = row.people.split(";").map(p => p.trim()).filter(Boolean);
+      for (const personName of peopleNames) {
+        const personLower = personName.toLowerCase();
+        const foundId = customerMap.get(personLower);
+        if (foundId && !customerIds.includes(foundId)) {
+          customerIds.push(foundId);
+        }
+      }
+      // Set legacy customerId to first person for backwards compatibility
+      customerId = customerIds.length > 0 ? customerIds[0] : null;
     }
 
     // Look up type by name
@@ -447,7 +457,7 @@ export async function importDatesFromCSV(
     toInsert.push({
       organization_id: userData.organization_id,
       customer_id: customerId,
-      customer_ids: customerId ? [customerId] : null,
+      customer_ids: customerIds.length > 0 ? customerIds : null,
       title: row.title.trim(),
       start_time: startTime.toISOString(),
       end_time: endTime?.toISOString() || null,

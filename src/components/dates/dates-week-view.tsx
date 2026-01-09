@@ -54,6 +54,9 @@ interface DatesWeekViewProps {
 // Time slots from 6 AM to 10 PM (16 hours)
 const TIME_SLOTS = Array.from({ length: 17 }, (_, i) => i + 6);
 
+// Fixed height for all events (in slot units, 1 = 1 hour)
+const FIXED_EVENT_HEIGHT = 0.75; // 45 minutes equivalent
+
 export function DatesWeekView({
   dates,
   onDateClick,
@@ -70,39 +73,47 @@ export function DatesWeekView({
   const goToNextWeek = () => setCurrentWeek(addWeeks(currentWeek, 1));
   const goToThisWeek = () => setCurrentWeek(new Date());
 
-  // Group dates by day and sort by time
+  // Group dates by day and sort by time (events only show on their start day)
   const datesByDay = useMemo(() => {
     const map = new Map<string, DateEntry[]>();
+
     for (const d of dates) {
-      const key = format(d.date, "yyyy-MM-dd");
-      if (!map.has(key)) {
-        map.set(key, []);
+      // Only show on start day (within visible week)
+      if (d.date >= weekStart && d.date <= weekEnd) {
+        const dayKey = format(d.date, "yyyy-MM-dd");
+        if (!map.has(dayKey)) {
+          map.set(dayKey, []);
+        }
+        map.get(dayKey)!.push(d);
       }
-      map.get(key)!.push(d);
     }
+
     // Sort each day's dates by time
     map.forEach((dayDates) => {
       dayDates.sort((a, b) => a.date.getTime() - b.date.getTime());
     });
     return map;
-  }, [dates]);
+  }, [dates, weekStart, weekEnd]);
 
-  // Calculate overlapping events layout for a day using proper time-based overlap detection
+  // Calculate overlapping events layout for a day using fixed-height overlap detection
   const getOverlapLayout = useCallback((dayDates: DateEntry[]) => {
     const layout = new Map<string, { column: number; totalColumns: number; visible: boolean }>();
     const overflowGroups = new Map<number, DateEntry[]>(); // For "+X more" groups (keyed by representative hour)
 
-    // Helper to get event end time (default 1 hour if not specified)
-    const getEndTime = (entry: DateEntry) => {
-      return entry.endDate || new Date(entry.date.getTime() + 60 * 60 * 1000);
+    // Use fixed duration for overlap detection (matches visual height)
+    const FIXED_DURATION_MS = FIXED_EVENT_HEIGHT * 60 * 60 * 1000;
+
+    // Helper to get event visual end time (fixed duration from start)
+    const getVisualEndTime = (entry: DateEntry) => {
+      return new Date(entry.date.getTime() + FIXED_DURATION_MS);
     };
 
-    // Check if two events overlap in time
+    // Check if two events visually overlap (using fixed height)
     const eventsOverlap = (a: DateEntry, b: DateEntry) => {
       const aStart = a.date.getTime();
-      const aEnd = getEndTime(a).getTime();
+      const aEnd = getVisualEndTime(a).getTime();
       const bStart = b.date.getTime();
-      const bEnd = getEndTime(b).getTime();
+      const bEnd = getVisualEndTime(b).getTime();
       // Events overlap if one starts before the other ends
       return aStart < bEnd && bStart < aEnd;
     };
@@ -177,8 +188,8 @@ export function DatesWeekView({
           columnEndTimes.push(0);
         }
 
-        // Update column end time
-        columnEndTimes[column] = getEndTime(entry).getTime();
+        // Update column end time (use fixed duration)
+        columnEndTimes[column] = getVisualEndTime(entry).getTime();
 
         layout.set(entry.id, {
           column: Math.min(column, MAX_VISIBLE_EVENTS - 1), // Cap column to max
@@ -191,7 +202,7 @@ export function DatesWeekView({
     return { layout, overflowGroups };
   }, []);
 
-  // Calculate position and height for a date entry
+  // Calculate position for a date entry (fixed height for all events)
   const getEntryStyle = (entry: DateEntry) => {
     const hour = entry.date.getHours();
     const minutes = entry.date.getMinutes();
@@ -200,16 +211,12 @@ export function DatesWeekView({
     // Calculate top position (percentage within the grid)
     const top = (startSlot + minutes / 60) * 100 / TIME_SLOTS.length;
 
-    // Calculate height based on duration (default 1 hour if no end time)
-    let durationHours = 1;
-    if (entry.endDate) {
-      durationHours = (entry.endDate.getTime() - entry.date.getTime()) / (1000 * 60 * 60);
-    }
-    const height = Math.min(durationHours * 100 / TIME_SLOTS.length, 100 - top);
+    // Fixed height for all events (clean, uniform appearance)
+    const height = FIXED_EVENT_HEIGHT * 100 / TIME_SLOTS.length;
 
     return {
       top: `${Math.max(0, top)}%`,
-      height: `${Math.max(height, 4)}%`, // Minimum 4% height for visibility
+      height: `${height}%`,
     };
   };
 
@@ -279,7 +286,7 @@ export function DatesWeekView({
                   key={day.toISOString()}
                   className={cn(
                     "p-2 text-center border-l",
-                    isToday(day) && "bg-primary/10"
+                    isToday(day) && "bg-primary/20 border-primary/30"
                   )}
                 >
                   <p className="text-xs text-muted-foreground">
@@ -332,6 +339,7 @@ export function DatesWeekView({
                         {...provided.droppableProps}
                         className={cn(
                           "relative border-l",
+                          isToday(day) && "bg-primary/5",
                           hasOverdueEvents && "bg-red-500/5",
                           snapshot.isDraggingOver && "bg-primary/10"
                         )}
@@ -374,17 +382,24 @@ export function DatesWeekView({
                                   const style = getEntryStyle(entry);
                                   const isCancelled = entry.status === "cancelled";
                                   const isCompleted = entry.status === "completed";
+                                  const isOverdue = !isCancelled && !isCompleted && isPast(entry.date) && !isToday(entry.date);
 
                                   // Get overlap layout for positioning
                                   const widthPercent = 100 / layoutInfo.totalColumns;
                                   const leftPercent = layoutInfo.column * widthPercent;
+
+                                  const isDragDisabled = !onDateMove;
+
+                                  // Calculate z-index: cancelled/completed events go below, active events on top
+                                  const baseZIndex = isCancelled ? 1 : isCompleted ? 2 : 10;
+                                  const zIndex = baseZIndex + layoutInfo.column;
 
                                   return (
                                     <Draggable
                                       key={entry.id}
                                       draggableId={entry.id}
                                       index={index}
-                                      isDragDisabled={!onDateMove}
+                                      isDragDisabled={isDragDisabled}
                                     >
                                       {(dragProvided, dragSnapshot) => (
                                         <div
@@ -392,19 +407,17 @@ export function DatesWeekView({
                                           {...dragProvided.draggableProps}
                                           {...dragProvided.dragHandleProps}
                                           className={cn(
-                                            "absolute rounded px-1 py-0.5 text-left overflow-hidden pointer-events-auto transition-shadow cursor-grab",
-                                            isCancelled
-                                              ? "bg-muted opacity-60 line-through"
-                                              : isCompleted
-                                              ? "bg-green-500/20 border border-green-500/30"
-                                              : entry.color ||
-                                                "bg-primary/20 border border-primary/30",
-                                            dragSnapshot.isDragging &&
-                                              "shadow-lg cursor-grabbing ring-2 ring-primary"
+                                            "absolute rounded px-1.5 py-0.5 text-left overflow-hidden pointer-events-auto transition-shadow border",
+                                            !isDragDisabled && "cursor-grab",
+                                            // Status-based colors (minimal, professional)
+                                            isCancelled && "bg-muted/50 border-transparent opacity-50 line-through",
+                                            isCompleted && "bg-muted/50 border-muted-foreground/20 opacity-70",
+                                            isOverdue && "bg-red-500/10 border-red-500/30",
+                                            !isCancelled && !isCompleted && !isOverdue && "bg-primary/10 border-primary/20",
+                                            dragSnapshot.isDragging && "shadow-lg cursor-grabbing ring-2 ring-primary z-50"
                                           )}
                                           style={{
                                             ...dragProvided.draggableProps.style,
-                                            // Position and size
                                             ...(dragSnapshot.isDragging
                                               ? {}
                                               : {
@@ -412,6 +425,7 @@ export function DatesWeekView({
                                                   height: style.height,
                                                   left: `calc(${leftPercent}% + 2px)`,
                                                   width: `calc(${widthPercent}% - 4px)`,
+                                                  zIndex,
                                                 }),
                                           }}
                                           onClick={(e) => {
@@ -421,13 +435,10 @@ export function DatesWeekView({
                                             }
                                           }}
                                         >
-                                          <p className="text-xs font-medium truncate">
-                                            {entry.title}
-                                          </p>
+                                          <p className="text-xs font-medium truncate">{entry.title}</p>
                                           <p className="text-[10px] text-muted-foreground truncate">
                                             {format(entry.date, "h:mm a")}
-                                            {entry.entityName &&
-                                              ` • ${entry.entityName}`}
+                                            {entry.entityName && ` • ${entry.entityName}`}
                                           </p>
                                         </div>
                                       )}
@@ -465,14 +476,17 @@ export function DatesWeekView({
                                   const columnWidth = 100 / MAX_VISIBLE_EVENTS;
                                   const leftPercent = visibleCount * columnWidth;
 
+                                  // Fixed height for the "+X more" button
+                                  const fixedHeight = FIXED_EVENT_HEIGHT * 100 / TIME_SLOTS.length;
+
                                   return (
                                     <Popover key={`overflow-${representativeHour}`}>
                                       <PopoverTrigger asChild>
                                         <button
-                                          className="absolute rounded px-1 py-0.5 text-left overflow-hidden pointer-events-auto bg-muted/80 border border-border hover:bg-muted transition-colors"
+                                          className="absolute rounded px-1.5 py-0.5 text-left overflow-hidden pointer-events-auto bg-muted/60 border border-muted-foreground/20 hover:bg-muted transition-colors"
                                           style={{
                                             top: `${Math.max(0, top)}%`,
-                                            height: `${Math.max(100 / TIME_SLOTS.length, 4)}%`,
+                                            height: `${fixedHeight}%`,
                                             left: `calc(${leftPercent}% + 2px)`,
                                             width: `calc(${columnWidth}% - 4px)`,
                                           }}
@@ -481,9 +495,6 @@ export function DatesWeekView({
                                           <p className="text-xs font-medium text-muted-foreground">
                                             +{hiddenCount} more
                                           </p>
-                                          <p className="text-[10px] text-muted-foreground/70">
-                                            {format(firstEvent.date, "h:mm a")}
-                                          </p>
                                         </button>
                                       </PopoverTrigger>
                                       <PopoverContent className="w-72 p-3" align="end">
@@ -491,22 +502,31 @@ export function DatesWeekView({
                                           {hiddenCount} more events
                                         </p>
                                         <div className="space-y-1.5 max-h-[250px] overflow-y-auto">
-                                          {hiddenEntries.map((entry) => (
-                                            <button
-                                              key={entry.id}
-                                              className={cn(
-                                                "w-full text-left p-2.5 rounded-md text-sm hover:bg-muted transition-colors border",
-                                                entry.status === "cancelled" && "opacity-60 line-through"
-                                              )}
-                                              onClick={() => onDateClick?.(entry)}
-                                            >
-                                              <p className="font-medium truncate">{entry.title}</p>
-                                              <p className="text-xs text-muted-foreground truncate mt-0.5">
-                                                {format(entry.date, "h:mm a")}
-                                                {entry.entityName && ` • ${entry.entityName}`}
-                                              </p>
-                                            </button>
-                                          ))}
+                                          {hiddenEntries.map((entry) => {
+                                            const isCancelled = entry.status === "cancelled";
+                                            const isCompleted = entry.status === "completed";
+                                            const isOverdue = !isCancelled && !isCompleted && isPast(entry.date) && !isToday(entry.date);
+
+                                            return (
+                                              <button
+                                                key={entry.id}
+                                                className={cn(
+                                                  "w-full text-left p-2 rounded-md text-sm hover:bg-muted/50 transition-colors border",
+                                                  isCancelled && "opacity-50 line-through border-transparent",
+                                                  isCompleted && "opacity-70 border-muted-foreground/20",
+                                                  isOverdue && "border-red-500/30 bg-red-500/5",
+                                                  !isCancelled && !isCompleted && !isOverdue && "border-primary/20"
+                                                )}
+                                                onClick={() => onDateClick?.(entry)}
+                                              >
+                                                <p className="font-medium truncate">{entry.title}</p>
+                                                <p className="text-xs text-muted-foreground truncate mt-0.5">
+                                                  {format(entry.date, "h:mm a")}
+                                                  {entry.entityName && ` • ${entry.entityName}`}
+                                                </p>
+                                              </button>
+                                            );
+                                          })}
                                         </div>
                                       </PopoverContent>
                                     </Popover>

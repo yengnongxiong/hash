@@ -23,6 +23,13 @@ import { updateAppointment, bulkUpdateAppointmentStatus, bulkDeleteAppointments 
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   List,
   Calendar as CalendarIcon,
   CalendarDays,
@@ -35,6 +42,10 @@ import {
   Check,
   Trash2,
   X,
+  ChevronFirst,
+  ChevronLast,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import {
   format,
@@ -42,6 +53,7 @@ import {
   isToday,
   isFuture,
   startOfDay,
+  isSameDay,
 } from "date-fns";
 import { formatDistanceToNow } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
@@ -77,6 +89,8 @@ function getComputedStatus(apt: AppointmentWithRelations): string {
 }
 
 const DATES_VIEW_STORAGE_KEY = "hash-dates-preferred-view";
+const DATES_ROWS_PER_PAGE_KEY = "hash-dates-rows-per-page";
+const ROWS_PER_PAGE_OPTIONS = [10, 20, 30, 50, 100];
 
 export function DatesView({ appointments, customers, appointmentTypes, organizationMembers }: DatesViewProps) {
   const [view, setView] = useState<"table" | "week" | "calendar">("table");
@@ -91,6 +105,9 @@ export function DatesView({ appointments, customers, appointmentTypes, organizat
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   // State for bulk selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // State for pagination
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [currentPage, setCurrentPage] = useState(0);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -100,12 +117,27 @@ export function DatesView({ appointments, customers, appointmentTypes, organizat
     if (savedView && ["table", "week", "calendar"].includes(savedView)) {
       setView(savedView as "table" | "week" | "calendar");
     }
+    const savedRowsPerPage = localStorage.getItem(DATES_ROWS_PER_PAGE_KEY);
+    if (savedRowsPerPage) {
+      const parsed = parseInt(savedRowsPerPage, 10);
+      if (ROWS_PER_PAGE_OPTIONS.includes(parsed)) {
+        setRowsPerPage(parsed);
+      }
+    }
   }, []);
 
   // Save view preference to localStorage when it changes
   const handleViewChange = useCallback((newView: "table" | "week" | "calendar") => {
     setView(newView);
     localStorage.setItem(DATES_VIEW_STORAGE_KEY, newView);
+  }, []);
+
+  // Handle rows per page change
+  const handleRowsPerPageChange = useCallback((value: string) => {
+    const newRowsPerPage = parseInt(value, 10);
+    setRowsPerPage(newRowsPerPage);
+    setCurrentPage(0); // Reset to first page
+    localStorage.setItem(DATES_ROWS_PER_PAGE_KEY, value);
   }, []);
 
   // Quick status change handler
@@ -160,24 +192,58 @@ export function DatesView({ appointments, customers, appointmentTypes, organizat
 
   const filteredAppointments = useMemo(() => {
     return appointments.filter((apt) => {
-      // Search filter - includes formatted dates
+      // Search filter - includes all fields
       if (search) {
         const searchLower = search.toLowerCase();
         const startDate = new Date(apt.start_time);
-        const formattedDate = format(startDate, "MMM d, yyyy").toLowerCase();
-        const formattedTime = format(startDate, "h:mm a").toLowerCase();
+        const endDate = apt.end_time ? new Date(apt.end_time) : null;
+        const formattedStartDate = format(startDate, "MMM d, yyyy").toLowerCase();
+        const formattedStartTime = format(startDate, "h:mm a").toLowerCase();
+        const formattedEndDate = endDate ? format(endDate, "MMM d, yyyy").toLowerCase() : "";
+        const formattedEndTime = endDate ? format(endDate, "h:mm a").toLowerCase() : "";
         const computedStatus = getComputedStatus(apt);
 
+        // Get all people names from customer_ids
+        const peopleNames = apt.customer_ids?.map(id => {
+          const customer = customers.find(c => c.id === id);
+          return customer ? [
+            customer.name?.toLowerCase() || "",
+            customer.company?.toLowerCase() || "",
+            customer.customer_number?.toLowerCase() || ""
+          ].join(" ") : "";
+        }).join(" ") || "";
+
+        // Get all assignee names/emails
+        const assigneeNames = apt.assignees?.map(a =>
+          [a.name?.toLowerCase() || "", a.email?.toLowerCase() || ""].join(" ")
+        ).join(" ") || "";
+
         const matchesSearch =
+          // Title
           apt.title.toLowerCase().includes(searchLower) ||
+          // People (legacy single customer)
           apt.customers?.name?.toLowerCase().includes(searchLower) ||
           apt.customers?.company?.toLowerCase().includes(searchLower) ||
+          // People (multi-customer)
+          peopleNames.includes(searchLower) ||
+          // Assignees
+          assigneeNames.includes(searchLower) ||
+          // Location
           apt.location?.toLowerCase().includes(searchLower) ||
+          // Description
           apt.description?.toLowerCase().includes(searchLower) ||
+          // Team Notes
+          apt.notes?.toLowerCase().includes(searchLower) ||
+          // Type
           apt.appointment_types?.name?.toLowerCase().includes(searchLower) ||
-          formattedDate.includes(searchLower) ||
-          formattedTime.includes(searchLower) ||
-          computedStatus.includes(searchLower);
+          // Dates and times
+          formattedStartDate.includes(searchLower) ||
+          formattedStartTime.includes(searchLower) ||
+          formattedEndDate.includes(searchLower) ||
+          formattedEndTime.includes(searchLower) ||
+          // Status
+          computedStatus.includes(searchLower) ||
+          apt.status.toLowerCase().includes(searchLower);
         if (!matchesSearch) return false;
       }
 
@@ -203,7 +269,7 @@ export function DatesView({ appointments, customers, appointmentTypes, organizat
 
       return true;
     });
-  }, [appointments, search, timeFilter]);
+  }, [appointments, search, timeFilter, customers]);
 
   // Sorted appointments
   const sortedAppointments = useMemo(() => {
@@ -252,14 +318,47 @@ export function DatesView({ appointments, customers, appointmentTypes, organizat
     });
   }, [filteredAppointments, sortKey, sortDirection]);
 
-  // Bulk selection handlers (must be after sortedAppointments)
-  const handleSelectAll = useCallback(() => {
-    if (selectedIds.size === sortedAppointments.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(sortedAppointments.map((apt) => apt.id)));
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(0);
+  }, [search, timeFilter, sortKey, sortDirection]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(sortedAppointments.length / rowsPerPage);
+  const paginatedAppointments = useMemo(() => {
+    const startIndex = currentPage * rowsPerPage;
+    return sortedAppointments.slice(startIndex, startIndex + rowsPerPage);
+  }, [sortedAppointments, currentPage, rowsPerPage]);
+
+  // Ensure current page is valid when data changes
+  useEffect(() => {
+    if (currentPage >= totalPages && totalPages > 0) {
+      setCurrentPage(totalPages - 1);
     }
-  }, [sortedAppointments, selectedIds.size]);
+  }, [currentPage, totalPages]);
+
+  // Bulk selection handlers (must be after paginatedAppointments)
+  const handleSelectAll = useCallback(() => {
+    // Check if all items on current page are selected
+    const currentPageIds = paginatedAppointments.map((apt) => apt.id);
+    const allCurrentPageSelected = currentPageIds.every((id) => selectedIds.has(id));
+
+    if (allCurrentPageSelected) {
+      // Deselect all items on current page
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        currentPageIds.forEach((id) => next.delete(id));
+        return next;
+      });
+    } else {
+      // Select all items on current page
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        currentPageIds.forEach((id) => next.add(id));
+        return next;
+      });
+    }
+  }, [paginatedAppointments, selectedIds]);
 
   const handleSelectOne = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -378,13 +477,33 @@ export function DatesView({ appointments, customers, appointmentTypes, organizat
   };
 
   const handleExport = useCallback(() => {
+    // Create a lookup map for customer IDs to names
+    const customerLookup = new Map<string, string>();
+    customers.forEach(c => {
+      customerLookup.set(c.id, c.name);
+    });
+
     exportToCSV(sortedAppointments, "dates", [
       { key: "title", label: "Title" },
       { key: "start_time", label: "Date", format: (v) => formatDateTime(v as string) },
       { key: "end_time", label: "End Time", format: (v) => v ? formatDateTime(v as string) : "" },
-      { key: "customers", label: "Person", format: (v) => {
-        const customer = v as AppointmentWithRelations["customers"];
-        return customer?.name || "";
+      { key: "customer_ids", label: "People", format: (v, row) => {
+        const apt = row as AppointmentWithRelations;
+        // Use customer_ids array if available, otherwise fall back to legacy customers
+        if (apt.customer_ids && apt.customer_ids.length > 0) {
+          return apt.customer_ids
+            .map(id => customerLookup.get(id) || "")
+            .filter(Boolean)
+            .join("; ");
+        }
+        return apt.customers?.name || "";
+      }},
+      { key: "assignees", label: "Assignees", format: (v) => {
+        const assignees = v as AppointmentWithRelations["assignees"];
+        if (assignees && assignees.length > 0) {
+          return assignees.map(a => a.name || a.email).join("; ");
+        }
+        return "";
       }},
       { key: "appointment_types", label: "Type", format: (v) => {
         const type = v as AppointmentWithRelations["appointment_types"];
@@ -392,11 +511,12 @@ export function DatesView({ appointments, customers, appointmentTypes, organizat
       }},
       { key: "location", label: "Location", format: (v) => (v as string) || "" },
       { key: "description", label: "Description", format: (v) => (v as string) || "" },
+      { key: "notes", label: "Notes", format: (v) => (v as string) || "" },
       { key: "status", label: "Status" },
       { key: "created_at", label: "Created", format: (v) => formatDateTime(v as string) },
       { key: "updated_at", label: "Updated", format: (v) => formatDateTime(v as string) },
     ]);
-  }, [sortedAppointments]);
+  }, [sortedAppointments, customers]);
 
   return (
     <div className="space-y-4">
@@ -556,6 +676,7 @@ export function DatesView({ appointments, customers, appointmentTypes, organizat
 
       {/* Content */}
       {view === "table" ? (
+        <>
         <div className="border rounded-lg overflow-x-auto">
           {sortedAppointments.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
@@ -571,8 +692,8 @@ export function DatesView({ appointments, customers, appointmentTypes, organizat
                     <div className="flex items-center justify-center">
                       <Checkbox
                         checked={
-                          sortedAppointments.length > 0 &&
-                          selectedIds.size === sortedAppointments.length
+                          paginatedAppointments.length > 0 &&
+                          paginatedAppointments.every((apt) => selectedIds.has(apt.id))
                         }
                         onCheckedChange={handleSelectAll}
                         aria-label="Select all"
@@ -586,7 +707,7 @@ export function DatesView({ appointments, customers, appointmentTypes, organizat
                     <SortableHeader sortKeyName="title">Title</SortableHeader>
                   </th>
                   <th className="text-left p-3 text-sm font-medium w-[130px]">
-                    <SortableHeader sortKeyName="person">Person</SortableHeader>
+                    <SortableHeader sortKeyName="person">People</SortableHeader>
                   </th>
                   <th className="text-left p-3 text-sm font-medium w-[100px]">
                     <SortableHeader sortKeyName="type">Type</SortableHeader>
@@ -604,7 +725,7 @@ export function DatesView({ appointments, customers, appointmentTypes, organizat
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {sortedAppointments.map((apt) => {
+                {paginatedAppointments.map((apt) => {
                   const startDate = new Date(apt.start_time);
                   const computedStatus = getComputedStatus(apt);
                   const isOverdue = computedStatus === "overdue";
@@ -642,27 +763,31 @@ export function DatesView({ appointments, customers, appointmentTypes, organizat
                             </p>
                             <p className="text-xs text-muted-foreground">
                               {format(startDate, "h:mm a")}
-                              {apt.end_time && ` - ${format(new Date(apt.end_time), "h:mm a")}`}
+                              {apt.end_time && (
+                                isSameDay(startDate, new Date(apt.end_time))
+                                  ? ` - ${format(new Date(apt.end_time), "h:mm a")}`
+                                  : ` → ${format(new Date(apt.end_time), "MMM d, h:mm a")}`
+                              )}
                             </p>
                           </div>
                         </div>
                       </td>
                       <td className="p-3 max-w-0">
-                        <p className="font-medium text-sm truncate">
+                        <p className="font-medium text-sm truncate" title={apt.title}>
                           {apt.title}
                         </p>
-                        {apt.location && (
-                          <p className="text-xs text-muted-foreground truncate">
-                            {apt.location}
-                          </p>
-                        )}
                       </td>
                       <td className="p-3 text-sm max-w-0">
                         {apt.customers ? (
-                          <div className="min-w-0">
-                            <p className="truncate">{apt.customers.name}</p>
-                            {apt.customers.company && (
-                              <p className="text-xs text-muted-foreground truncate">{apt.customers.company}</p>
+                          <div className="flex items-center gap-1 min-w-0">
+                            <Badge variant="secondary" className="gap-1.5 max-w-[100px] shrink-0">
+                              <div className="w-2 h-2 rounded-full bg-primary/60 shrink-0" />
+                              <span className="truncate" title={apt.customers.name}>{apt.customers.name}</span>
+                            </Badge>
+                            {apt.customer_ids && apt.customer_ids.length > 1 && (
+                              <span className="text-xs text-muted-foreground shrink-0">
+                                +{apt.customer_ids.length - 1}
+                              </span>
                             )}
                           </div>
                         ) : (
@@ -671,7 +796,7 @@ export function DatesView({ appointments, customers, appointmentTypes, organizat
                       </td>
                       <td className="p-3 max-w-0">
                         {apt.appointment_types ? (
-                          <Badge variant="outline" className="gap-1.5 max-w-full truncate">
+                          <Badge variant="outline" className="gap-1.5 max-w-[90px]" title={apt.appointment_types.name}>
                             <div className={cn("w-2 h-2 rounded-full shrink-0", apt.appointment_types.color)} />
                             <span className="truncate">{apt.appointment_types.name}</span>
                           </Badge>
@@ -762,6 +887,77 @@ export function DatesView({ appointments, customers, appointmentTypes, organizat
             </table>
           )}
         </div>
+
+        {/* Pagination - separate from table */}
+        {sortedAppointments.length > 0 && (
+          <div className="flex items-center justify-between py-4">
+            <div className="text-sm text-muted-foreground">
+              {selectedIds.size} of {sortedAppointments.length} row(s) selected.
+            </div>
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Rows per page</span>
+                <Select
+                  value={rowsPerPage.toString()}
+                  onValueChange={handleRowsPerPageChange}
+                >
+                  <SelectTrigger className="h-8 w-[70px]">
+                    <SelectValue placeholder={rowsPerPage.toString()} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ROWS_PER_PAGE_OPTIONS.map((option) => (
+                      <SelectItem key={option} value={option.toString()}>
+                        {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Page {currentPage + 1} of {totalPages || 1}
+              </div>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setCurrentPage(0)}
+                  disabled={currentPage === 0}
+                >
+                  <ChevronFirst className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
+                  disabled={currentPage === 0}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages - 1, p + 1))}
+                  disabled={currentPage >= totalPages - 1}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setCurrentPage(totalPages - 1)}
+                  disabled={currentPage >= totalPages - 1}
+                >
+                  <ChevronLast className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+        </>
       ) : view === "week" ? (
         <DatesWeekView
           dates={calendarDates}

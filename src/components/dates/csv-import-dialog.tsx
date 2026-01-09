@@ -20,7 +20,7 @@ interface CSVRow {
   date: string;
   time?: string;
   end_time?: string;
-  person?: string;
+  people?: string;
   type?: string;
   location?: string;
   description?: string;
@@ -71,7 +71,7 @@ export function DatesCSVImportDialog({ customers, appointmentTypes }: DatesCSVIm
         else if (header === "date") row.date = value;
         else if (header === "time") row.time = value;
         else if (header === "end_time" || header === "end time") row.end_time = value;
-        else if (header === "person" || header === "people") row.person = value;
+        else if (header === "person" || header === "people") row.people = value;
         else if (header === "type") row.type = value;
         else if (header === "location") row.location = value;
         else if (header === "description") row.description = value;
@@ -195,7 +195,7 @@ export function DatesCSVImportDialog({ customers, appointmentTypes }: DatesCSVIm
   };
 
   const downloadTemplate = () => {
-    const template = "title,date,time,end_time,person,type,location,description,status\nTeam Meeting,2025-01-15,10:00 AM,11:00 AM,John Doe,Meeting,Conference Room,Weekly sync,scheduled";
+    const template = "title,date,time,end_time,people,type,location,description,status\nTeam Meeting,2025-01-15,10:00 AM,11:00 AM,John Doe; Jane Smith,Meeting,Conference Room,Weekly sync,scheduled";
     const blob = new Blob([template], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
