@@ -3,7 +3,7 @@
 import { useState, useCallback, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useDropzone } from "react-dropzone";
-import { Upload, FileText, X, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import { Upload, FileText, X, CheckCircle, AlertCircle, Loader2, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { uploadDocument } from "@/app/(dashboard)/documents/actions";
@@ -55,6 +55,14 @@ export function DocumentUpload() {
 
   const removeFile = (index: number) => {
     setFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const retryFile = (index: number) => {
+    setFiles((prev) =>
+      prev.map((f, idx) =>
+        idx === index ? { ...f, status: "pending", error: undefined, progress: 0 } : f
+      )
+    );
   };
 
   const uploadFiles = async () => {
@@ -240,7 +248,26 @@ export function DocumentUpload() {
                     <CheckCircle className="h-5 w-5 text-green-600" />
                   )}
                   {uploadingFile.status === "error" && (
-                    <AlertCircle className="h-5 w-5 text-destructive" />
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => retryFile(index)}
+                        className="h-8 w-8"
+                        title="Retry upload"
+                      >
+                        <RotateCw className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeFile(index)}
+                        className="h-8 w-8"
+                        title="Remove file"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
                   )}
                 </div>
               </div>

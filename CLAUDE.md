@@ -1,229 +1,39 @@
-# Hash - B2B Document & Customer Management Platform
+# Hash - B2B Document & People Management Platform
 
-## Quick Context (For Session Recovery)
+## Quick Context
 
 **What this is**: B2B SaaS for document/people management with AI OCR. Multi-tenant, Supabase backend.
 
 **User Preferences**:
-- Proactively use MCP tools (Supabase, Playwright, Context7) without asking
+- Proactively use MCP tools (Supabase, Playwright, Context7, Shadcn, Semgrep) without asking
 - Use agents (Explore, Plan, feature-dev) for complex tasks
-- Run build after changes to verify: `npm run build`
+- Run `npm run build` after changes to verify
 - Commit only when explicitly requested
 - Admin email: yengnongxiong@gmail.com
 
 **Key Terminology**:
 - "People" (not "Customers") - renamed for professionalism
-- Person IDs are 6-char alphanumeric (e.g., "A3B7K2"), not sequential
-- Document IDs are sequential DOC-0001 format
+- Person and Document IDs are 6-char alphanumeric (e.g., "A3B7K2"), not sequential
+
 
 **Current State**: All MVP + Phase 2 + Phase 3 complete. App is functional.
 
 ---
 
-## ⚠️ PARALLEL DEVELOPMENT MODE (READ FIRST)
-
-This project uses **git worktrees** for parallel development with 4 separate Claude Code instances. Each instance has a specific scope and MUST NOT modify files outside its designated area.
-
-### Which Branch Am I On?
-
-Run `git branch --show-current` to identify your branch and scope:
-
-| Branch | Dev Port | Scope |
-|--------|----------|-------|
-| `feature/people` | 3001 | People/Customers management |
-| `feature/dates` | 3002 | Dates/Appointments |
-| `feature/documents` | 3003 | Documents & OCR |
-| `feature/whiteboard` | 3004 | Whiteboard/Kanban |
-| `main` | 3000 | NO DEVELOPMENT - merge target only |
-
-### Start Dev Server on Correct Port
-
-```bash
-# Check your branch first
-git branch --show-current
-
-# Start on your assigned port
-PORT=3001 npm run dev  # people
-PORT=3002 npm run dev  # dates
-PORT=3003 npm run dev  # documents
-PORT=3004 npm run dev  # whiteboard
-```
-
-### Scope Boundaries (STRICTLY ENFORCED)
-
-#### feature/people - People Management
-**CAN modify:**
-- `src/app/(dashboard)/people/**/*`
-- `src/components/customers/**/*`
-- `src/components/data-table/**/*` (shared, be careful)
-
-**CANNOT modify:**
-- `src/app/(dashboard)/dates/**/*`
-- `src/app/(dashboard)/documents/**/*`
-- `src/app/(dashboard)/whiteboard/**/*`
-- `src/components/dates/**/*`
-- `src/components/documents/**/*`
-- `src/components/dashboard/whiteboard*`
-
----
-
-#### feature/dates - Dates/Appointments
-**CAN modify:**
-- `src/app/(dashboard)/dates/**/*`
-- `src/components/dates/**/*`
-- `src/components/customers/appointments/**/*` (shared with people)
-
-**CANNOT modify:**
-- `src/app/(dashboard)/people/**/*` (except appointments subfolder)
-- `src/app/(dashboard)/documents/**/*`
-- `src/app/(dashboard)/whiteboard/**/*`
-- `src/components/customers/**/*` (except appointments)
-- `src/components/documents/**/*`
-- `src/components/dashboard/whiteboard*`
-
----
-
-#### feature/documents - Documents & OCR
-**CAN modify:**
-- `src/app/(dashboard)/documents/**/*`
-- `src/components/documents/**/*`
-- `src/lib/ocr/**/*`
-
-**CANNOT modify:**
-- `src/app/(dashboard)/people/**/*`
-- `src/app/(dashboard)/dates/**/*`
-- `src/app/(dashboard)/whiteboard/**/*`
-- `src/components/customers/**/*`
-- `src/components/dates/**/*`
-- `src/components/dashboard/whiteboard*`
-
----
-
-#### feature/whiteboard - Whiteboard/Kanban
-**CAN modify:**
-- `src/app/(dashboard)/whiteboard/**/*`
-- `src/components/dashboard/whiteboard*.tsx`
-- `src/components/dashboard/activity-feed.tsx`
-
-**CANNOT modify:**
-- `src/app/(dashboard)/people/**/*`
-- `src/app/(dashboard)/dates/**/*`
-- `src/app/(dashboard)/documents/**/*`
-- `src/components/customers/**/*`
-- `src/components/dates/**/*`
-- `src/components/documents/**/*`
-
----
-
-### Shared Files (COORDINATE BEFORE MODIFYING)
-
-These files may cause merge conflicts. Only modify if absolutely necessary:
-
-| File | Risk Level | Notes |
-|------|------------|-------|
-| `src/types/database.ts` | HIGH | Add types, don't remove/rename |
-| `package.json` | HIGH | Only add deps, don't change versions |
-| `src/components/ui/**/*` | MEDIUM | Add new shadcn components via CLI only |
-| `src/components/layout/**/*` | HIGH | Sidebar, header - avoid changes |
-| `src/lib/utils/**/*` | MEDIUM | Add new utils, don't modify existing |
-| `CLAUDE.md` | DO NOT MODIFY | Changes will cause merge conflicts |
-
-### Database Migrations
-
-To avoid migration conflicts, use this naming convention:
-- **people**: `YYYYMMDD_people_<description>.sql`
-- **dates**: `YYYYMMDD_dates_<description>.sql`
-- **documents**: `YYYYMMDD_documents_<description>.sql`
-- **whiteboard**: `YYYYMMDD_whiteboard_<description>.sql`
-
-### Before You Start Development
-
-1. Confirm your branch: `git branch --show-current`
-2. Start dev server on correct port: `PORT=300X npm run dev`
-3. Only modify files within your scope
-4. Test with Playwright on YOUR port (navigate to `http://localhost:300X`)
-5. Commit frequently with descriptive messages
-6. DO NOT modify CLAUDE.md
-
-### When Development is Complete
-
-1. Run `npm run build` to verify no errors
-2. Commit all changes
-3. Push your branch: `git push -u origin feature/<area>`
-4. Notify the user that your branch is ready for merge
-
----
-
-## Project Overview
-
-Hash is a B2B SaaS platform for document and customer management with AI-powered OCR extraction. Built for small-to-medium businesses to manage customer relationships, process documents (invoices, contracts, receipts), and collaborate in real-time.
-
-## Project Status
-
-| Phase | Status | Description |
-|-------|--------|-------------|
-| MVP (Phases 1-5) | Complete | Core functionality |
-| Phase 2 Enhancements | Complete | Advanced features |
-| Phase 3 Polish | Complete | UX improvements |
-
-### Recently Completed (This Session)
-- **URL Rename**: Changed `/customers` to `/people` throughout the app
-- **Dates Tab Enhancements**
-  - Changed "appointment types" to "date types" in Types dialog
-  - Added search functionality to people selector in New Date dialog
-  - Show unique ID (customer_number) next to people names in selector
-  - Multi-select people when creating dates (checkbox popover)
-  - Renamed "New Appointment" to "New Date"
-  - Sortable columns on all table headers
-  - Search across all columns including formatted dates (e.g., "Jan 7, 2026")
-  - Smart status logic: Completed/Cancelled shown first, then Overdue/Today/Upcoming
-  - Blank circle for dates without a type (instead of default blue)
-  - Calendar UI no longer shows red for cancelled dates
-  - Dialog always opens in view mode first (fixed edit state persistence)
-- **Database**: Added `customer_ids` array column for multi-person dates
-
-### Previously Completed
-- People Tab Rename - "Customers" to "People" throughout
-- Customer ID Format - 6-char alphanumeric (e.g., "A3B7K2")
-- Gallery Detail Dialog - Click cards to open editable dialog
-- Admin Panel - `/admin` with email 2FA (Resend)
-- System alerts with global/org targeting
-- Advanced document filters (search, status, type, date range)
-- Bulk CSV import for customers with template download
-- Document dates calendar view (/documents/calendar)
-- CSV export for documents
-- Keyboard shortcuts (Cmd+Shift+D/C/A/O/U/W/S for navigation, ? for help)
-- Document flags detection after OCR (past due, duplicates, suspicious amounts)
-- Document flags UI with resolve functionality
-- Mobile responsive sidebar with Sheet/drawer pattern
-- Fixed OCR double-logging issue
-- Fixed keyboard shortcuts dialog (?) cross-browser compatibility
-- Fixed accessibility issues in mobile sidebar
-
-### Database Migrations Required
-Run the following migrations in Supabase SQL Editor:
-```sql
--- See migrations/create_document_flags.sql
--- See migrations/create_system_alerts.sql
--- See migrations/update_appointments_and_types.sql
--- See migrations/add_customer_ids_to_appointments.sql (for multi-person dates)
-```
-
-### Next Up (Suggestions)
-1. **Email notifications** - Appointment reminders, document alerts
-2. **Team member management** - Invite/remove users from organization
-3. **Role-based permissions** - Admin vs member access
-4. **API integrations** - QuickBooks, Xero
-
 ## Tech Stack
 
-- **Framework**: Next.js 14 (App Router, Server Actions, Turbopack)
-- **Database**: Supabase (PostgreSQL + Auth + Storage + Realtime)
-- **UI**: shadcn/ui + Tailwind CSS
-- **Tables**: TanStack Table v8
-- **OCR**: Mistral AI (pixtral-12b-latest)
-- **Drag & Drop**: @hello-pangea/dnd
-- **Command Palette**: cmdk
+| Category | Technology |
+|----------|------------|
+| Framework | Next.js 14 (App Router, Server Actions, Turbopack) |
+| Database | Supabase (PostgreSQL + Auth + Storage + Realtime) |
+| UI | shadcn/ui + Tailwind CSS |
+| Tables | TanStack Table v8 |
+| OCR | Mistral AI (pixtral-12b-latest) |
+| Drag & Drop | @hello-pangea/dnd |
+| Command Palette | cmdk |
+| Email | Resend |
+
+---
 
 ## Supabase Configuration
 
@@ -238,24 +48,26 @@ Region: us-east-2
 |-------|---------|
 | `organizations` | Multi-tenant org data |
 | `users` | User profiles linked to Supabase Auth |
-| `customers` | People records with 6-char alphanumeric IDs (e.g., A3B7K2) |
+| `customers` | People records with 6-char alphanumeric IDs |
 | `documents` | Uploaded docs with auto-incrementing DOC-#### |
 | `document_audit_log` | Document activity history |
-| `appointments` | Customer appointments |
+| `appointments` | Customer appointments (supports multi-person via `customer_ids`) |
 | `whiteboard_tasks` | Realtime kanban tasks |
 | `document_flags` | LLM-detected anomalies |
 | `document_dates` | Extracted important dates |
 | `task_recommendations` | LLM-generated suggestions |
 | `activity_log` | Organization-wide activity |
-| `system_alerts` | Maintenance notices (supports global + per-org targeting) |
+| `system_alerts` | Maintenance notices (global + per-org targeting) |
 | `admin_verification_codes` | Email 2FA codes for admin access |
 | `admin_sessions` | Verified admin sessions (24-hour validity) |
 
-### Realtime Enabled Tables
+### Realtime Enabled
 - `whiteboard_tasks` - Live collaboration on kanban board
 
 ### Key Database Functions
 - `user_organization_id()` - Returns current user's org ID for RLS
+
+---
 
 ## Project Structure
 
@@ -263,7 +75,7 @@ Region: us-east-2
 src/
 ├── app/
 │   ├── (dashboard)/           # Protected routes (business users)
-│   │   ├── people/            # People management (formerly customers)
+│   │   ├── people/            # People management
 │   │   │   └── appointments/  # People appointments
 │   │   ├── dates/             # Unified dates view (appointments + document dates)
 │   │   ├── documents/         # Document management
@@ -285,177 +97,52 @@ src/
 │   ├── login/                 # Login page
 │   └── signup/                # Signup page
 ├── components/
-│   ├── customers/             # Customer components
+│   ├── customers/             # People components
 │   │   ├── appointments/      # Appointment components
 │   │   ├── customer-gallery.tsx
 │   │   ├── customer-card.tsx
 │   │   ├── customers-view.tsx
-│   │   └── csv-import-dialog.tsx      # Bulk CSV import
+│   │   └── csv-import-dialog.tsx
 │   ├── documents/             # Document components
-│   │   ├── documents-view.tsx         # Main view with filters
-│   │   ├── document-calendar.tsx      # Calendar view component
+│   │   ├── documents-view.tsx
+│   │   ├── document-calendar.tsx
 │   │   ├── document-list.tsx
 │   │   ├── document-upload.tsx
-│   │   ├── document-flags.tsx         # Flag display component
-│   │   ├── document-flags-wrapper.tsx # Client wrapper for flags
-│   │   ├── document-audit-log.tsx     # Activity timeline
+│   │   ├── document-flags.tsx
+│   │   ├── document-audit-log.tsx
 │   │   └── extracted-data-view.tsx
+│   ├── dates/                 # Dates tab components
 │   ├── dashboard/             # Dashboard components
-│   │   ├── activity-feed.tsx  # Realtime activity stream
+│   │   ├── activity-feed.tsx
 │   │   ├── whiteboard.tsx
 │   │   ├── whiteboard-column.tsx
 │   │   └── whiteboard-task.tsx
 │   ├── layout/                # Layout components
-│   │   ├── sidebar.tsx        # Collapsible + mobile drawer
-│   │   ├── header.tsx         # Theme toggle, search, mobile menu
+│   │   ├── sidebar.tsx
+│   │   ├── header.tsx
 │   │   ├── command-palette.tsx
-│   │   ├── keyboard-shortcuts-dialog.tsx  # Shortcuts help
+│   │   ├── keyboard-shortcuts-dialog.tsx
 │   │   └── dashboard-shell.tsx
 │   ├── admin/                 # Admin panel components
-│   │   ├── admin-dashboard.tsx
-│   │   ├── admin-alerts-manager.tsx
-│   │   └── admin-page-wrapper.tsx
 │   ├── settings/              # Settings components
-│   │   └── system-alerts-manager.tsx  # Read-only alerts view
 │   ├── data-table/            # Reusable table components
 │   └── ui/                    # shadcn/ui components
 ├── contexts/
 │   ├── theme-context.tsx      # Dark/light mode
 │   └── sidebar-context.tsx    # Collapsed state
 ├── lib/
-│   ├── supabase/
-│   │   ├── client.ts          # Browser client
-│   │   ├── server.ts          # Server client
-│   │   └── middleware.ts      # Auth middleware
-│   ├── admin/
-│   │   └── auth.ts            # Admin 2FA auth utilities
-│   ├── email/
-│   │   └── resend.ts          # Resend email service
-│   ├── ocr/
-│   │   ├── mistral.ts         # OCR extraction
-│   │   └── detect-flags.ts    # Document flag detection
-│   ├── hooks/
-│   │   ├── use-debounce.ts
-│   │   └── use-keyboard-shortcuts.ts  # Global keyboard shortcuts
+│   ├── supabase/              # Supabase clients (client.ts, server.ts, middleware.ts)
+│   ├── admin/                 # Admin 2FA auth utilities
+│   ├── email/                 # Resend email service
+│   ├── ocr/                   # Mistral OCR extraction + flag detection
+│   ├── hooks/                 # Custom hooks (use-debounce, use-keyboard-shortcuts)
 │   ├── export.ts              # CSV export utility
-│   └── utils/
-│       └── format.ts          # Formatting helpers
+│   └── utils/                 # Formatting helpers
 └── types/
     └── database.ts            # Supabase types
 ```
 
-## Key Features
-
-### People Management (formerly Customers)
-- **Auto-ID**: 6-character random alphanumeric (e.g., "A3B7K2", "9X4M2P")
-- **Global search**: Searches across name, company, email, phone, address, notes
-- **Inline editing**: Click any cell to edit in table view
-- **Gallery view**: Card-based grid layout with detail dialog on click
-- **Tags**: Array-based tagging system
-- **Appointments**: Linked calendar and table view
-- **Bulk CSV import**: Import people from CSV with validation
-- **CSV export**: Export filtered people data
-
-### Document Management
-- **Auto-numbering**: DOC-0001, DOC-0002, etc.
-- **OCR extraction**: Mistral AI extracts structured data
-- **File types**: PDF, images
-- **Status tracking**: pending → processing → completed/failed
-- **Person linking**: Associate documents with people
-- **Advanced filters**: Search, status, type, date range filters
-- **Calendar view**: View due dates, expirations, important dates
-- **Document flags**: LLM-detected anomalies (past due, duplicates)
-- **Audit log**: Track document activity history
-- **CSV export**: Export filtered document data
-
-### Whiteboard
-- **Kanban columns**: To Do, In Progress, Done
-- **Realtime sync**: Supabase Realtime subscriptions
-- **Drag & drop**: @hello-pangea/dnd
-- **Optimistic updates**: Instant UI feedback
-
-### UI/UX
-- **Theme**: Dark/light mode with localStorage persistence
-- **Sidebar**: Collapsible (icons only when collapsed)
-- **Command palette**: Cmd+K for navigation and actions
-- **CSV export**: Export filtered table data
-
-## Code Patterns
-
-### Server Actions Pattern
-```typescript
-// src/app/(dashboard)/people/actions.ts
-"use server";
-
-export async function createCustomer(formData: FormData) {
-  const supabase = await createClient();
-  // ... validation and insert
-  revalidatePath("/people");
-  return { success: true };
-}
-```
-
-### Realtime Subscription Pattern
-```typescript
-// Subscribe to changes
-useEffect(() => {
-  const supabase = createClient();
-  const channel = supabase
-    .channel("changes")
-    .on("postgres_changes", {
-      event: "*",
-      schema: "public",
-      table: "whiteboard_tasks",
-    }, (payload) => {
-      // Handle INSERT, UPDATE, DELETE
-    })
-    .subscribe();
-
-  return () => supabase.removeChannel(channel);
-}, []);
-```
-
-### Optimistic Update Pattern
-```typescript
-// Update UI immediately, then sync
-const handleMove = async (taskId: string, newStatus: string) => {
-  // Optimistic update
-  setTasks(prev => prev.map(t =>
-    t.id === taskId ? { ...t, status: newStatus } : t
-  ));
-
-  // Server sync
-  const result = await updateTaskStatus(taskId, newStatus);
-  if (result.error) {
-    toast.error("Failed to move task");
-    // Realtime will restore correct state
-  }
-};
-```
-
-### Context Provider Pattern
-```typescript
-// src/contexts/theme-context.tsx
-"use client";
-
-const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
-
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>("dark");
-
-  useEffect(() => {
-    const stored = localStorage.getItem("theme") as Theme;
-    if (stored) setTheme(stored);
-  }, []);
-
-  // ... toggle logic
-  return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
-      {children}
-    </ThemeContext.Provider>
-  );
-}
-```
+---
 
 ## Environment Variables
 
@@ -464,127 +151,181 @@ Required in `.env.local`:
 NEXT_PUBLIC_SUPABASE_URL=https://hbsmvvxdyvzbhetofnbu.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
 MISTRAL_API_KEY=<mistral-key>
-ADMIN_EMAIL=yengnongxiong@gmail.com    # Email allowed to access admin panel
-RESEND_API_KEY=<resend-key>             # Resend.com API key for admin 2FA emails
+ADMIN_EMAIL=yengnongxiong@gmail.com
+RESEND_API_KEY=<resend-key>
 ```
 
-## MCP Tools Usage
+---
+
+## MCP Servers
 
 ### Supabase MCP
-Use for database operations:
-```
-mcp__plugin_supabase_supabase__execute_sql - Run queries
-mcp__plugin_supabase_supabase__apply_migration - Schema changes
-mcp__plugin_supabase_supabase__list_tables - View schema
-mcp__plugin_supabase_supabase__get_logs - Debug issues
-```
+Database operations for this project.
+
+| Tool | When to Use |
+|------|-------------|
+| `execute_sql` | Run SELECT/INSERT/UPDATE/DELETE queries |
+| `apply_migration` | DDL changes (CREATE TABLE, ALTER, etc.) |
+| `list_tables` | View current schema |
+| `list_migrations` | See applied migrations |
+| `get_logs` | Debug database/auth/storage issues |
+| `get_advisors` | Check security (RLS) and performance issues |
+| `generate_typescript_types` | Regenerate `database.ts` after schema changes |
+| `list_edge_functions` | View deployed edge functions |
+| `deploy_edge_function` | Deploy new/updated edge functions |
+| `search_docs` | Search Supabase documentation (GraphQL) |
 
 ### Playwright MCP
-Use for testing:
-```
-mcp__plugin_playwright_playwright__browser_navigate - Go to URL
-mcp__plugin_playwright_playwright__browser_snapshot - Get page state
-mcp__plugin_playwright_playwright__browser_click - Click elements
-mcp__plugin_playwright_playwright__browser_type - Fill inputs
-mcp__plugin_playwright_playwright__browser_take_screenshot - Visual verification
-```
+Browser automation and testing.
+
+| Tool | When to Use |
+|------|-------------|
+| `browser_navigate` | Go to a URL |
+| `browser_snapshot` | Get page accessibility tree (preferred over screenshot for actions) |
+| `browser_take_screenshot` | Visual verification |
+| `browser_click` | Click elements by ref |
+| `browser_type` | Type into inputs |
+| `browser_fill_form` | Fill multiple form fields at once |
+| `browser_select_option` | Select dropdown options |
+| `browser_press_key` | Keyboard input (Enter, Escape, etc.) |
+| `browser_wait_for` | Wait for text/element/time |
+| `browser_console_messages` | Check for JS errors |
+| `browser_network_requests` | Debug API calls |
+| `browser_tabs` | Manage browser tabs |
+| `browser_close` | Close the browser |
 
 ### Context7 MCP
-Use for documentation lookups:
-```
-mcp__plugin_context7_context7__resolve-library-id - Find library ID
-mcp__plugin_context7_context7__query-docs - Get up-to-date docs
-```
+Up-to-date library documentation.
 
-## Available Skills
+| Tool | When to Use |
+|------|-------------|
+| `resolve-library-id` | Find Context7 library ID (call first) |
+| `query-docs` | Get documentation for a library |
 
-- `/feature-dev` - Guided feature development with architecture focus
-- `/frontend-design` - Create production-grade UI components
-- `/vercel:deploy` - Deploy to Vercel
-- `/vercel:logs` - View deployment logs
+### Shadcn MCP
+Component registry operations.
 
-## Available Agents
+| Tool | When to Use |
+|------|-------------|
+| `search_items_in_registries` | Find components by name/description |
+| `view_items_in_registries` | Get component details and code |
+| `get_item_examples_from_registries` | Find usage examples/demos |
+| `get_add_command_for_items` | Get CLI command to install components |
+| `get_audit_checklist` | Verify new components work correctly |
 
-- `feature-dev:code-architect` - Design feature architectures
-- `feature-dev:code-reviewer` - Review code for issues
-- `feature-dev:code-explorer` - Analyze codebase patterns
-- `Explore` - Quick codebase exploration
-- `Plan` - Design implementation strategies
+### Semgrep MCP
+Security scanning and code analysis.
+
+| Tool | When to Use |
+|------|-------------|
+| `semgrep_scan` | Scan files for security vulnerabilities |
+| `semgrep_scan_with_custom_rule` | Scan with custom YAML rules |
+| `semgrep_findings` | Get findings from Semgrep AppSec Platform |
+| `semgrep_scan_supply_chain` | Check dependencies for vulnerabilities |
+| `get_abstract_syntax_tree` | Get AST for code analysis |
+| `semgrep_rule_schema` | Get schema for writing custom rules |
+
+### Sequential Thinking MCP
+Complex problem solving.
+
+| Tool | When to Use |
+|------|-------------|
+| `sequentialthinking` | Multi-step reasoning, planning, hypothesis verification |
+
+---
+
+## Agents
+
+Use the Task tool with `subagent_type` parameter:
+
+| Agent | When to Use |
+|-------|-------------|
+| `Explore` | Quick codebase exploration, find files/patterns, answer questions about code |
+| `Plan` | Design implementation strategies, architectural decisions |
+| `feature-dev:code-architect` | Design feature architectures with specific files/components |
+| `feature-dev:code-reviewer` | Review code for bugs, security, quality issues |
+| `feature-dev:code-explorer` | Deep analysis of existing features, trace execution paths |
+| `code-simplifier:code-simplifier` | Simplify and refine code for clarity |
+| `Bash` | Git operations, command execution |
+| `general-purpose` | Multi-step tasks, complex research |
+
+---
+
+## Skills (Slash Commands)
+
+Use the Skill tool to invoke:
+
+| Skill | When to Use |
+|-------|-------------|
+| `/feature-dev` | Guided feature development with codebase understanding |
+| `/frontend-design` | Create distinctive, production-grade UI components |
+| `/vercel:deploy` | Deploy to Vercel |
+| `/vercel:setup` | Configure Vercel CLI and project |
+| `/vercel:logs` | View Vercel deployment logs |
+
+---
 
 ## Common Commands
 
 ```bash
-# Development
 npm run dev          # Start dev server (Turbopack)
-npm run build        # Production build
+npm run build        # Production build (run after changes)
 npm run lint         # ESLint check
 
-# Supabase (if using CLI)
+# Regenerate types after schema changes
 npx supabase gen types typescript --project-id hbsmvvxdyvzbhetofnbu > src/types/database.ts
 ```
 
-## Testing Notes
+---
 
-The app runs on `http://localhost:3000`. Test accounts:
-- Email: test@example.com (or use magic link)
+## Key Pages
 
-Key pages to test:
-- `/people` - People table with gallery view, CSV import/export
-- `/people/appointments` - People appointments with calendar
-- `/dates` - Unified dates/appointments view
-- `/documents` - Document list with filters and OCR status
-- `/documents/calendar` - Document dates calendar view
-- `/whiteboard` - Realtime kanban board
-- `/settings` - User profile + read-only system alerts
-- `/admin` - Admin dashboard (requires email 2FA, ADMIN_EMAIL only)
-- `/admin/alerts` - System alerts management
-- `/admin/analytics` - Platform statistics
+| Path | Description |
+|------|-------------|
+| `/people` | People table with gallery view, CSV import/export |
+| `/people/appointments` | People appointments with calendar |
+| `/dates` | Unified dates/appointments view |
+| `/documents` | Document list with filters and OCR status |
+| `/documents/calendar` | Document dates calendar view |
+| `/whiteboard` | Realtime kanban board |
+| `/settings` | User profile + system alerts |
+| `/admin` | Admin dashboard (email 2FA, ADMIN_EMAIL only) |
 
-## Future Development Ideas
+---
 
-### Priority 1 (Complete)
-- [x] Document flags UI - Display LLM-detected anomalies (past due, duplicates) ✓
-- [x] Audit log timeline - Visual document history in detail page ✓
-- [x] Activity feed - Dashboard realtime activity stream ✓
-- [x] Keyboard shortcuts - Global shortcuts for power users ✓
-- [x] Mobile responsive improvements ✓
+## Code Style Guidelines
 
-### Priority 2 (Complete)
-- [x] Document dates calendar - Calendar view of due dates, expirations ✓
-- [x] Advanced search filters - Date ranges, status filters ✓
-- [x] Bulk CSV import - Import people from CSV ✓
-- [x] CSV export - Export documents and people ✓
+1. Use **Server Actions** for mutations (not API routes)
+2. **Optimistic updates** for better UX
+3. **Toast notifications** for feedback (sonner)
+4. **Relative timestamps** for dates (formatDistanceToNow)
+5. **Badge components** for status indicators
+6. **Icons from lucide-react** only
+7. **No emojis** unless user requests
+8. **Minimal comments** - code should be self-documenting
 
-### Priority 3 (Next Up)
-- [ ] Recommendations bar - Bottom bar with LLM-generated suggestions
-- [ ] Dashboard widgets - Customizable widget layout
-- [ ] Email notifications - Appointment reminders, document alerts
-- [ ] Team member management - Invite/remove users
-- [ ] Role-based permissions - Admin vs member access
-- [ ] API integrations (QuickBooks, Xero)
-- [ ] Custom document templates
+---
 
 ## Troubleshooting
 
 ### Build Errors
 - Missing shadcn components: `npx shadcn@latest add <component> -y`
-- Type errors: Check `src/types/database.ts` matches schema
+- Type errors: Regenerate `database.ts` or check schema
 
 ### Database Issues
 - Check RLS policies: `mcp__plugin_supabase_supabase__get_advisors`
 - View logs: `mcp__plugin_supabase_supabase__get_logs`
 
 ### Realtime Not Working
-- Ensure table added to publication: `ALTER PUBLICATION supabase_realtime ADD TABLE <table>`
-- Check Supabase dashboard for realtime status
+- Add table to publication: `ALTER PUBLICATION supabase_realtime ADD TABLE <table>`
 
-## Code Style Guidelines
+---
 
-1. **Use Server Actions** for mutations (not API routes)
-2. **Optimistic updates** for better UX
-3. **Toast notifications** for user feedback (sonner)
-4. **Relative timestamps** for dates (formatDistanceToNow)
-5. **Badge components** for status indicators
-6. **Icons from lucide-react** only
-7. **No emojis** unless user requests
-8. **Minimal comments** - code should be self-documenting
+## Future Ideas
+
+- Email notifications (appointment reminders, document alerts)
+- Team member management (invite/remove users)
+- Role-based permissions (admin vs member)
+- API integrations (QuickBooks, Xero)
+- Recommendations bar with LLM suggestions
+- Dashboard widgets

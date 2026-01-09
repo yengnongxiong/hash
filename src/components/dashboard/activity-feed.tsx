@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import {
   Upload,
@@ -12,10 +12,15 @@ import {
   XCircle,
   Calendar,
   Activity,
+  WifiOff,
+  RefreshCw,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "@/lib/utils/format";
 import { createClient } from "@/lib/supabase/client";
+import { toast } from "sonner";
 
 interface ActivityItem {
   id: string;
@@ -51,64 +56,27 @@ interface ActivityFeedProps {
   initialActivities?: ActivityItem[];
 }
 
+type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error";
+
 export function ActivityFeed({ initialActivities = [] }: ActivityFeedProps) {
   const [activities, setActivities] = useState<ActivityItem[]>(initialActivities);
   const [isLoading, setIsLoading] = useState(initialActivities.length === 0);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("connecting");
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  useEffect(() => {
-    if (initialActivities.length === 0) {
-      fetchActivities();
-    }
-
-    // Set up realtime subscription
-    const supabase = createClient();
-    const channel = supabase
-      .channel("activity_feed")
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "document_audit_log",
-        },
-        async (payload) => {
-          // Fetch the new activity with document info
-          const { data } = await supabase
-            .from("document_audit_log")
-            .select("*, documents(file_name), users(name, email)")
-            .eq("id", payload.new.id)
-            .single();
-
-          if (data) {
-            const newActivity: ActivityItem = {
-              id: data.id,
-              type: "document",
-              action: data.action,
-              entity_name: data.documents?.file_name || "Unknown",
-              entity_id: data.document_id,
-              user_name: data.users?.name || data.users?.email,
-              created_at: data.created_at,
-            };
-            setActivities((prev) => [newActivity, ...prev.slice(0, 9)]);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  const fetchActivities = async () => {
+  const fetchActivities = useCallback(async () => {
     const supabase = createClient();
 
-    // Fetch recent document audit logs
-    const { data: auditLogs } = await supabase
+    const { data: auditLogs, error } = await supabase
       .from("document_audit_log")
       .select("*, documents(file_name), users(name, email)")
       .order("created_at", { ascending: false })
       .limit(10);
+
+    if (error) {
+      toast.error("Failed to load activities");
+      return;
+    }
 
     if (auditLogs) {
       const activities: ActivityItem[] = auditLogs.map((log) => ({
@@ -124,7 +92,72 @@ export function ActivityFeed({ initialActivities = [] }: ActivityFeedProps) {
     }
 
     setIsLoading(false);
+  }, []);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await fetchActivities();
+    setIsRefreshing(false);
+    toast.success("Activity feed refreshed");
   };
+
+  useEffect(() => {
+    if (initialActivities.length === 0) {
+      fetchActivities();
+    }
+
+    const supabase = createClient();
+    const channel = supabase
+      .channel("activity_feed")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "document_audit_log",
+        },
+        async (payload) => {
+          const { data, error } = await supabase
+            .from("document_audit_log")
+            .select("*, documents(file_name), users(name, email)")
+            .eq("id", payload.new.id)
+            .single();
+
+          if (error) {
+            console.error("Failed to fetch new activity:", error);
+            return;
+          }
+
+          if (data) {
+            const newActivity: ActivityItem = {
+              id: data.id,
+              type: "document",
+              action: data.action,
+              entity_name: data.documents?.file_name || "Unknown",
+              entity_id: data.document_id,
+              user_name: data.users?.name || data.users?.email,
+              created_at: data.created_at,
+            };
+            setActivities((prev) => [newActivity, ...prev.slice(0, 9)]);
+          }
+        }
+      )
+      .subscribe((status, err) => {
+        if (status === "SUBSCRIBED") {
+          setConnectionStatus("connected");
+        } else if (status === "CLOSED") {
+          setConnectionStatus("disconnected");
+        } else if (status === "CHANNEL_ERROR") {
+          setConnectionStatus("error");
+          console.error("Realtime subscription error:", err);
+          toast.error("Live updates disconnected. Click refresh to update manually.");
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchActivities, initialActivities.length]);
 
   const getEntityLink = (item: ActivityItem) => {
     switch (item.type) {
@@ -160,10 +193,33 @@ export function ActivityFeed({ initialActivities = [] }: ActivityFeedProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Activity className="h-5 w-5" />
-          Recent Activity
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <Activity className="h-5 w-5" />
+            Recent Activity
+            {connectionStatus === "connected" && (
+              <Badge variant="outline" className="ml-2 text-xs font-normal text-green-600 border-green-300">
+                Live
+              </Badge>
+            )}
+            {(connectionStatus === "disconnected" || connectionStatus === "error") && (
+              <Badge variant="outline" className="ml-2 text-xs font-normal text-yellow-600 border-yellow-300">
+                <WifiOff className="h-3 w-3 mr-1" />
+                Offline
+              </Badge>
+            )}
+          </CardTitle>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="h-8 w-8 p-0"
+            aria-label="Refresh activity feed"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         {activities.length > 0 ? (

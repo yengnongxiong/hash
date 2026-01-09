@@ -46,6 +46,12 @@ import {
   ChevronLast,
   ChevronLeft,
   ChevronRight,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  Clock,
+  CalendarClock,
 } from "lucide-react";
 import {
   format,
@@ -626,6 +632,9 @@ export function DatesView({ appointments, customers, appointmentTypes, organizat
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" disabled={isPending}>
+                  {isPending ? (
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  ) : null}
                   Set Status
                 </Button>
               </PopoverTrigger>
@@ -659,7 +668,11 @@ export function DatesView({ appointments, customers, appointmentTypes, organizat
               onClick={handleBulkDelete}
               disabled={isPending}
             >
-              <Trash2 className="h-4 w-4 mr-1" />
+              {isPending ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4 mr-1" />
+              )}
               Delete
             </Button>
             <Button
@@ -814,15 +827,30 @@ export function DatesView({ appointments, customers, appointmentTypes, organizat
                               disabled={isPending}
                             >
                               {computedStatus === "cancelled" ? (
-                                <Badge variant="secondary" className="cursor-pointer hover:opacity-80">Cancelled</Badge>
+                                <Badge variant="secondary" className="cursor-pointer hover:opacity-80 gap-1">
+                                  <XCircle className="h-3 w-3" />
+                                  Cancelled
+                                </Badge>
                               ) : computedStatus === "completed" ? (
-                                <Badge className="bg-green-500 hover:bg-green-600 cursor-pointer">Completed</Badge>
+                                <Badge className="bg-green-500 hover:bg-green-600 cursor-pointer gap-1">
+                                  <CheckCircle2 className="h-3 w-3" />
+                                  Completed
+                                </Badge>
                               ) : computedStatus === "overdue" ? (
-                                <Badge variant="destructive" className="cursor-pointer hover:opacity-80">Overdue</Badge>
+                                <Badge variant="destructive" className="cursor-pointer hover:opacity-80 gap-1">
+                                  <AlertTriangle className="h-3 w-3" />
+                                  Overdue
+                                </Badge>
                               ) : computedStatus === "today" ? (
-                                <Badge className="bg-yellow-500 hover:bg-yellow-600 text-black cursor-pointer">Today</Badge>
+                                <Badge className="bg-yellow-500 hover:bg-yellow-600 text-black cursor-pointer gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  Today
+                                </Badge>
                               ) : (
-                                <Badge className="bg-blue-500 hover:bg-blue-600 cursor-pointer">Upcoming</Badge>
+                                <Badge className="bg-blue-500 hover:bg-blue-600 cursor-pointer gap-1">
+                                  <CalendarClock className="h-3 w-3" />
+                                  Upcoming
+                                </Badge>
                               )}
                             </button>
                           </PopoverTrigger>

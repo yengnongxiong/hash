@@ -126,6 +126,14 @@ export function DocumentsView({ documents }: DocumentsViewProps) {
 
   const debouncedSearch = useDebounce(search, 300);
 
+  // Reset selection when filters change to prevent accidental deletions
+  useEffect(() => {
+    setSelected(new Set());
+  }, [debouncedSearch, statusFilter, typeFilter, flagFilter, dateFrom, dateTo]);
+
+  // Check for invalid date range
+  const hasInvalidDateRange = dateFrom && dateTo && dateFrom > dateTo;
+
   // Filter documents
   const filteredDocuments = useMemo(() => {
     return documents.filter((doc) => {
@@ -380,6 +388,23 @@ export function DocumentsView({ documents }: DocumentsViewProps) {
             />
           </PopoverContent>
         </Popover>
+
+        {/* Date Range Warning */}
+        {hasInvalidDateRange && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+                  <AlertTriangle className="h-4 w-4" />
+                  <span className="text-sm">Invalid range</span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>&quot;From&quot; date is after &quot;To&quot; date - no results will match</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
 
         {/* Clear Filters */}
         {hasActiveFilters && (

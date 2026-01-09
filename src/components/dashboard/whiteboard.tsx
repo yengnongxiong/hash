@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useTransition, useRef, useCallback } from "react";
+import { useState, useEffect, useTransition, useRef, useCallback, useMemo } from "react";
 import { WhiteboardTask, User } from "@/types/database";
 import { WhiteboardColumn } from "./whiteboard-column";
 import { WhiteboardTable } from "./whiteboard-table";
@@ -79,6 +79,12 @@ export function Whiteboard({ initialTasks, organizationId, teamMembers = [] }: W
   // Cursor glow effect
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const boardRef = useRef<HTMLDivElement>(null);
+
+  // Use ref to track hiddenTaskIds in realtime callback without causing re-subscription
+  const hiddenTaskIdsRef = useRef<Set<string>>(hiddenTaskIds);
+  useEffect(() => {
+    hiddenTaskIdsRef.current = hiddenTaskIds;
+  }, [hiddenTaskIds]);
 
   // Load hidden tasks from local storage
   useEffect(() => {
@@ -274,7 +280,7 @@ export function Whiteboard({ initialTasks, organizationId, teamMembers = [] }: W
     toast.success(`Exported ${filteredTasks.length} tasks`);
   };
 
-  // Set up realtime subscription
+  // Set up realtime subscription (no dependency on hiddenTaskIds - use ref instead)
   useEffect(() => {
     const supabase = createClient();
 
@@ -307,10 +313,10 @@ export function Whiteboard({ initialTasks, organizationId, teamMembers = [] }: W
             setTasks((prev) =>
               prev.filter((t) => t.id !== (payload.old as WhiteboardTask).id)
             );
-            // Also remove from hidden if deleted
+            // Use ref to access current hiddenTaskIds without causing re-subscription
             const deletedId = (payload.old as WhiteboardTask).id;
-            if (hiddenTaskIds.has(deletedId)) {
-              const newHidden = new Set(hiddenTaskIds);
+            if (hiddenTaskIdsRef.current.has(deletedId)) {
+              const newHidden = new Set(hiddenTaskIdsRef.current);
               newHidden.delete(deletedId);
               saveHiddenTasks(newHidden);
             }
@@ -322,7 +328,7 @@ export function Whiteboard({ initialTasks, organizationId, teamMembers = [] }: W
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [hiddenTaskIds]);
+  }, []);
 
   const handleDeleteTask = async (taskId: string) => {
     setTasks((prev) => prev.filter((t) => t.id !== taskId));
@@ -433,10 +439,13 @@ export function Whiteboard({ initialTasks, organizationId, teamMembers = [] }: W
     });
   };
 
-  const getTasksByColumn = (columnId: ColumnId) =>
-    filteredTasks
-      .filter((t) => t.status === columnId && !hiddenTaskIds.has(t.id))
-      .sort((a, b) => ((a as any).position || 0) - ((b as any).position || 0));
+  const getTasksByColumn = useCallback(
+    (columnId: ColumnId) =>
+      filteredTasks
+        .filter((t) => t.status === columnId && !hiddenTaskIds.has(t.id))
+        .sort((a, b) => ((a as any).position || 0) - ((b as any).position || 0)),
+    [filteredTasks, hiddenTaskIds]
+  );
 
   const handleMoveTask = async (taskId: string, newStatus: ColumnId) => {
     const task = tasks.find(t => t.id === taskId);
