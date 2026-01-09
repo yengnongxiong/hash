@@ -50,16 +50,20 @@ export function formatDate(date: Date): string {
 }
 
 /**
- * Format a date with time
+ * Format a date with time (e.g., "Jan 8, 2026 at 5:38 PM")
  */
 export function formatDateTime(date: Date): string {
-  return date.toLocaleDateString("en-US", {
+  const datePart = date.toLocaleDateString("en-US", {
     year: "numeric",
     month: "short",
     day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
   });
+  const timePart = date.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+  return `${datePart} at ${timePart}`;
 }
 
 /**

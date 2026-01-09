@@ -1,10 +1,34 @@
 "use client";
 
 import { Table } from "@tanstack/react-table";
-import { X, Trash2 } from "lucide-react";
+import { X, Trash2, SlidersHorizontal } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
+// Column name mappings for display
+const columnNameMap: Record<string, string> = {
+  customer_number: "ID",
+};
 
 interface DataTableToolbarProps<TData> {
   table: Table<TData>;
@@ -17,6 +41,7 @@ interface DataTableToolbarProps<TData> {
   }[];
   selectedRowCount?: number;
   onDeleteSelected?: () => void;
+  onClearSelection?: () => void;
 }
 
 export function DataTableToolbar<TData>({
@@ -26,6 +51,7 @@ export function DataTableToolbar<TData>({
   filterableColumns = [],
   selectedRowCount = 0,
   onDeleteSelected,
+  onClearSelection,
 }: DataTableToolbarProps<TData>) {
   const isFiltered = table.getState().columnFilters.length > 0;
 
@@ -79,16 +105,79 @@ export function DataTableToolbar<TData>({
       </div>
       <div className="flex items-center space-x-2">
         {selectedRowCount > 0 && onDeleteSelected && (
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={onDeleteSelected}
-            className="h-8"
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete ({selectedRowCount})
-          </Button>
+          <>
+            {onClearSelection && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onClearSelection}
+                className="h-8"
+              >
+                <X className="mr-1 h-4 w-4" />
+                Unselect
+              </Button>
+            )}
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="h-8"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete ({selectedRowCount})
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete {selectedRowCount} {selectedRowCount === 1 ? "Person" : "People"}</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete {selectedRowCount} selected {selectedRowCount === 1 ? "person" : "people"}? This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={onDeleteSelected}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </>
         )}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="h-8">
+              <SlidersHorizontal className="mr-2 h-4 w-4" />
+              Columns
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-[150px]">
+            <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {table
+              .getAllColumns()
+              .filter(
+                (column) =>
+                  typeof column.accessorFn !== "undefined" && column.getCanHide()
+              )
+              .map((column) => {
+                return (
+                  <DropdownMenuCheckboxItem
+                    key={column.id}
+                    className="capitalize"
+                    checked={column.getIsVisible()}
+                    onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                  >
+                    {columnNameMap[column.id] || column.id.replace(/_/g, " ")}
+                  </DropdownMenuCheckboxItem>
+                );
+              })}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );

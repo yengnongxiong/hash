@@ -1,18 +1,18 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
-import { Customer } from "@/types/database";
+import { Customer, PersonTag, CustomerWithUserInfo } from "@/types/database";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { DataTableColumnHeader } from "@/components/data-table/column-header";
-import {
-  EditableCell,
-  EditableTagsCell,
-} from "@/components/data-table/editable-cell";
+import { EditableCell } from "@/components/data-table/editable-cell";
 import { formatDistanceToNow } from "@/lib/utils/format";
 import { Badge } from "@/components/ui/badge";
+import { ColoredTagsDisplay } from "./tag-selector";
+import { cn } from "@/lib/utils";
 
-export const customerColumns: ColumnDef<Customer>[] = [
+export function createCustomerColumns(personTags: PersonTag[]): ColumnDef<CustomerWithUserInfo>[] {
+  return [
   {
     id: "select",
     size: 40,
@@ -95,15 +95,47 @@ export const customerColumns: ColumnDef<Customer>[] = [
   },
   {
     accessorKey: "tags",
-    size: 90,
+    size: 120,
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Tags" />
     ),
-    cell: (props) => <EditableTagsCell {...props} />,
+    cell: ({ getValue }) => {
+      const tags = getValue() as string[] | null;
+      if (!tags || tags.length === 0) {
+        return (
+          <span className="text-muted-foreground italic text-sm px-2">No tags</span>
+        );
+      }
+      return (
+        <div className="px-2 py-1">
+          <ColoredTagsDisplay tags={tags} personTags={personTags} maxDisplay={2} size="sm" />
+        </div>
+      );
+    },
     filterFn: (row, id, value) => {
       const tags = row.getValue(id) as string[];
       return tags?.some((tag) =>
         tag.toLowerCase().includes(value.toLowerCase())
+      );
+    },
+  },
+  {
+    accessorKey: "notes",
+    size: 150,
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Notes" />
+    ),
+    cell: ({ getValue }) => {
+      const notes = getValue() as string | null;
+      if (!notes) {
+        return (
+          <span className="text-muted-foreground italic text-sm px-2">No notes</span>
+        );
+      }
+      return (
+        <span className="text-sm truncate block max-w-[150px]" title={notes}>
+          {notes}
+        </span>
       );
     },
   },
@@ -149,7 +181,7 @@ export const customerColumns: ColumnDef<Customer>[] = [
           size="sm"
           onClick={(e) => {
             e.stopPropagation();
-            (table.options.meta as { onViewCustomer?: (customer: Customer) => void })?.onViewCustomer?.(customer);
+            (table.options.meta as { onViewCustomer?: (customer: CustomerWithUserInfo) => void })?.onViewCustomer?.(customer);
           }}
         >
           View
@@ -159,4 +191,5 @@ export const customerColumns: ColumnDef<Customer>[] = [
     enableSorting: false,
     enableHiding: false,
   },
-];
+  ];
+}

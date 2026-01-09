@@ -1,16 +1,22 @@
 "use client";
 
-import { Customer } from "@/types/database";
+import { Customer, PersonTag, CustomerWithUserInfo } from "@/types/database";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Building2, Mail, Phone, MapPin, Eye } from "lucide-react";
 import { formatDistanceToNow } from "@/lib/utils/format";
+import { ColoredTagsDisplay } from "./tag-selector";
+import { cn } from "@/lib/utils";
 
 interface CustomerCardProps {
-  customer: Customer;
+  customer: CustomerWithUserInfo;
+  personTags: PersonTag[];
   onClick: () => void;
+  selected?: boolean;
+  onSelect?: () => void;
 }
 
 function getInitials(name: string): string {
@@ -22,15 +28,35 @@ function getInitials(name: string): string {
     .slice(0, 2);
 }
 
-export function CustomerCard({ customer, onClick }: CustomerCardProps) {
+export function CustomerCard({ customer, personTags, onClick, selected = false, onSelect }: CustomerCardProps) {
   return (
     <Card
-      className="cursor-pointer hover:bg-accent/50 transition-colors"
+      className={cn(
+        "cursor-pointer hover:bg-accent/50 transition-colors h-full flex flex-col relative group",
+        selected && "ring-2 ring-primary"
+      )}
       onClick={onClick}
     >
-      <CardContent className="p-4">
+      {/* Selection checkbox */}
+      {onSelect && (
+        <div
+          className={cn(
+            "absolute top-3 left-3 z-10 transition-opacity",
+            selected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+          )}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Checkbox
+            checked={selected}
+            onCheckedChange={onSelect}
+            className="bg-background"
+          />
+        </div>
+      )}
+      <CardContent className="p-4 flex flex-col flex-1">
+        {/* Header */}
         <div className="flex items-start gap-3">
-          <Avatar className="h-10 w-10">
+          <Avatar className={cn("h-10 w-10 shrink-0", onSelect && "ml-6")}>
             <AvatarFallback className="bg-primary/10 text-primary">
               {getInitials(customer.name)}
             </AvatarFallback>
@@ -46,14 +72,15 @@ export function CustomerCard({ customer, onClick }: CustomerCardProps) {
             </div>
             {customer.company && (
               <div className="flex items-center gap-1 text-sm text-muted-foreground mt-0.5">
-                <Building2 className="h-3 w-3" />
+                <Building2 className="h-3 w-3 shrink-0" />
                 <span className="truncate">{customer.company}</span>
               </div>
             )}
           </div>
         </div>
 
-        <div className="mt-3 space-y-1.5">
+        {/* Contact details */}
+        <div className="mt-3 space-y-1.5 flex-1">
           {customer.email && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Mail className="h-3 w-3 shrink-0" />
@@ -74,29 +101,32 @@ export function CustomerCard({ customer, onClick }: CustomerCardProps) {
           )}
         </div>
 
+        {/* Tags */}
         {customer.tags && customer.tags.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-1">
-            {customer.tags.slice(0, 3).map((tag, index) => (
-              <Badge key={`${tag}-${index}`} variant="secondary" className="text-xs">
-                {tag}
-              </Badge>
-            ))}
-            {customer.tags.length > 3 && (
-              <Badge variant="secondary" className="text-xs">
-                +{customer.tags.length - 3}
-              </Badge>
-            )}
+          <div className="mt-3">
+            <ColoredTagsDisplay
+              tags={customer.tags}
+              personTags={personTags}
+              maxDisplay={3}
+              size="sm"
+            />
           </div>
         )}
 
-        <div className="mt-3 flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">
-            Updated {formatDistanceToNow(new Date(customer.updated_at))}
-          </span>
+        {/* Footer */}
+        <div className="mt-3 pt-3 border-t flex items-center justify-between gap-2">
+          <div className="flex flex-col text-xs text-muted-foreground min-w-0 flex-1">
+            <span className="truncate">
+              Created {formatDistanceToNow(new Date(customer.created_at))}
+            </span>
+            <span className="truncate">
+              Updated {formatDistanceToNow(new Date(customer.updated_at))}
+            </span>
+          </div>
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 px-2"
+            className="h-7 px-2 shrink-0"
             onClick={(e) => {
               e.stopPropagation();
               onClick();

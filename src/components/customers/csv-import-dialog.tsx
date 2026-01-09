@@ -177,7 +177,7 @@ export function CSVImportDialog() {
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
           <Upload className="h-4 w-4 mr-2" />
-          Import CSV
+          Import
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg overflow-hidden">

@@ -1,24 +1,27 @@
 "use client";
 
 import { useState, useTransition, useEffect, useCallback } from "react";
-import { Customer } from "@/types/database";
+import { Customer, PersonTag, CustomerWithUserInfo } from "@/types/database";
 import { CustomerTable } from "./customer-table";
 import { CustomerGallery } from "./customer-gallery";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, LayoutGrid, List, Download } from "lucide-react";
+import { Search, LayoutGrid, List, Download, Loader2 } from "lucide-react";
 import { getCustomers } from "@/app/(dashboard)/people/actions";
 import { exportToCSV } from "@/lib/export";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { CSVImportDialog } from "./csv-import-dialog";
+import { PersonTagsDialog } from "./person-tags-dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface CustomersViewProps {
-  initialData: Customer[];
+  initialData: CustomerWithUserInfo[];
+  personTags: PersonTag[];
 }
 
-export function CustomersView({ initialData }: CustomersViewProps) {
-  const [data, setData] = useState<Customer[]>(initialData);
+export function CustomersView({ initialData, personTags }: CustomersViewProps) {
+  const [data, setData] = useState<CustomerWithUserInfo[]>(initialData);
   const [view, setView] = useState<"table" | "gallery">("table");
   const [search, setSearch] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -47,7 +50,7 @@ export function CustomersView({ initialData }: CustomersViewProps) {
   }, [debouncedSearch, initialData]);
 
   const handleExport = useCallback(() => {
-    exportToCSV(data, "people", [
+    exportToCSV(data as unknown as Record<string, unknown>[], "people", [
       { key: "customer_number", label: "ID" },
       { key: "name", label: "Name" },
       { key: "company", label: "Company" },
@@ -89,6 +92,9 @@ export function CustomersView({ initialData }: CustomersViewProps) {
           </TabsList>
         </Tabs>
 
+        {/* Tags Management */}
+        <PersonTagsDialog personTags={personTags} />
+
         {/* Import */}
         <CSVImportDialog />
 
@@ -101,19 +107,77 @@ export function CustomersView({ initialData }: CustomersViewProps) {
 
       {/* Results count */}
       {search && (
-        <p className="text-sm text-muted-foreground">
-          {isPending ? "Searching..." : `${data.length} result${data.length !== 1 ? "s" : ""} found`}
+        <p className="text-sm text-muted-foreground flex items-center gap-2">
+          {isPending ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Searching...
+            </>
+          ) : (
+            `${data.length} result${data.length !== 1 ? "s" : ""} found`
+          )}
         </p>
       )}
 
       {/* Content */}
-      <div className={isPending ? "opacity-70" : ""}>
-        {view === "table" ? (
-          <CustomerTable initialData={data} />
-        ) : (
-          <CustomerGallery data={data} />
-        )}
+      {isPending && search ? (
+        <SearchSkeleton view={view} />
+      ) : (
+        <div>
+          {view === "table" ? (
+            <CustomerTable initialData={data} personTags={personTags} />
+          ) : (
+            <CustomerGallery data={data} personTags={personTags} />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SearchSkeleton({ view }: { view: "table" | "gallery" }) {
+  if (view === "table") {
+    return (
+      <div className="rounded-md border">
+        <div className="p-4 space-y-3">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="flex items-center gap-4">
+              <Skeleton className="h-4 w-4" />
+              <Skeleton className="h-6 w-16" />
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-4 w-40" />
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="h-4 w-36" />
+              <Skeleton className="h-4 w-20" />
+            </div>
+          ))}
+        </div>
       </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+        <div key={i} className="rounded-lg border p-4 space-y-3">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-10 w-10 rounded-full" />
+            <div className="space-y-1.5 flex-1">
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-3 w-1/2" />
+            </div>
+          </div>
+          <div className="space-y-2 pt-2">
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-4/5" />
+          </div>
+          <div className="pt-2 flex gap-2">
+            <Skeleton className="h-5 w-12 rounded-full" />
+            <Skeleton className="h-5 w-16 rounded-full" />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

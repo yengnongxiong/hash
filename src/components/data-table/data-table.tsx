@@ -38,6 +38,7 @@ interface DataTableProps<TData, TValue> {
     title: string;
     options: { label: string; value: string }[];
   }[];
+  defaultColumnVisibility?: VisibilityState;
 }
 
 export function DataTable<TData, TValue>({
@@ -49,13 +50,14 @@ export function DataTable<TData, TValue>({
   onRowDelete,
   onViewRow,
   filterableColumns = [],
+  defaultColumnVisibility = {},
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
   );
   const [columnVisibility, setColumnVisibility] =
-    React.useState<VisibilityState>({});
+    React.useState<VisibilityState>(defaultColumnVisibility);
   const [rowSelection, setRowSelection] = React.useState({});
 
   const table = useReactTable({
@@ -103,12 +105,13 @@ export function DataTable<TData, TValue>({
               }
             : undefined
         }
+        onClearSelection={() => setRowSelection({})}
       />
       <div className="rounded-md border">
         <Table>
-          <TableHeader>
+          <TableHeader className="bg-muted/50">
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
+              <TableRow key={headerGroup.id} className="hover:bg-muted/50">
                 {headerGroup.headers.map((header) => {
                   return (
                     <TableHead
@@ -148,9 +151,26 @@ export function DataTable<TData, TValue>({
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
-                  className="h-24 text-center"
+                  className="h-32"
                 >
-                  No results.
+                  <div className="flex flex-col items-center justify-center text-center py-8">
+                    <div className="rounded-full bg-muted p-3 mb-3">
+                      <svg
+                        className="h-5 w-5 text-muted-foreground"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={1.5}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
+                        />
+                      </svg>
+                    </div>
+                    <p className="text-sm text-muted-foreground">No results found</p>
+                  </div>
                 </TableCell>
               </TableRow>
             )}

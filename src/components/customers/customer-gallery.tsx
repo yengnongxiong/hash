@@ -1,28 +1,47 @@
 "use client";
 
-import { useState } from "react";
-import { Customer } from "@/types/database";
+import { useState, useTransition } from "react";
+import { Customer, PersonTag, CustomerWithUserInfo } from "@/types/database";
 import { CustomerCard } from "./customer-card";
 import { CustomerDetailDialog } from "./customer-detail-dialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  Trash2,
+  X,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useRouter } from "next/navigation";
+import { deleteCustomers } from "@/app/(dashboard)/people/actions";
+import { toast } from "sonner";
 
 interface CustomerGalleryProps {
-  data: Customer[];
+  data: CustomerWithUserInfo[];
+  personTags: PersonTag[];
 }
 
-export function CustomerGallery({ data }: CustomerGalleryProps) {
+export function CustomerGallery({ data, personTags }: CustomerGalleryProps) {
   const router = useRouter();
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerWithUserInfo | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(12);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isPending, startTransition] = useTransition();
 
   const pageCount = Math.ceil(data.length / pageSize);
   const startIndex = pageIndex * pageSize;
@@ -34,13 +53,31 @@ export function CustomerGallery({ data }: CustomerGalleryProps) {
 
   if (data.length === 0) {
     return (
-      <div className="text-center py-12 text-muted-foreground">
-        No people found
+      <div className="flex flex-col items-center justify-center py-16 text-center border rounded-lg bg-muted/30">
+        <div className="rounded-full bg-muted p-3 mb-4">
+          <svg
+            className="h-6 w-6 text-muted-foreground"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={1.5}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"
+            />
+          </svg>
+        </div>
+        <h3 className="font-medium text-foreground mb-1">No people found</h3>
+        <p className="text-sm text-muted-foreground max-w-sm">
+          Get started by adding your first person using the &quot;Add Person&quot; button above.
+        </p>
       </div>
     );
   }
 
-  const handleCardClick = (customer: Customer) => {
+  const handleCardClick = (customer: CustomerWithUserInfo) => {
     setSelectedCustomer(customer);
     setDialogOpen(true);
   };
@@ -56,14 +93,108 @@ export function CustomerGallery({ data }: CustomerGalleryProps) {
     router.refresh();
   };
 
+  const toggleSelection = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const selectAllOnPage = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      paginatedData.forEach((c) => next.add(c.id));
+      return next;
+    });
+  };
+
+  const deselectAll = () => {
+    setSelectedIds(new Set());
+  };
+
+  const handleDeleteSelected = () => {
+    const ids = Array.from(selectedIds);
+    startTransition(async () => {
+      const result = await deleteCustomers(ids);
+      if (result.error) {
+        toast.error("Failed to delete", { description: result.error });
+      } else {
+        toast.success(`${result.count} ${result.count === 1 ? "person" : "people"} deleted`);
+        setSelectedIds(new Set());
+        router.refresh();
+      }
+    });
+  };
+
+  const allPageSelected = paginatedData.length > 0 && paginatedData.every((c) => selectedIds.has(c.id));
+  const someSelected = selectedIds.size > 0;
+
   return (
     <>
+      {/* Selection toolbar */}
+      {someSelected && (
+        <div className="flex items-center justify-between mb-4 p-3 bg-muted/50 rounded-lg border">
+          <div className="flex items-center gap-3">
+            <Checkbox
+              checked={allPageSelected}
+              onCheckedChange={(checked) => checked ? selectAllOnPage() : deselectAll()}
+            />
+            <span className="text-sm font-medium">
+              {selectedIds.size} selected
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={deselectAll}>
+              <X className="h-4 w-4 mr-1" />
+              Unselect
+            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  disabled={isPending}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete ({selectedIds.size})
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete {selectedIds.size} {selectedIds.size === 1 ? "Person" : "People"}</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete {selectedIds.size} selected {selectedIds.size === 1 ? "person" : "people"}? This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDeleteSelected}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {paginatedData.map((customer) => (
           <CustomerCard
             key={customer.id}
             customer={customer}
+            personTags={personTags}
             onClick={() => handleCardClick(customer)}
+            selected={selectedIds.has(customer.id)}
+            onSelect={() => toggleSelection(customer.id)}
           />
         ))}
       </div>
@@ -145,6 +276,7 @@ export function CustomerGallery({ data }: CustomerGalleryProps) {
         open={dialogOpen}
         onOpenChange={handleDialogClose}
         onUpdate={handleUpdate}
+        personTags={personTags}
       />
     </>
   );

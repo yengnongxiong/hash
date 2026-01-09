@@ -240,6 +240,8 @@ export type Database = {
           notes: string | null;
           created_at: string;
           updated_at: string;
+          created_by: string | null;
+          updated_by: string | null;
         };
         Insert: {
           id?: string;
@@ -254,6 +256,8 @@ export type Database = {
           notes?: string | null;
           created_at?: string;
           updated_at?: string;
+          created_by?: string | null;
+          updated_by?: string | null;
         };
         Update: {
           id?: string;
@@ -268,6 +272,8 @@ export type Database = {
           notes?: string | null;
           created_at?: string;
           updated_at?: string;
+          created_by?: string | null;
+          updated_by?: string | null;
         };
         Relationships: [
           {
@@ -606,6 +612,32 @@ export interface AppointmentType {
   color: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface PersonTag {
+  id: string;
+  organization_id: string;
+  name: string;
+  color: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CustomerWithTags extends Customer {
+  person_tags?: PersonTag[];
+}
+
+// User info for display (subset of User type)
+export interface UserInfo {
+  id: string;
+  name: string | null;
+  email: string | null;
+}
+
+// Customer with created_by and updated_by user info
+export interface CustomerWithUserInfo extends Customer {
+  created_by_user?: UserInfo | null;
+  updated_by_user?: UserInfo | null;
 }
 
 export type AppointmentWithRelations = Appointment & {

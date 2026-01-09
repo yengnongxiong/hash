@@ -1,21 +1,22 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Customer } from "@/types/database";
+import { Customer, PersonTag, CustomerWithUserInfo } from "@/types/database";
 import { DataTable } from "@/components/data-table/data-table";
-import { customerColumns } from "./customer-columns";
+import { createCustomerColumns } from "./customer-columns";
 import { CustomerDetailDialog } from "./customer-detail-dialog";
 import { updateCustomerField, deleteCustomers } from "@/app/(dashboard)/people/actions";
 import { toast } from "sonner";
 
 interface CustomerTableProps {
-  initialData: Customer[];
+  initialData: CustomerWithUserInfo[];
+  personTags: PersonTag[];
 }
 
-export function CustomerTable({ initialData }: CustomerTableProps) {
-  const [data, setData] = useState<Customer[]>(initialData);
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+export function CustomerTable({ initialData, personTags }: CustomerTableProps) {
+  const [data, setData] = useState<CustomerWithUserInfo[]>(initialData);
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerWithUserInfo | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const router = useRouter();
 
@@ -25,7 +26,17 @@ export function CustomerTable({ initialData }: CustomerTableProps) {
   }, [initialData]);
   const [isPending, startTransition] = useTransition();
 
-  const handleViewCustomer = (customer: Customer) => {
+  const columns = useMemo(() => createCustomerColumns(personTags), [personTags]);
+
+  // Default column visibility: show ID, Name, Company, Email, Phone, Created, Updated
+  // Hide: Address, Tags, Notes
+  const defaultColumnVisibility = {
+    address: false,
+    tags: false,
+    notes: false,
+  };
+
+  const handleViewCustomer = (customer: CustomerWithUserInfo) => {
     setSelectedCustomer(customer);
     setDetailDialogOpen(true);
   };
@@ -91,11 +102,12 @@ export function CustomerTable({ initialData }: CustomerTableProps) {
     <>
       <div className={isPending ? "opacity-70 pointer-events-none" : ""}>
         <DataTable
-          columns={customerColumns}
+          columns={columns}
           data={data}
           onRowUpdate={handleRowUpdate}
           onRowDelete={handleRowDelete}
           onViewRow={handleViewCustomer}
+          defaultColumnVisibility={defaultColumnVisibility}
         />
       </div>
 
@@ -104,6 +116,7 @@ export function CustomerTable({ initialData }: CustomerTableProps) {
         open={detailDialogOpen}
         onOpenChange={setDetailDialogOpen}
         onUpdate={() => router.refresh()}
+        personTags={personTags}
       />
     </>
   );

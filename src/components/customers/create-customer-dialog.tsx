@@ -16,13 +16,23 @@ import {
 } from "@/components/ui/dialog";
 import { createCustomer } from "@/app/(dashboard)/people/actions";
 import { toast } from "sonner";
+import { PersonTag } from "@/types/database";
+import { TagSelector } from "./tag-selector";
 
-export function CreateCustomerDialog() {
+interface CreateCustomerDialogProps {
+  personTags: PersonTag[];
+}
+
+export function CreateCustomerDialog({ personTags }: CreateCustomerDialogProps) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const router = useRouter();
 
   async function handleSubmit(formData: FormData) {
+    // Add selected tags to form data
+    formData.set("tags", selectedTags.join(","));
+
     startTransition(async () => {
       const result = await createCustomer(formData);
 
@@ -35,13 +45,21 @@ export function CreateCustomerDialog() {
           description: "The person has been added successfully",
         });
         setOpen(false);
+        setSelectedTags([]);
         router.refresh();
       }
     });
   }
 
+  const handleOpenChange = (isOpen: boolean) => {
+    setOpen(isOpen);
+    if (!isOpen) {
+      setSelectedTags([]);
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button>
           <Plus className="mr-2 h-4 w-4" />
@@ -114,13 +132,14 @@ export function CreateCustomerDialog() {
               />
             </div>
             <div className="grid gap-2">
-              <label htmlFor="tags" className="text-sm font-medium">
+              <label className="text-sm font-medium">
                 Tags
               </label>
-              <Input
-                id="tags"
-                name="tags"
-                placeholder="vip, retail, priority (comma separated)"
+              <TagSelector
+                personTags={personTags}
+                selectedTags={selectedTags}
+                onChange={setSelectedTags}
+                placeholder="Select tags..."
               />
             </div>
             <div className="grid gap-2">

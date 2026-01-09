@@ -102,6 +102,8 @@ export async function createCustomer(formData: FormData) {
     ...result.data,
     customer_number: customerId,
     organization_id: userData.organization_id,
+    created_by: user.id,
+    updated_by: user.id,
   });
 
   if (error) {
@@ -118,6 +120,15 @@ export async function updateCustomerField(
   value: unknown
 ) {
   const supabase = await createClient();
+
+  // Get current user
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Not authenticated" };
+  }
 
   // Validate the field is allowed
   const allowedFields = [
@@ -153,6 +164,7 @@ export async function updateCustomerField(
     .update({
       [field]: value === "" ? null : value,
       updated_at: new Date().toISOString(),
+      updated_by: user.id,
     })
     .eq("id", customerId);
 
@@ -336,6 +348,8 @@ export async function importCustomersFromCSV(customers: CSVCustomer[]) {
     notes: string | null;
     organization_id: string;
     customer_number: string;
+    created_by: string;
+    updated_by: string;
   }> = [];
   const errors: string[] = [];
 
@@ -370,6 +384,8 @@ export async function importCustomersFromCSV(customers: CSVCustomer[]) {
       notes: row.notes?.trim() || null,
       organization_id: userData.organization_id,
       customer_number: generateCustomerId(),
+      created_by: user.id,
+      updated_by: user.id,
     });
   }
 
@@ -397,4 +413,77 @@ export async function importCustomersFromCSV(customers: CSVCustomer[]) {
     errors,
     total: customers.length,
   };
+}
+
+// Person Tags actions
+export async function getPersonTags() {
+  const supabase = await createClient();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
+    .from("person_tags")
+    .select("*")
+    .order("name", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data;
+}
+
+export async function createPersonTag(name: string, color: string) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Not authenticated" };
+  }
+
+  const { data: userData } = await supabase
+    .from("users")
+    .select("organization_id")
+    .eq("id", user.id)
+    .single();
+
+  if (!userData?.organization_id) {
+    return { error: "No organization found" };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any).from("person_tags").insert({
+    name: name.trim(),
+    color,
+    organization_id: userData.organization_id,
+  });
+
+  if (error) {
+    if (error.code === "23505") {
+      return { error: "A tag with this name already exists" };
+    }
+    return { error: error.message };
+  }
+
+  revalidatePath("/people");
+  return { success: true };
+}
+
+export async function deletePersonTag(tagId: string) {
+  const supabase = await createClient();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
+    .from("person_tags")
+    .delete()
+    .eq("id", tagId);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/people");
+  return { success: true };
 }

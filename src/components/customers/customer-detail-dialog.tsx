@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, useEffect } from "react";
-import { Customer } from "@/types/database";
+import { Customer, PersonTag, CustomerWithUserInfo } from "@/types/database";
 import {
   Dialog,
   DialogContent,
@@ -23,12 +23,12 @@ import {
   MapPin,
   Tag,
   FileText,
-  Calendar,
   Pencil,
   Save,
   X,
   Trash2,
 } from "lucide-react";
+import { TagSelector, ColoredTagsDisplay } from "./tag-selector";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,13 +49,14 @@ import {
 import { updateCustomerField, deleteCustomers } from "@/app/(dashboard)/people/actions";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { formatDistanceToNow } from "@/lib/utils/format";
+import { formatDateTime } from "@/lib/utils/format";
 
 interface CustomerDetailDialogProps {
-  customer: Customer | null;
+  customer: CustomerWithUserInfo | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onUpdate?: () => void;
+  personTags?: PersonTag[];
 }
 
 function getInitials(name: string): string {
@@ -72,10 +73,13 @@ export function CustomerDetailDialog({
   open,
   onOpenChange,
   onUpdate,
+  personTags = [],
 }: CustomerDetailDialogProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const [editedCustomer, setEditedCustomer] = useState<Partial<Customer>>({});
+  const [editedCustomer, setEditedCustomer] = useState<Partial<CustomerWithUserInfo>>({});
+  // Track saved data to display until customer prop is refreshed
+  const [savedData, setSavedData] = useState<Partial<CustomerWithUserInfo> | null>(null);
   const router = useRouter();
 
   // Reset editing state when dialog closes or customer changes
@@ -83,6 +87,7 @@ export function CustomerDetailDialog({
     if (!open) {
       setIsEditing(false);
       setEditedCustomer({});
+      setSavedData(null);
     }
   }, [open]);
 
@@ -90,6 +95,7 @@ export function CustomerDetailDialog({
   useEffect(() => {
     setIsEditing(false);
     setEditedCustomer({});
+    setSavedData(null);
   }, [customer?.id]);
 
   const handleDelete = () => {
@@ -133,7 +139,7 @@ export function CustomerDetailDialog({
     startTransition(async () => {
       const fieldsToUpdate = Object.entries(editedCustomer).filter(
         ([key, value]) => {
-          const originalValue = customer[key as keyof Customer];
+          const originalValue = customer[key as keyof CustomerWithUserInfo];
           // Compare arrays properly
           if (Array.isArray(value) && Array.isArray(originalValue)) {
             return JSON.stringify(value) !== JSON.stringify(originalValue);
@@ -159,6 +165,8 @@ export function CustomerDetailDialog({
 
       if (!hasError) {
         toast.success("Person updated successfully");
+        // Store saved data to display until customer prop refreshes
+        setSavedData(editedCustomer);
         setIsEditing(false);
         setEditedCustomer({});
         onUpdate?.();
@@ -166,9 +174,12 @@ export function CustomerDetailDialog({
     });
   };
 
+  // Use savedData to display recently saved changes until customer prop is refreshed
   const currentData = isEditing
     ? { ...customer, ...editedCustomer }
-    : customer;
+    : savedData
+      ? { ...customer, ...savedData }
+      : customer;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -418,29 +429,25 @@ export function CustomerDetailDialog({
               Tags
             </Label>
             {isEditing ? (
-              <Input
-                value={(editedCustomer.tags || []).join(", ")}
-                onChange={(e) =>
+              <TagSelector
+                personTags={personTags}
+                selectedTags={editedCustomer.tags || []}
+                onChange={(tags) =>
                   setEditedCustomer((prev) => ({
                     ...prev,
-                    tags: e.target.value
-                      .split(",")
-                      .map((t) => t.trim())
-                      .filter(Boolean),
+                    tags,
                   }))
                 }
-                placeholder="tag1, tag2, tag3"
+                placeholder="Select tags..."
               />
             ) : (
               <div className="pl-6 overflow-hidden">
                 {currentData.tags && currentData.tags.length > 0 ? (
-                  <div className="flex flex-wrap gap-1 max-h-20 overflow-hidden">
-                    {currentData.tags.map((tag, index) => (
-                      <Badge key={`${tag}-${index}`} variant="secondary" className="text-xs max-w-[120px] truncate">
-                        {tag}
-                      </Badge>
-                    ))}
-                  </div>
+                  <ColoredTagsDisplay
+                    tags={currentData.tags}
+                    personTags={personTags}
+                    maxDisplay={10}
+                  />
                 ) : (
                   <span className="text-sm text-muted-foreground italic">
                     No tags
@@ -478,23 +485,19 @@ export function CustomerDetailDialog({
           </div>
 
           {/* Timestamps */}
-          <div className="pt-2 border-t">
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <Calendar className="h-3 w-3" />
-                <span>
-                  Created{" "}
-                  {formatDistanceToNow(new Date(currentData.created_at))}
-                </span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Calendar className="h-3 w-3" />
-                <span>
-                  Updated{" "}
-                  {formatDistanceToNow(new Date(currentData.updated_at))}
-                </span>
-              </div>
-            </div>
+          <div className="pt-2 border-t space-y-1">
+            <p className="text-xs text-muted-foreground">
+              Created: {formatDateTime(new Date(currentData.created_at))}
+              {currentData.created_by_user && (
+                <> by <span className="font-medium text-foreground">{currentData.created_by_user.name || currentData.created_by_user.email || "Unknown"}</span></>
+              )}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Updated: {formatDateTime(new Date(currentData.updated_at))}
+              {currentData.updated_by_user && (
+                <> by <span className="font-medium text-foreground">{currentData.updated_by_user.name || currentData.updated_by_user.email || "Unknown"}</span></>
+              )}
+            </p>
           </div>
         </div>
       </DialogContent>
