@@ -11,6 +11,7 @@ import {
   isPast,
   addMonths,
   subMonths,
+  isSameDay,
 } from "date-fns";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -48,16 +49,19 @@ export function DatesCalendar({ dates, onDateClick, onEmptyDayClick }: DatesCale
   const startDayOfWeek = monthStart.getDay();
   const paddingDays = Array.from({ length: startDayOfWeek }, (_, i) => i);
 
-  // Group dates by day
+  // Group dates by day (events only show on their start day)
   const datesByDay = useMemo(() => {
     const map = new Map<string, DateEntry[]>();
+
     for (const d of dates) {
-      const key = format(d.date, "yyyy-MM-dd");
-      if (!map.has(key)) {
-        map.set(key, []);
+      // Only show on start day
+      const startKey = format(d.date, "yyyy-MM-dd");
+      if (!map.has(startKey)) {
+        map.set(startKey, []);
       }
-      map.get(key)!.push(d);
+      map.get(startKey)!.push(d);
     }
+
     return map;
   }, [dates]);
 
@@ -135,15 +139,25 @@ export function DatesCalendar({ dates, onDateClick, onEmptyDayClick }: DatesCale
                   </span>
                   {hasEvents && (
                     <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-0.5">
-                      {dayDates.slice(0, 3).map((d, i) => (
-                        <div
-                          key={i}
-                          className={cn(
-                            "w-1.5 h-1.5 rounded-full",
-                            d.color || "border border-muted-foreground/50"
-                          )}
-                        />
-                      ))}
+                      {dayDates.slice(0, 3).map((d, i) => {
+                        // Status-based dot colors (minimal, professional)
+                        const isCancelled = d.status === "cancelled";
+                        const isCompleted = d.status === "completed";
+                        const isOverdue = !isCancelled && !isCompleted && isPast(d.date) && !isToday(d.date);
+
+                        return (
+                          <div
+                            key={i}
+                            className={cn(
+                              "w-1.5 h-1.5 rounded-full",
+                              isCancelled && "bg-muted-foreground/30",
+                              isCompleted && "bg-muted-foreground/50",
+                              isOverdue && "bg-red-500",
+                              !isCancelled && !isCompleted && !isOverdue && "bg-primary"
+                            )}
+                          />
+                        );
+                      })}
                       {dayDates.length > 3 && (
                         <span className="text-[8px] text-muted-foreground">
                           +{dayDates.length - 3}
@@ -160,39 +174,52 @@ export function DatesCalendar({ dates, onDateClick, onEmptyDayClick }: DatesCale
                   </p>
                   {hasEvents ? (
                     <div className="space-y-1 max-h-[300px] overflow-y-auto">
-                      {dayDates.map((d) => (
-                        <button
-                          key={d.id}
-                          onClick={() => onDateClick?.(d)}
-                          className="w-full flex items-start gap-2 p-2 rounded hover:bg-muted transition-colors text-left"
-                        >
-                          <div
+                      {dayDates.map((d) => {
+                        // Status-based styling
+                        const isCancelled = d.status === "cancelled";
+                        const isCompleted = d.status === "completed";
+                        const isOverdue = !isCancelled && !isCompleted && isPast(d.date) && !isToday(d.date);
+
+                        return (
+                          <button
+                            key={d.id}
+                            onClick={() => onDateClick?.(d)}
                             className={cn(
-                              "w-2 h-2 rounded-full mt-1.5 shrink-0",
-                              d.color || "border border-muted-foreground/50"
+                              "w-full flex items-start gap-2 p-2 rounded hover:bg-muted/50 transition-colors text-left border",
+                              isCancelled && "opacity-50 line-through border-transparent",
+                              isCompleted && "opacity-70 border-muted-foreground/20",
+                              isOverdue && "border-red-500/30 bg-red-500/5",
+                              !isCancelled && !isCompleted && !isOverdue && "border-transparent"
                             )}
-                          />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium truncate">
-                              {d.title}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {d.entityName || "No person"}
-                              {d.endDate && (
-                                <> • {format(d.date, "h:mm a")} - {format(d.endDate, "h:mm a")}</>
+                          >
+                            <div
+                              className={cn(
+                                "w-2 h-2 rounded-full mt-1.5 shrink-0",
+                                isCancelled && "bg-muted-foreground/30",
+                                isCompleted && "bg-muted-foreground/50",
+                                isOverdue && "bg-red-500",
+                                !isCancelled && !isCompleted && !isOverdue && "bg-primary"
                               )}
-                              {!d.endDate && (
-                                <> • {format(d.date, "h:mm a")}</>
-                              )}
-                            </p>
-                            {d.location && (
-                              <p className="text-xs text-muted-foreground truncate">
-                                {d.location}
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium truncate">{d.title}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {d.entityName || "No person"}
+                                {d.endDate && isSameDay(d.date, d.endDate) ? (
+                                  <> • {format(d.date, "h:mm a")} - {format(d.endDate, "h:mm a")}</>
+                                ) : (
+                                  <> • {format(d.date, "h:mm a")}</>
+                                )}
                               </p>
-                            )}
-                          </div>
-                        </button>
-                      ))}
+                              {d.location && (
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {d.location}
+                                </p>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground">No dates scheduled</p>

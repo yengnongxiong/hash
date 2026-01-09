@@ -147,3 +147,73 @@
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
   background-color: hsl(var(--muted-foreground) / 0.5);
 }
+
+/* Fix datetime-local input calendar icon visibility in dark mode */
+.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
+.dark input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
+.dark input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
+/* Print styles */
+@media print {
+  /* Hide navigation, sidebar, and controls */
+  aside,
+  nav,
+  header,
+  [data-sidebar],
+  [role="navigation"] {
+    display: none !important;
+  }
+
+  /* Hide elements with data-print-hide attribute */
+  [data-print-hide="true"] {
+    display: none !important;
+  }
+
+  /* Reset background colors for printing */
+  body,
+  main {
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Make main content full width */
+  main {
+    margin: 0 !important;
+    padding: 1rem !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Ensure table is visible and fits page */
+  table {
+    width: 100% !important;
+    font-size: 10pt !important;
+  }
+
+  /* Keep table headers visible */
+  thead {
+    display: table-header-group;
+  }
+
+  /* Remove hover effects */
+  tr:hover {
+    background: none !important;
+  }
+
+  /* Make badges print-friendly */
+  .bg-green-500,
+  .bg-blue-500,
+  .bg-yellow-500,
+  .bg-red-500 {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

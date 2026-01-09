@@ -25,8 +25,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Settings, Plus, Trash2 } from "lucide-react";
-import { createAppointmentType, deleteAppointmentType } from "@/app/(dashboard)/dates/actions";
+import { Tags, Plus, Trash2 } from "lucide-react";
+import { createAppointmentType, updateAppointmentType, deleteAppointmentType } from "@/app/(dashboard)/dates/actions";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -74,6 +79,19 @@ export function AppointmentTypesDialog({ appointmentTypes }: AppointmentTypesDia
     });
   };
 
+  const handleUpdateTypeColor = (id: string, color: string) => {
+    startTransition(async () => {
+      const result = await updateAppointmentType(id, { color });
+
+      if (result.error) {
+        toast.error("Failed to update color", { description: result.error });
+      } else {
+        toast.success("Color updated");
+        router.refresh();
+      }
+    });
+  };
+
   const handleDeleteType = (id: string, name: string) => {
     startTransition(async () => {
       const result = await deleteAppointmentType(id);
@@ -91,11 +109,11 @@ export function AppointmentTypesDialog({ appointmentTypes }: AppointmentTypesDia
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
-          <Settings className="h-4 w-4 mr-2" />
+          <Tags className="h-4 w-4 mr-2" />
           Types
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[450px]">
+      <DialogContent className="sm:max-w-[450px] overflow-hidden">
         <DialogHeader>
           <DialogTitle>Date Types</DialogTitle>
           <DialogDescription>
@@ -116,12 +134,44 @@ export function AppointmentTypesDialog({ appointmentTypes }: AppointmentTypesDia
                 {appointmentTypes.map((type) => (
                   <div
                     key={type.id}
-                    className="flex items-center justify-between p-3 border rounded-lg"
+                    className="flex items-center gap-3 p-3 border rounded-lg overflow-hidden"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className={cn("w-4 h-4 rounded-full", type.color)} />
-                      <span className="font-medium">{type.name}</span>
-                    </div>
+                    {/* Clickable color picker */}
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button
+                          className={cn(
+                            "w-6 h-6 rounded-full shrink-0 transition-all hover:ring-2 hover:ring-offset-2 hover:ring-primary/50",
+                            type.color
+                          )}
+                          title="Click to change color"
+                        />
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-3" align="start">
+                        <div className="space-y-2">
+                          <p className="text-xs text-muted-foreground font-medium">Select color</p>
+                          <div className="flex flex-wrap gap-2 max-w-[200px]">
+                            {COLOR_OPTIONS.map((color) => (
+                              <button
+                                key={color.value}
+                                type="button"
+                                onClick={() => handleUpdateTypeColor(type.id, color.value)}
+                                disabled={isPending}
+                                className={cn(
+                                  "w-7 h-7 rounded-full transition-all",
+                                  color.value,
+                                  type.color === color.value
+                                    ? "ring-2 ring-offset-2 ring-primary"
+                                    : "hover:scale-110"
+                                )}
+                                title={color.label}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                    <span className="font-medium truncate max-w-[280px]" title={type.name}>{type.name}</span>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button
@@ -135,8 +185,8 @@ export function AppointmentTypesDialog({ appointmentTypes }: AppointmentTypesDia
                       <AlertDialogContent>
                         <AlertDialogHeader>
                           <AlertDialogTitle>Delete Type</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Are you sure you want to delete &quot;{type.name}&quot;? Dates using this type will have their type cleared.
+                          <AlertDialogDescription className="break-words">
+                            Are you sure you want to delete &quot;<span className="font-medium">{type.name.length > 50 ? `${type.name.slice(0, 50)}...` : type.name}</span>&quot;? Dates using this type will have their type cleared.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -164,6 +214,7 @@ export function AppointmentTypesDialog({ appointmentTypes }: AppointmentTypesDia
                 placeholder="Type name (e.g., Interview)"
                 value={newTypeName}
                 onChange={(e) => setNewTypeName(e.target.value)}
+                maxLength={50}
                 className="flex-1"
               />
               <Button
