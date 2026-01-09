@@ -7,6 +7,19 @@ import { revalidatePath } from "next/cache";
 import { detectDocumentFlags, saveDocumentFlags } from "@/lib/ocr/detect-flags";
 import { ExtractedDocumentData } from "@/lib/ocr/types";
 
+/**
+ * Generates a 6-character random alphanumeric document ID
+ * Format: mix of uppercase letters and numbers (e.g., "A3B7K2", "9X4M2P")
+ */
+function generateDocumentId(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // Excluded I, O, 0, 1 to avoid confusion
+  let result = "";
+  for (let i = 0; i < 6; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
 export async function uploadDocument(formData: FormData) {
   const supabase = await createClient();
 
@@ -82,12 +95,16 @@ export async function uploadDocument(formData: FormData) {
       .from("documents")
       .getPublicUrl(filePath);
 
+    // Generate unique document ID
+    const documentNumber = generateDocumentId();
+
     // Create document record
     const { data: document, error: dbError } = await supabase
       .from("documents")
       .insert({
         organization_id: orgId,
         customer_id: customerId || null,
+        document_number: documentNumber,
         file_url: urlData.publicUrl,
         file_name: file.name,
         file_type: file.type,
@@ -167,11 +184,11 @@ async function processDocumentOCR(documentId: string) {
       throw new Error(result.error || "OCR processing failed");
     }
 
-    // Update document with results
+    // Update document with results - set to pending_review for human approval
     await adminClient
       .from("documents")
       .update({
-        status: "completed",
+        status: "pending_review",
         raw_text: result.rawText,
         document_type: result.extractedData.documentType || "other",
         extracted_data: JSON.parse(JSON.stringify(result.extractedData)),
@@ -218,6 +235,14 @@ async function processDocumentOCR(documentId: string) {
     } catch (flagError) {
       console.error("Flag detection error:", flagError);
       // Don't fail the whole process if flag detection fails
+    }
+
+    // Extract and save document dates
+    try {
+      await saveDocumentDates(documentId, result.extractedData as ExtractedDocumentData, adminClient);
+    } catch (dateError) {
+      console.error("Date extraction error:", dateError);
+      // Don't fail the whole process if date extraction fails
     }
   } catch (error) {
     console.error("OCR processing error:", error);
@@ -341,6 +366,176 @@ export async function retryDocumentOCR(documentId: string) {
   return { success: true };
 }
 
+export async function approveDocument(documentId: string) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Not authenticated" };
+  }
+
+  // Verify document belongs to user's org and is pending_review
+  const { data: document } = await supabase
+    .from("documents")
+    .select("id, status")
+    .eq("id", documentId)
+    .single();
+
+  if (!document) {
+    return { error: "Document not found" };
+  }
+
+  if (document.status !== "pending_review") {
+    return { error: "Document is not pending review" };
+  }
+
+  // Update document status to completed and record approval
+  const { error: updateError } = await supabase
+    .from("documents")
+    .update({
+      status: "completed",
+      approved_by: user.id,
+      approved_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", documentId);
+
+  if (updateError) {
+    return { error: updateError.message };
+  }
+
+  // Create audit log entry
+  await supabase.from("document_audit_log").insert({
+    document_id: documentId,
+    user_id: user.id,
+    action: "approved",
+    details: {},
+  });
+
+  revalidatePath("/documents");
+  revalidatePath(`/documents/${documentId}`);
+  revalidatePath("/documents/review");
+  return { success: true };
+}
+
+export async function rejectDocument(documentId: string) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Not authenticated" };
+  }
+
+  // Verify document belongs to user's org and is pending_review
+  const { data: document } = await supabase
+    .from("documents")
+    .select("id, status")
+    .eq("id", documentId)
+    .single();
+
+  if (!document) {
+    return { error: "Document not found" };
+  }
+
+  if (document.status !== "pending_review") {
+    return { error: "Document is not pending review" };
+  }
+
+  // Update document status to rejected
+  const { error: updateError } = await supabase
+    .from("documents")
+    .update({
+      status: "rejected",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", documentId);
+
+  if (updateError) {
+    return { error: updateError.message };
+  }
+
+  // Create audit log entry
+  await supabase.from("document_audit_log").insert({
+    document_id: documentId,
+    user_id: user.id,
+    action: "rejected",
+    details: {},
+  });
+
+  revalidatePath("/documents");
+  revalidatePath(`/documents/${documentId}`);
+  revalidatePath("/documents/review");
+  return { success: true };
+}
+
+export async function bulkApproveDocuments(documentIds: string[]) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Not authenticated" };
+  }
+
+  if (documentIds.length === 0) {
+    return { error: "No documents selected" };
+  }
+
+  // Verify all documents are pending_review
+  const { data: documents } = await supabase
+    .from("documents")
+    .select("id, status")
+    .in("id", documentIds);
+
+  if (!documents || documents.length === 0) {
+    return { error: "No documents found" };
+  }
+
+  const pendingDocs = documents.filter((d) => d.status === "pending_review");
+  if (pendingDocs.length === 0) {
+    return { error: "No documents pending review" };
+  }
+
+  const pendingIds = pendingDocs.map((d) => d.id);
+
+  // Bulk update documents
+  const { error: updateError } = await supabase
+    .from("documents")
+    .update({
+      status: "completed",
+      approved_by: user.id,
+      approved_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .in("id", pendingIds);
+
+  if (updateError) {
+    return { error: updateError.message };
+  }
+
+  // Create audit log entries for each document
+  const auditEntries = pendingIds.map((docId) => ({
+    document_id: docId,
+    user_id: user.id,
+    action: "approved",
+    details: { bulk: true },
+  }));
+
+  await supabase.from("document_audit_log").insert(auditEntries);
+
+  revalidatePath("/documents");
+  revalidatePath("/documents/review");
+  return { success: true, count: pendingIds.length };
+}
+
 export async function logDocumentView(documentId: string) {
   const supabase = await createClient();
 
@@ -406,4 +601,193 @@ export async function getDocumentFlags(documentId: string) {
   }
 
   return data || [];
+}
+
+// Helper function to extract and save document dates from OCR results
+async function saveDocumentDates(
+  documentId: string,
+  extractedData: ExtractedDocumentData,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  adminClient: any
+) {
+  const datesToInsert: Array<{
+    document_id: string;
+    date_type: string;
+    date_value: string;
+    label: string;
+    is_manual: boolean;
+  }> = [];
+
+  // Extract known date fields based on document type
+  const dateFieldMappings: Array<{
+    field: keyof ExtractedDocumentData;
+    type: string;
+    label: string;
+  }> = [
+    { field: "dueDate", type: "due_date", label: "Due Date" },
+    { field: "invoiceDate", type: "invoice_date", label: "Invoice Date" },
+    { field: "expirationDate", type: "expiration", label: "Expiration Date" },
+    { field: "effectiveDate", type: "effective", label: "Effective Date" },
+    { field: "transactionDate", type: "transaction", label: "Transaction Date" },
+  ];
+
+  for (const mapping of dateFieldMappings) {
+    const dateValue = extractedData[mapping.field];
+    if (dateValue && typeof dateValue === "string" && isValidDate(dateValue)) {
+      datesToInsert.push({
+        document_id: documentId,
+        date_type: mapping.type,
+        date_value: dateValue,
+        label: mapping.label,
+        is_manual: false,
+      });
+    }
+  }
+
+  // Also extract dates from the general dates array
+  if (extractedData.dates && Array.isArray(extractedData.dates)) {
+    for (const dateItem of extractedData.dates) {
+      if (dateItem.date && isValidDate(dateItem.date)) {
+        // Map the type to our enum
+        const typeMap: Record<string, string> = {
+          due_date: "due_date",
+          invoice_date: "invoice_date",
+          expiration: "expiration",
+          effective: "effective",
+          transaction: "transaction",
+        };
+        const dateType = typeMap[dateItem.type] || "other";
+
+        // Check if we already have this date
+        const exists = datesToInsert.some(
+          (d) => d.date_value === dateItem.date && d.date_type === dateType
+        );
+
+        if (!exists) {
+          datesToInsert.push({
+            document_id: documentId,
+            date_type: dateType,
+            date_value: dateItem.date,
+            label: dateItem.context || formatDateType(dateType),
+            is_manual: false,
+          });
+        }
+      }
+    }
+  }
+
+  if (datesToInsert.length === 0) {
+    return;
+  }
+
+  // Delete existing auto-extracted dates for this document (keep manual ones)
+  await adminClient
+    .from("document_dates")
+    .delete()
+    .eq("document_id", documentId)
+    .eq("is_manual", false);
+
+  // Insert new dates
+  const { error } = await adminClient
+    .from("document_dates")
+    .insert(datesToInsert);
+
+  if (error) {
+    console.error("Error saving document dates:", error);
+  }
+}
+
+// Helper to validate date format
+function isValidDate(dateStr: string): boolean {
+  const date = new Date(dateStr);
+  return !isNaN(date.getTime());
+}
+
+// Helper to format date type for display
+function formatDateType(type: string): string {
+  const labels: Record<string, string> = {
+    due_date: "Due Date",
+    invoice_date: "Invoice Date",
+    expiration: "Expiration Date",
+    effective: "Effective Date",
+    transaction: "Transaction Date",
+    other: "Other Date",
+  };
+  return labels[type] || "Date";
+}
+
+export async function getDocumentDates(documentId: string) {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("document_dates")
+    .select("*")
+    .eq("document_id", documentId)
+    .order("date_value", { ascending: true });
+
+  if (error) {
+    console.error("Error fetching document dates:", error);
+    return [];
+  }
+
+  return data || [];
+}
+
+export async function addDocumentDate(
+  documentId: string,
+  dateType: string,
+  dateValue: string,
+  label?: string
+) {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("document_dates")
+    .insert({
+      document_id: documentId,
+      date_type: dateType,
+      date_value: dateValue,
+      label: label || formatDateType(dateType),
+      is_manual: true,
+    });
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  // Create audit log
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  await supabase.from("document_audit_log").insert({
+    document_id: documentId,
+    user_id: user?.id,
+    action: "date_added",
+    details: {
+      dateType,
+      dateValue,
+      label,
+    },
+  });
+
+  revalidatePath(`/documents/${documentId}`);
+  return { success: true };
+}
+
+export async function deleteDocumentDate(documentId: string, dateId: string) {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("document_dates")
+    .delete()
+    .eq("id", dateId)
+    .eq("document_id", documentId);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath(`/documents/${documentId}`);
+  return { success: true };
 }

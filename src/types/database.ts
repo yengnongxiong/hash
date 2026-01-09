@@ -312,8 +312,10 @@ export type Database = {
           document_type: "invoice" | "receipt" | "contract" | "other" | null;
           raw_text: string | null;
           extracted_data: Json;
-          status: "pending" | "processing" | "completed" | "failed";
+          status: "pending" | "processing" | "pending_review" | "completed" | "failed" | "rejected";
           uploaded_by: string | null;
+          approved_at: string | null;
+          approved_by: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -329,8 +331,10 @@ export type Database = {
           document_type?: "invoice" | "receipt" | "contract" | "other" | null;
           raw_text?: string | null;
           extracted_data?: Json;
-          status?: "pending" | "processing" | "completed" | "failed";
+          status?: "pending" | "processing" | "pending_review" | "completed" | "failed" | "rejected";
           uploaded_by?: string | null;
+          approved_at?: string | null;
+          approved_by?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -346,8 +350,10 @@ export type Database = {
           document_type?: "invoice" | "receipt" | "contract" | "other" | null;
           raw_text?: string | null;
           extracted_data?: Json;
-          status?: "pending" | "processing" | "completed" | "failed";
+          status?: "pending" | "processing" | "pending_review" | "completed" | "failed" | "rejected";
           uploaded_by?: string | null;
+          approved_at?: string | null;
+          approved_by?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -460,6 +466,49 @@ export type Database = {
             foreignKeyName: "document_flags_resolved_by_fkey";
             columns: ["resolved_by"];
             referencedRelation: "users";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      document_dates: {
+        Row: {
+          id: string;
+          document_id: string;
+          date_type: string;
+          date_value: string;
+          label: string | null;
+          description: string | null;
+          is_manual: boolean | null;
+          created_at: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          document_id: string;
+          date_type: string;
+          date_value: string;
+          label?: string | null;
+          description?: string | null;
+          is_manual?: boolean | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          document_id?: string;
+          date_type?: string;
+          date_value?: string;
+          label?: string | null;
+          description?: string | null;
+          is_manual?: boolean | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "document_dates_document_id_fkey";
+            columns: ["document_id"];
+            referencedRelation: "documents";
             referencedColumns: ["id"];
           }
         ];
@@ -680,10 +729,13 @@ export interface DocumentFlag {
 export interface DocumentDate {
   id: string;
   document_id: string;
-  date_type: "due_date" | "invoice_date" | "expiration" | "effective" | "transaction" | "other";
+  date_type: "due_date" | "invoice_date" | "expiration" | "effective" | "transaction" | "custom" | "other";
   date_value: string;
+  label?: string;
   description?: string;
+  is_manual: boolean;
   created_at: string;
+  updated_at: string;
 }
 
 export type WhiteboardTask = Tables<"whiteboard_tasks">;

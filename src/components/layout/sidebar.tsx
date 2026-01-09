@@ -22,7 +22,6 @@ import {
   LayoutDashboard,
   Users,
   FileText,
-  Upload,
   Settings,
   Kanban,
   Calendar,
@@ -37,7 +36,6 @@ const navigation = [
   { name: "People", href: "/people", icon: Users },
   { name: "Dates", href: "/dates", icon: Calendar },
   { name: "Documents", href: "/documents", icon: FileText },
-  { name: "Upload", href: "/documents/upload", icon: Upload },
   { name: "Whiteboard", href: "/whiteboard", icon: Kanban },
   { name: "Settings", href: "/settings", icon: Settings },
 ];

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Download, History, RotateCw } from "lucide-react";
+import { ArrowLeft, Download, History, RotateCw, CheckCircle, User } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,7 @@ import { ExtractedDataView } from "@/components/documents/extracted-data-view";
 import { ProcessingStatus } from "@/components/documents/processing-status";
 import { DocumentAuditLog } from "@/components/documents/document-audit-log";
 import { DocumentFlagsWrapper } from "@/components/documents/document-flags-wrapper";
+import { DocumentApproval } from "@/components/documents/document-approval";
 import { formatDistanceToNow, formatFileSize } from "@/lib/utils/format";
 import { logDocumentView, getDocumentAuditLog, getDocumentFlags } from "../actions";
 
@@ -43,7 +44,9 @@ export default async function DocumentDetailPage({
 
   const isProcessing = document.status === "processing";
   const isFailed = document.status === "failed";
+  const isPendingReview = document.status === "pending_review";
   const isCompleted = document.status === "completed";
+  const hasUnresolvedFlags = flags.some((f) => !f.resolved);
 
   return (
     <div className="min-h-[calc(100vh-8rem)] flex flex-col">
@@ -80,8 +83,17 @@ export default async function DocumentDetailPage({
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <ProcessingStatus status={document.status} />
+          {isPendingReview && (
+            <DocumentApproval documentId={document.id} hasUnresolvedFlags={hasUnresolvedFlags} />
+          )}
+          {isCompleted && document.approved_by && document.approved_at && (
+            <span className="text-xs text-muted-foreground flex items-center gap-1">
+              <CheckCircle className="h-3 w-3 text-green-600" />
+              Approved {formatDistanceToNow(new Date(document.approved_at))}
+            </span>
+          )}
           <a href={document.file_url} download={document.file_name}>
             <Button variant="outline" size="sm">
               <Download className="h-4 w-4 mr-2" />
@@ -102,6 +114,26 @@ export default async function DocumentDetailPage({
           </div>
           <p className="text-yellow-700 text-sm mt-1">
             This may take a few moments. The page will update automatically when complete.
+          </p>
+        </div>
+      )}
+
+      {/* Pending Review State */}
+      {isPendingReview && (
+        <div className="bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-lg p-4 mb-4">
+          <div className="flex items-center gap-2">
+            <User className="h-4 w-4 text-purple-600" />
+            <span className="text-purple-800 dark:text-purple-200 font-medium">
+              Review Required
+            </span>
+          </div>
+          <p className="text-purple-700 dark:text-purple-300 text-sm mt-1">
+            Review the extracted data below and make any corrections before approving.
+            {hasUnresolvedFlags && (
+              <span className="block mt-1 font-medium">
+                Note: This document has unresolved flags that should be reviewed.
+              </span>
+            )}
           </p>
         </div>
       )}
@@ -151,7 +183,7 @@ export default async function DocumentDetailPage({
             <h2 className="text-sm font-medium">Extracted Data</h2>
           </div>
           <div className="p-4">
-            {isCompleted ? (
+            {(isCompleted || isPendingReview) ? (
               <ExtractedDataView
                 documentId={document.id}
                 documentType={document.document_type}

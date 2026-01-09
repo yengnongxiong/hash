@@ -1,15 +1,24 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Save, X, Edit2 } from "lucide-react";
+import { Save, X, Edit2, AlertCircle, CheckCircle, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { updateDocumentExtractedData } from "@/app/(dashboard)/documents/[id]/actions";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import type { Json } from "@/types/database";
+
+type ConfidenceLevel = "high" | "medium" | "low";
 
 interface ExtractedDataViewProps {
   documentId: string;
@@ -23,7 +32,50 @@ interface EditableFieldProps {
   value: string | number | null | undefined;
   field: string;
   type?: "text" | "number" | "date";
+  confidence?: ConfidenceLevel;
   onSave: (field: string, value: string | number | null) => Promise<void>;
+}
+
+// Confidence indicator component
+function ConfidenceIndicator({ confidence }: { confidence?: ConfidenceLevel }) {
+  if (!confidence) return null;
+
+  const config = {
+    high: {
+      icon: <CheckCircle className="h-3.5 w-3.5" />,
+      color: "text-green-500",
+      label: "High confidence",
+      description: "This value was clearly identified",
+    },
+    medium: {
+      icon: <HelpCircle className="h-3.5 w-3.5" />,
+      color: "text-yellow-500",
+      label: "Medium confidence",
+      description: "This value may need verification",
+    },
+    low: {
+      icon: <AlertCircle className="h-3.5 w-3.5" />,
+      color: "text-red-500",
+      label: "Low confidence",
+      description: "This value requires review",
+    },
+  };
+
+  const { icon, color, label, description } = config[confidence];
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className={cn("cursor-help", color)}>{icon}</span>
+        </TooltipTrigger>
+        <TooltipContent side="top">
+          <p className="font-medium">{label}</p>
+          <p className="text-xs text-muted-foreground">{description}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
 }
 
 function EditableField({
@@ -31,6 +83,7 @@ function EditableField({
   value,
   field,
   type = "text",
+  confidence,
   onSave,
 }: EditableFieldProps) {
   const [isEditing, setIsEditing] = useState(false);
@@ -93,15 +146,28 @@ function EditableField({
     );
   }
 
+  // Determine border color based on confidence
+  const borderClass = confidence === "low"
+    ? "border-l-2 border-l-red-400 pl-2"
+    : confidence === "medium"
+    ? "border-l-2 border-l-yellow-400 pl-2"
+    : "";
+
   return (
     <div
-      className="group cursor-pointer hover:bg-muted/50 rounded p-2 -m-2"
+      className={cn(
+        "group cursor-pointer hover:bg-muted/50 rounded p-2 -m-2",
+        borderClass
+      )}
       onClick={() => setIsEditing(true)}
     >
       <div className="flex items-start justify-between">
-        <div>
-          <label className="text-xs text-muted-foreground">{label}</label>
-          <p className="text-sm font-medium">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5">
+            <label className="text-xs text-muted-foreground">{label}</label>
+            <ConfidenceIndicator confidence={confidence} />
+          </div>
+          <p className="text-sm font-medium truncate">
             {value !== null && value !== undefined ? (
               String(value)
             ) : (
@@ -109,7 +175,7 @@ function EditableField({
             )}
           </p>
         </div>
-        <Edit2 className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity mt-1" />
+        <Edit2 className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity mt-1 shrink-0" />
       </div>
     </div>
   );
@@ -123,6 +189,13 @@ export function ExtractedDataView({
 }: ExtractedDataViewProps) {
   const [isPending, startTransition] = useTransition();
   const data = extractedData as Record<string, unknown>;
+  const fieldConfidence = (data.fieldConfidence as Record<string, ConfidenceLevel>) || {};
+  const overallConfidence = data.overallConfidence as ConfidenceLevel | undefined;
+
+  // Helper to get confidence for a field
+  const getConfidence = (field: string): ConfidenceLevel | undefined => {
+    return fieldConfidence[field];
+  };
 
   const handleSave = async (field: string, value: string | number | null) => {
     startTransition(async () => {
@@ -142,6 +215,15 @@ export function ExtractedDataView({
     other: "Other",
   }[documentType || "other"];
 
+  // Count confidence levels
+  const confidenceCounts = Object.values(fieldConfidence).reduce(
+    (acc, conf) => {
+      acc[conf] = (acc[conf] || 0) + 1;
+      return acc;
+    },
+    {} as Record<string, number>
+  );
+
   return (
     <div className={isPending ? "opacity-70" : ""}>
       <Tabs defaultValue="structured" className="h-full">
@@ -151,10 +233,32 @@ export function ExtractedDataView({
         </TabsList>
 
         <TabsContent value="structured" className="space-y-4">
-          {/* Document Type Badge */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Document Type:</span>
-            <Badge variant="outline">{documentTypeLabel}</Badge>
+          {/* Document Type Badge with Confidence Summary */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Document Type:</span>
+              <Badge variant="outline">{documentTypeLabel}</Badge>
+            </div>
+            {Object.keys(fieldConfidence).length > 0 && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground border-l pl-3">
+                <span>Extraction Quality:</span>
+                {confidenceCounts.high && (
+                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800">
+                    {confidenceCounts.high} high
+                  </Badge>
+                )}
+                {confidenceCounts.medium && (
+                  <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-800">
+                    {confidenceCounts.medium} needs review
+                  </Badge>
+                )}
+                {confidenceCounts.low && (
+                  <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800">
+                    {confidenceCounts.low} low
+                  </Badge>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Invoice Fields */}
@@ -168,12 +272,14 @@ export function ExtractedDataView({
                   label="Invoice Number"
                   value={data.invoiceNumber as string}
                   field="invoiceNumber"
+                  confidence={getConfidence("invoiceNumber")}
                   onSave={handleSave}
                 />
                 <EditableField
                   label="Vendor Name"
                   value={data.vendorName as string}
                   field="vendorName"
+                  confidence={getConfidence("vendorName")}
                   onSave={handleSave}
                 />
                 <EditableField
@@ -181,6 +287,7 @@ export function ExtractedDataView({
                   value={data.invoiceDate as string}
                   field="invoiceDate"
                   type="date"
+                  confidence={getConfidence("invoiceDate")}
                   onSave={handleSave}
                 />
                 <EditableField
@@ -188,6 +295,7 @@ export function ExtractedDataView({
                   value={data.dueDate as string}
                   field="dueDate"
                   type="date"
+                  confidence={getConfidence("dueDate")}
                   onSave={handleSave}
                 />
                 <EditableField
@@ -195,12 +303,14 @@ export function ExtractedDataView({
                   value={data.totalAmount as number}
                   field="totalAmount"
                   type="number"
+                  confidence={getConfidence("totalAmount")}
                   onSave={handleSave}
                 />
                 <EditableField
                   label="Currency"
                   value={data.currency as string}
                   field="currency"
+                  confidence={getConfidence("currency")}
                   onSave={handleSave}
                 />
               </CardContent>
@@ -218,6 +328,7 @@ export function ExtractedDataView({
                   label="Merchant Name"
                   value={data.merchantName as string}
                   field="merchantName"
+                  confidence={getConfidence("merchantName")}
                   onSave={handleSave}
                 />
                 <EditableField
@@ -225,6 +336,7 @@ export function ExtractedDataView({
                   value={data.transactionDate as string}
                   field="transactionDate"
                   type="date"
+                  confidence={getConfidence("transactionDate")}
                   onSave={handleSave}
                 />
                 <EditableField
@@ -232,6 +344,7 @@ export function ExtractedDataView({
                   value={data.subtotal as number}
                   field="subtotal"
                   type="number"
+                  confidence={getConfidence("subtotal")}
                   onSave={handleSave}
                 />
                 <EditableField
@@ -239,6 +352,7 @@ export function ExtractedDataView({
                   value={data.tax as number}
                   field="tax"
                   type="number"
+                  confidence={getConfidence("tax")}
                   onSave={handleSave}
                 />
                 <EditableField
@@ -246,12 +360,14 @@ export function ExtractedDataView({
                   value={data.total as number}
                   field="total"
                   type="number"
+                  confidence={getConfidence("total")}
                   onSave={handleSave}
                 />
                 <EditableField
                   label="Payment Method"
                   value={data.paymentMethod as string}
                   field="paymentMethod"
+                  confidence={getConfidence("paymentMethod")}
                   onSave={handleSave}
                 />
               </CardContent>
@@ -269,12 +385,14 @@ export function ExtractedDataView({
                   label="Party A"
                   value={data.partyA as string}
                   field="partyA"
+                  confidence={getConfidence("partyA")}
                   onSave={handleSave}
                 />
                 <EditableField
                   label="Party B"
                   value={data.partyB as string}
                   field="partyB"
+                  confidence={getConfidence("partyB")}
                   onSave={handleSave}
                 />
                 <EditableField
@@ -282,6 +400,7 @@ export function ExtractedDataView({
                   value={data.effectiveDate as string}
                   field="effectiveDate"
                   type="date"
+                  confidence={getConfidence("effectiveDate")}
                   onSave={handleSave}
                 />
                 <EditableField
@@ -289,6 +408,7 @@ export function ExtractedDataView({
                   value={data.expirationDate as string}
                   field="expirationDate"
                   type="date"
+                  confidence={getConfidence("expirationDate")}
                   onSave={handleSave}
                 />
                 <EditableField
@@ -296,6 +416,7 @@ export function ExtractedDataView({
                   value={data.contractValue as number}
                   field="contractValue"
                   type="number"
+                  confidence={getConfidence("contractValue")}
                   onSave={handleSave}
                 />
               </CardContent>

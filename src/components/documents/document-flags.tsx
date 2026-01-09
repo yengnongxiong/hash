@@ -12,16 +12,18 @@ import {
   FileQuestion,
   Flag,
   Loader2,
+  CheckCheck,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "@/lib/utils/format";
-import { resolveDocumentFlag } from "@/lib/ocr/detect-flags";
+import { resolveDocumentFlag, resolveAllDocumentFlags } from "@/lib/ocr/detect-flags";
 import { toast } from "sonner";
 
 interface DocumentFlag {
   id: string;
+  document_id: string;
   flag_type: string;
   severity: string;
   message: string;
@@ -65,6 +67,7 @@ const severityStyles: Record<string, { bg: string; text: string; icon: React.Rea
 
 export function DocumentFlags({ flags, onFlagResolved }: DocumentFlagsProps) {
   const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const [isResolvingAll, setIsResolvingAll] = useState(false);
 
   const unresolvedFlags = flags.filter((f) => !f.resolved);
   const resolvedFlags = flags.filter((f) => f.resolved);
@@ -83,6 +86,36 @@ export function DocumentFlags({ flags, onFlagResolved }: DocumentFlagsProps) {
       toast.error("Failed to resolve flag");
     } finally {
       setResolvingId(null);
+    }
+  };
+
+  const handleResolveAll = async () => {
+    if (unresolvedFlags.length === 0) return;
+
+    setIsResolvingAll(true);
+    try {
+      const documentId = unresolvedFlags[0]?.document_id;
+      if (!documentId) {
+        // Fallback: resolve each flag individually
+        for (const flag of unresolvedFlags) {
+          await resolveDocumentFlag(flag.id);
+        }
+        toast.success(`${unresolvedFlags.length} flags resolved`);
+        onFlagResolved?.();
+        return;
+      }
+
+      const result = await resolveAllDocumentFlags(documentId);
+      if (result.success) {
+        toast.success(`${result.count} flags resolved`);
+        onFlagResolved?.();
+      } else {
+        toast.error(result.error || "Failed to resolve flags");
+      }
+    } catch {
+      toast.error("Failed to resolve flags");
+    } finally {
+      setIsResolvingAll(false);
     }
   };
 
@@ -108,15 +141,33 @@ export function DocumentFlags({ flags, onFlagResolved }: DocumentFlagsProps) {
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-medium flex items-center gap-2">
-          <Flag className="h-4 w-4" />
-          Document Flags
-          {unresolvedFlags.length > 0 && (
-            <Badge variant="destructive" className="ml-2">
-              {unresolvedFlags.length} unresolved
-            </Badge>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <Flag className="h-4 w-4" />
+            Document Flags
+            {unresolvedFlags.length > 0 && (
+              <Badge variant="destructive" className="ml-2">
+                {unresolvedFlags.length} unresolved
+              </Badge>
+            )}
+          </CardTitle>
+          {unresolvedFlags.length > 1 && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleResolveAll}
+              disabled={isResolvingAll}
+              className="h-7 text-xs"
+            >
+              {isResolvingAll ? (
+                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+              ) : (
+                <CheckCheck className="h-3 w-3 mr-1" />
+              )}
+              Resolve All
+            </Button>
           )}
-        </CardTitle>
+        </div>
       </CardHeader>
       <CardContent className="space-y-3">
         {unresolvedFlags.map((flag) => {
