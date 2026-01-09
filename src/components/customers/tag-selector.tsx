@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { PersonTag } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,8 +9,9 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { ChevronDown, X } from "lucide-react";
+import { ChevronDown, X, Search } from "lucide-react";
 
 interface TagSelectorProps {
   personTags: PersonTag[];
@@ -28,6 +29,21 @@ export function TagSelector({
   disabled = false,
 }: TagSelectorProps) {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const filteredTags = useMemo(() => {
+    if (!search.trim()) return personTags;
+    return personTags.filter((tag) =>
+      tag.name.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [personTags, search]);
+
+  const handleOpenChange = (isOpen: boolean) => {
+    setOpen(isOpen);
+    if (!isOpen) {
+      setSearch(""); // Clear search when closing
+    }
+  };
 
   const handleToggleTag = (tagName: string) => {
     if (selectedTags.includes(tagName)) {
@@ -47,7 +63,7 @@ export function TagSelector({
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -99,22 +115,43 @@ export function TagSelector({
             No tags available. Create tags using the Tags button.
           </div>
         ) : (
-          <div className="max-h-[250px] overflow-y-auto p-2 space-y-1">
-            {personTags.map((tag) => (
-              <div
-                key={tag.id}
-                className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent cursor-pointer min-w-0"
-                onClick={() => handleToggleTag(tag.name)}
-              >
-                <Checkbox
-                  checked={selectedTags.includes(tag.name)}
-                  onCheckedChange={() => handleToggleTag(tag.name)}
-                  className="shrink-0"
+          <div className="flex flex-col">
+            {/* Search input */}
+            <div className="p-2 border-b">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search tags..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-8 h-8"
                 />
-                <div className={cn("w-3 h-3 rounded-full shrink-0", tag.color)} />
-                <span className="text-sm flex-1 w-0 truncate">{tag.name}</span>
               </div>
-            ))}
+            </div>
+            {/* Tags list */}
+            <div className="max-h-[200px] overflow-y-auto p-2 space-y-1">
+              {filteredTags.length === 0 ? (
+                <div className="py-2 text-sm text-muted-foreground text-center">
+                  No tags found
+                </div>
+              ) : (
+                filteredTags.map((tag) => (
+                  <div
+                    key={tag.id}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent cursor-pointer min-w-0"
+                    onClick={() => handleToggleTag(tag.name)}
+                  >
+                    <Checkbox
+                      checked={selectedTags.includes(tag.name)}
+                      onCheckedChange={() => handleToggleTag(tag.name)}
+                      className="shrink-0"
+                    />
+                    <div className={cn("w-3 h-3 rounded-full shrink-0", tag.color)} />
+                    <span className="text-sm flex-1 w-0 truncate">{tag.name}</span>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         )}
       </PopoverContent>
