@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { PersonTag } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,6 +30,19 @@ export function TagSelector({
 }: TagSelectorProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Handle wheel events manually to ensure scrolling works inside dialogs
+  const handleWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+    const container = scrollRef.current;
+    if (!container) return;
+
+    // Scroll the container
+    container.scrollTop += e.deltaY;
+
+    // Prevent the event from bubbling up to parent (Dialog)
+    e.stopPropagation();
+  }, []);
 
   const filteredTags = useMemo(() => {
     if (!search.trim()) return personTags;
@@ -129,7 +142,11 @@ export function TagSelector({
               </div>
             </div>
             {/* Tags list - scrollable */}
-            <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-1 overscroll-contain scrollbar-thin">
+            <div
+              ref={scrollRef}
+              className="flex-1 min-h-0 overflow-y-auto p-2 space-y-1 overscroll-contain scrollbar-thin"
+              onWheel={handleWheel}
+            >
               {filteredTags.length === 0 ? (
                 <div className="py-2 text-sm text-muted-foreground text-center">
                   No tags found
