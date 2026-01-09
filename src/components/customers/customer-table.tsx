@@ -28,11 +28,10 @@ export function CustomerTable({ initialData, personTags }: CustomerTableProps) {
 
   const columns = useMemo(() => createCustomerColumns(personTags), [personTags]);
 
-  // Default column visibility: show ID, Name, Company, Email, Phone, Created, Updated
-  // Hide: Address, Tags, Notes
+  // Default column visibility: show ID, Name, Company, Email, Phone, Tags, Created, Updated
+  // Hide: Address, Notes
   const defaultColumnVisibility = {
     address: false,
-    tags: false,
     notes: false,
   };
 

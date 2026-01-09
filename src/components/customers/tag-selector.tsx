@@ -56,12 +56,12 @@ export function TagSelector({
           disabled={disabled}
           className="w-full justify-between h-auto min-h-10 py-2"
         >
-          <div className="flex flex-wrap gap-1 flex-1">
+          <div className="flex flex-wrap gap-1 flex-1 min-w-0 overflow-hidden">
             {selectedTags.length > 0 ? (
               selectedTags.map((tagName) => (
                 <span
                   key={tagName}
-                  className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-white"
+                  className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-white max-w-[150px]"
                   style={{
                     backgroundColor: `var(--tag-color)`,
                   }}
@@ -69,7 +69,7 @@ export function TagSelector({
                   <span
                     className={cn("w-2 h-2 rounded-full shrink-0", getTagColor(tagName))}
                   />
-                  <span className="text-foreground">{tagName}</span>
+                  <span className="text-foreground truncate">{tagName}</span>
                   <span
                     role="button"
                     tabIndex={0}
@@ -80,7 +80,7 @@ export function TagSelector({
                         handleRemoveTag(e as unknown as React.MouseEvent, tagName);
                       }
                     }}
-                    className="text-muted-foreground hover:text-foreground ml-0.5 cursor-pointer"
+                    className="text-muted-foreground hover:text-foreground ml-0.5 cursor-pointer shrink-0"
                   >
                     <X className="h-3 w-3" />
                   </span>
@@ -103,15 +103,16 @@ export function TagSelector({
             {personTags.map((tag) => (
               <div
                 key={tag.id}
-                className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent cursor-pointer"
+                className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent cursor-pointer min-w-0"
                 onClick={() => handleToggleTag(tag.name)}
               >
                 <Checkbox
                   checked={selectedTags.includes(tag.name)}
                   onCheckedChange={() => handleToggleTag(tag.name)}
+                  className="shrink-0"
                 />
                 <div className={cn("w-3 h-3 rounded-full shrink-0", tag.color)} />
-                <span className="text-sm flex-1">{tag.name}</span>
+                <span className="text-sm flex-1 w-0 truncate">{tag.name}</span>
               </div>
             ))}
           </div>
@@ -147,12 +148,12 @@ export function ColoredTagsDisplay({
   }
 
   return (
-    <div className="flex flex-wrap gap-1">
+    <div className="flex flex-wrap gap-1 overflow-hidden">
       {displayTags.map((tagName, index) => (
         <span
           key={`${tagName}-${index}`}
           className={cn(
-            "inline-flex items-center gap-1 rounded-full font-medium",
+            "inline-flex items-center gap-1 rounded-full font-medium max-w-[120px]",
             size === "sm" ? "px-1.5 py-0 text-[10px]" : "px-2 py-0.5 text-xs"
           )}
         >
@@ -163,12 +164,12 @@ export function ColoredTagsDisplay({
               size === "sm" ? "w-1.5 h-1.5" : "w-2 h-2"
             )}
           />
-          <span className="text-foreground">{tagName}</span>
+          <span className="text-foreground truncate">{tagName}</span>
         </span>
       ))}
       {remainingCount > 0 && (
         <span className={cn(
-          "text-muted-foreground",
+          "text-muted-foreground shrink-0",
           size === "sm" ? "text-[10px]" : "text-xs"
         )}>
           +{remainingCount}

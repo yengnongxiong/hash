@@ -118,18 +118,18 @@ export function PersonTagsDialog({ personTags }: PersonTagsDialogProps) {
                 {personTags.map((tag) => (
                   <div
                     key={tag.id}
-                    className="flex items-center justify-between p-3 border rounded-lg"
+                    className="flex items-center justify-between p-3 border rounded-lg gap-2"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className={cn("w-4 h-4 rounded-full", tag.color)} />
-                      <span className="font-medium">{tag.name}</span>
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className={cn("w-4 h-4 rounded-full shrink-0", tag.color)} />
+                      <span className="font-medium truncate flex-1 w-0">{tag.name}</span>
                     </div>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
