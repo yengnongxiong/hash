@@ -6,7 +6,17 @@ import { revalidatePath } from "next/cache";
 export async function createWhiteboardTask(
   organizationId: string,
   title: string,
-  status: "todo" | "in_progress" | "done" = "todo"
+  status: "todo" | "in_progress" | "done" = "todo",
+  options?: {
+    description?: string | null;
+    priority?: "low" | "medium" | "high" | "urgent";
+    due_date?: string | null;
+    color?: string;
+    assigned_to?: string | null;
+    labels?: string[];
+    position_x?: number;
+    position_y?: number;
+  }
 ) {
   const supabase = await createClient();
 
@@ -25,8 +35,14 @@ export async function createWhiteboardTask(
       title,
       status,
       created_by: user.id,
-      priority: "medium",
-      labels: [],
+      priority: options?.priority || "medium",
+      description: options?.description || null,
+      due_date: options?.due_date || null,
+      color: options?.color || "#ffffff",
+      assigned_to: options?.assigned_to || null,
+      labels: options?.labels || [],
+      position_x: options?.position_x,
+      position_y: options?.position_y,
     })
     .select()
     .single();
@@ -40,17 +56,56 @@ export async function createWhiteboardTask(
 
 export async function updateWhiteboardTaskStatus(
   taskId: string,
-  status: "todo" | "in_progress" | "done"
+  status: "todo" | "in_progress" | "done",
+  position?: number
 ) {
   const supabase = await createClient();
 
+  const updateData: {
+    status: "todo" | "in_progress" | "done";
+    updated_at: string;
+    position?: number
+  } = {
+    status,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (position !== undefined) {
+    updateData.position = position;
+  }
+
   const { error } = await supabase
     .from("whiteboard_tasks")
-    .update({
-      status,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updateData)
     .eq("id", taskId);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  return { success: true };
+}
+
+// Reorder tasks within a column or move to a new column with position
+export async function reorderWhiteboardTasks(
+  updates: { id: string; status: "todo" | "in_progress" | "done"; position: number }[]
+) {
+  const supabase = await createClient();
+
+  // Update each task's position
+  const promises = updates.map(({ id, status, position }) =>
+    supabase
+      .from("whiteboard_tasks")
+      .update({
+        status,
+        position,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+  );
+
+  const results = await Promise.all(promises);
+  const error = results.find((r) => r.error)?.error;
 
   if (error) {
     return { error: error.message };
@@ -70,6 +125,8 @@ export async function updateWhiteboardTask(
     due_date?: string | null;
     assigned_to?: string | null;
     labels?: string[];
+    position_x?: number;
+    position_y?: number;
   }
 ) {
   const supabase = await createClient();

@@ -3,19 +3,21 @@
 import { useState, useEffect, useTransition, useRef, useCallback } from "react";
 import { WhiteboardTask, User } from "@/types/database";
 import { WhiteboardColumn } from "./whiteboard-column";
-import { WhiteboardGallery } from "./whiteboard-gallery";
+import { WhiteboardCanvas } from "./whiteboard-canvas";
 import { TaskDetailDialog } from "./task-detail-dialog";
+import { CreateTaskDialog } from "./create-task-dialog";
 import { createClient } from "@/lib/supabase/client";
 import {
-  createWhiteboardTask,
   updateWhiteboardTaskStatus,
   deleteWhiteboardTask,
+  reorderWhiteboardTasks,
 } from "@/app/(dashboard)/whiteboard/actions";
 import { toast } from "sonner";
 import { DragDropContext, DropResult } from "@hello-pangea/dnd";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Kanban, LayoutGrid, Search } from "lucide-react";
+import { Kanban, LayoutGrid, Search, Plus } from "lucide-react";
 
 interface WhiteboardProps {
   initialTasks: WhiteboardTask[];
@@ -34,9 +36,10 @@ type ColumnId = (typeof columns)[number]["id"];
 export function Whiteboard({ initialTasks, organizationId, teamMembers = [] }: WhiteboardProps) {
   const [tasks, setTasks] = useState<WhiteboardTask[]>(initialTasks);
   const [isPending, startTransition] = useTransition();
-  const [view, setView] = useState<"kanban" | "gallery">("kanban");
+  const [view, setView] = useState<"kanban" | "board">("kanban");
   const [selectedTask, setSelectedTask] = useState<WhiteboardTask | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   // Cursor glow effect
@@ -67,7 +70,18 @@ export function Whiteboard({ initialTasks, organizationId, teamMembers = [] }: W
   // Handle task click
   const handleTaskClick = (task: WhiteboardTask) => {
     setSelectedTask(task);
-    setIsDialogOpen(true);
+    setIsDetailDialogOpen(true);
+  };
+
+  // Handle task created from dialog
+  const handleTaskCreated = (task: WhiteboardTask) => {
+    // Optimistic update - realtime will also sync
+    setTasks((prev) => {
+      if (prev.find((t) => t.id === task.id)) {
+        return prev;
+      }
+      return [...prev, task];
+    });
   };
 
   // Handle task update from dialog
@@ -122,18 +136,6 @@ export function Whiteboard({ initialTasks, organizationId, teamMembers = [] }: W
     };
   }, []);
 
-  const handleAddTask = async (title: string, columnId: ColumnId) => {
-    startTransition(async () => {
-      const result = await createWhiteboardTask(organizationId, title, columnId);
-      if (result.error) {
-        toast.error("Failed to create task", { description: result.error });
-      } else if (result.task) {
-        // Optimistic update already handled by realtime
-        toast.success("Task created");
-      }
-    });
-  };
-
   const handleDeleteTask = async (taskId: string) => {
     // Optimistic delete
     setTasks((prev) => prev.filter((t) => t.id !== taskId));
@@ -158,25 +160,111 @@ export function Whiteboard({ initialTasks, organizationId, teamMembers = [] }: W
       return;
     }
 
-    const newStatus = destination.droppableId as ColumnId;
+    const sourceStatus = source.droppableId as ColumnId;
+    const destStatus = destination.droppableId as ColumnId;
+    const columnTitle = columns.find(c => c.id === destStatus)?.title || destStatus;
 
-    // Optimistic update
-    setTasks((prev) =>
-      prev.map((t) => (t.id === draggableId ? { ...t, status: newStatus } : t))
-    );
+    // Get current tasks in source and destination columns (sorted by position)
+    const sourceTasks = tasks
+      .filter((t) => t.status === sourceStatus)
+      .sort((a, b) => ((a as any).position || 0) - ((b as any).position || 0));
+
+    const destTasks = sourceStatus === destStatus
+      ? sourceTasks
+      : tasks
+          .filter((t) => t.status === destStatus)
+          .sort((a, b) => ((a as any).position || 0) - ((b as any).position || 0));
+
+    // Find the dragged task
+    const draggedTask = tasks.find((t) => t.id === draggableId);
+    if (!draggedTask) return;
+
+    // Calculate new positions
+    const updates: { id: string; status: "todo" | "in_progress" | "done"; position: number }[] = [];
+
+    if (sourceStatus === destStatus) {
+      // Reordering within the same column
+      const reorderedTasks = [...sourceTasks];
+      const [removed] = reorderedTasks.splice(source.index, 1);
+      reorderedTasks.splice(destination.index, 0, removed);
+
+      // Update positions for all tasks in this column
+      reorderedTasks.forEach((task, index) => {
+        updates.push({ id: task.id, status: destStatus, position: index });
+      });
+
+      // Optimistic update
+      setTasks((prev) => {
+        const newTasks = [...prev];
+        reorderedTasks.forEach((task, index) => {
+          const taskIndex = newTasks.findIndex((t) => t.id === task.id);
+          if (taskIndex !== -1) {
+            (newTasks[taskIndex] as any).position = index;
+          }
+        });
+        return newTasks;
+      });
+    } else {
+      // Moving to a different column
+      // Remove from source
+      const newSourceTasks = sourceTasks.filter((t) => t.id !== draggableId);
+      newSourceTasks.forEach((task, index) => {
+        updates.push({ id: task.id, status: sourceStatus, position: index });
+      });
+
+      // Add to destination at the correct position
+      const newDestTasks = [...destTasks];
+      newDestTasks.splice(destination.index, 0, draggedTask);
+      newDestTasks.forEach((task, index) => {
+        updates.push({ id: task.id, status: destStatus, position: index });
+      });
+
+      // Optimistic update
+      setTasks((prev) => {
+        const newTasks = prev.map((t) => {
+          if (t.id === draggableId) {
+            return { ...t, status: destStatus, position: destination.index } as any;
+          }
+          // Update positions for source column
+          const sourceTask = newSourceTasks.find((st) => st.id === t.id);
+          if (sourceTask) {
+            const idx = newSourceTasks.indexOf(sourceTask);
+            return { ...t, position: idx } as any;
+          }
+          // Update positions for dest column (excluding dragged)
+          const destTask = destTasks.find((dt) => dt.id === t.id);
+          if (destTask) {
+            const idx = newDestTasks.indexOf(destTask);
+            return { ...t, position: idx } as any;
+          }
+          return t;
+        });
+        return newTasks;
+      });
+    }
 
     startTransition(async () => {
-      const result = await updateWhiteboardTaskStatus(draggableId, newStatus);
+      const result = await reorderWhiteboardTasks(updates);
       if (result.error) {
-        toast.error("Failed to move task", { description: result.error });
+        toast.error("Failed to reorder tasks", { description: result.error });
+      } else if (sourceStatus !== destStatus) {
+        toast.success(`Task moved to ${columnTitle}`);
       }
     });
   };
 
   const getTasksByColumn = (columnId: ColumnId) =>
-    filteredTasks.filter((t) => t.status === columnId);
+    filteredTasks
+      .filter((t) => t.status === columnId)
+      .sort((a, b) => ((a as any).position || 0) - ((b as any).position || 0));
 
   const handleMoveTask = async (taskId: string, newStatus: ColumnId) => {
+    // Check if status actually changed
+    const task = tasks.find(t => t.id === taskId);
+    if (task && task.status === newStatus) {
+      return; // No change needed
+    }
+
     // Optimistic update
     setTasks((prev) =>
       prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t))
@@ -186,6 +274,12 @@ export function Whiteboard({ initialTasks, organizationId, teamMembers = [] }: W
       const result = await updateWhiteboardTaskStatus(taskId, newStatus);
       if (result.error) {
         toast.error("Failed to move task", { description: result.error });
+        // Revert optimistic update on error
+        if (task) {
+          setTasks((prev) =>
+            prev.map((t) => (t.id === taskId ? { ...t, status: task.status } : t))
+          );
+        }
       }
     });
   };
@@ -205,19 +299,25 @@ export function Whiteboard({ initialTasks, organizationId, teamMembers = [] }: W
           />
         </div>
 
-        {/* View Toggle */}
-        <Tabs value={view} onValueChange={(v) => setView(v as "kanban" | "gallery")}>
-          <TabsList>
-            <TabsTrigger value="kanban" className="gap-1.5">
-              <Kanban className="h-4 w-4" />
-              <span className="hidden sm:inline">Kanban</span>
-            </TabsTrigger>
-            <TabsTrigger value="gallery" className="gap-1.5">
-              <LayoutGrid className="h-4 w-4" />
-              <span className="hidden sm:inline">Board</span>
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+        {/* View Toggle and Add Task Button */}
+        <div className="flex items-center gap-2">
+          <Tabs value={view} onValueChange={(v) => setView(v as "kanban" | "board")}>
+            <TabsList>
+              <TabsTrigger value="kanban" className="gap-1.5">
+                <Kanban className="h-4 w-4" />
+                <span className="hidden sm:inline">Kanban</span>
+              </TabsTrigger>
+              <TabsTrigger value="board" className="gap-1.5">
+                <LayoutGrid className="h-4 w-4" />
+                <span className="hidden sm:inline">Board</span>
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <Button onClick={() => setIsCreateDialogOpen(true)} className="gap-1.5">
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">Add Task</span>
+          </Button>
+        </div>
       </div>
 
       {/* Board with cursor glow effect */}
@@ -245,7 +345,6 @@ export function Whiteboard({ initialTasks, organizationId, teamMembers = [] }: W
                   id={column.id}
                   title={column.title}
                   tasks={getTasksByColumn(column.id)}
-                  onAddTask={(title) => handleAddTask(title, column.id)}
                   onDeleteTask={handleDeleteTask}
                   onTaskClick={handleTaskClick}
                 />
@@ -253,12 +352,12 @@ export function Whiteboard({ initialTasks, organizationId, teamMembers = [] }: W
             </div>
           </DragDropContext>
         ) : (
-          <WhiteboardGallery
+          <WhiteboardCanvas
             tasks={filteredTasks}
-            onAddTask={handleAddTask}
             onDeleteTask={handleDeleteTask}
-            onMoveTask={handleMoveTask}
+            onDragEnd={handleDragEnd}
             onTaskClick={handleTaskClick}
+            organizationId={organizationId}
             isPending={isPending}
             mousePos={mousePos}
           />
@@ -268,10 +367,19 @@ export function Whiteboard({ initialTasks, organizationId, teamMembers = [] }: W
       {/* Task Detail Dialog */}
       <TaskDetailDialog
         task={selectedTask}
-        open={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
+        open={isDetailDialogOpen}
+        onOpenChange={setIsDetailDialogOpen}
         onTaskUpdate={handleTaskUpdate}
         onTaskDelete={handleDeleteTask}
+        teamMembers={teamMembers}
+      />
+
+      {/* Create Task Dialog */}
+      <CreateTaskDialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+        onTaskCreated={handleTaskCreated}
+        organizationId={organizationId}
         teamMembers={teamMembers}
       />
     </div>
