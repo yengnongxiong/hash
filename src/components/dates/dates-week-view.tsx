@@ -18,7 +18,14 @@ import {
 } from "date-fns";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+
+const MAX_VISIBLE_EVENTS = 3;
 import {
   DragDropContext,
   Droppable,
@@ -79,6 +86,110 @@ export function DatesWeekView({
     });
     return map;
   }, [dates]);
+
+  // Calculate overlapping events layout for a day using proper time-based overlap detection
+  const getOverlapLayout = useCallback((dayDates: DateEntry[]) => {
+    const layout = new Map<string, { column: number; totalColumns: number; visible: boolean }>();
+    const overflowGroups = new Map<number, DateEntry[]>(); // For "+X more" groups (keyed by representative hour)
+
+    // Helper to get event end time (default 1 hour if not specified)
+    const getEndTime = (entry: DateEntry) => {
+      return entry.endDate || new Date(entry.date.getTime() + 60 * 60 * 1000);
+    };
+
+    // Check if two events overlap in time
+    const eventsOverlap = (a: DateEntry, b: DateEntry) => {
+      const aStart = a.date.getTime();
+      const aEnd = getEndTime(a).getTime();
+      const bStart = b.date.getTime();
+      const bEnd = getEndTime(b).getTime();
+      // Events overlap if one starts before the other ends
+      return aStart < bEnd && bStart < aEnd;
+    };
+
+    // Find all events that overlap with a given event
+    const findOverlappingEvents = (entry: DateEntry, allEntries: DateEntry[]) => {
+      return allEntries.filter(other => other.id !== entry.id && eventsOverlap(entry, other));
+    };
+
+    // Build overlap clusters using union-find approach
+    const clusters: DateEntry[][] = [];
+    const assignedToCluster = new Set<string>();
+
+    for (const entry of dayDates) {
+      if (assignedToCluster.has(entry.id)) continue;
+
+      // Start a new cluster with this entry
+      const cluster: DateEntry[] = [entry];
+      const toCheck = [entry];
+      assignedToCluster.add(entry.id);
+
+      // BFS to find all transitively overlapping events
+      while (toCheck.length > 0) {
+        const current = toCheck.pop()!;
+        const overlapping = findOverlappingEvents(current, dayDates);
+
+        for (const overlappingEntry of overlapping) {
+          if (!assignedToCluster.has(overlappingEntry.id)) {
+            cluster.push(overlappingEntry);
+            assignedToCluster.add(overlappingEntry.id);
+            toCheck.push(overlappingEntry);
+          }
+        }
+      }
+
+      // Sort cluster by start time
+      cluster.sort((a, b) => a.date.getTime() - b.date.getTime());
+      clusters.push(cluster);
+    }
+
+    // Assign columns within each cluster
+    for (const cluster of clusters) {
+      const hasOverflow = cluster.length > MAX_VISIBLE_EVENTS;
+      const maxVisible = hasOverflow ? MAX_VISIBLE_EVENTS - 1 : MAX_VISIBLE_EVENTS;
+
+      if (hasOverflow) {
+        // Use the earliest event's hour as the key for overflow group
+        const representativeHour = cluster[0].date.getHours();
+        overflowGroups.set(representativeHour, cluster);
+      }
+
+      // Assign columns using a greedy algorithm
+      // Track which columns are occupied at any given time
+      const columnEndTimes: number[] = [];
+
+      cluster.forEach((entry, index) => {
+        const isVisible = index < maxVisible;
+        const startTime = entry.date.getTime();
+
+        // Find the first available column
+        let column = -1;
+        for (let i = 0; i < columnEndTimes.length; i++) {
+          if (columnEndTimes[i] <= startTime) {
+            column = i;
+            break;
+          }
+        }
+
+        // If no column is free, add a new one
+        if (column === -1) {
+          column = columnEndTimes.length;
+          columnEndTimes.push(0);
+        }
+
+        // Update column end time
+        columnEndTimes[column] = getEndTime(entry).getTime();
+
+        layout.set(entry.id, {
+          column: Math.min(column, MAX_VISIBLE_EVENTS - 1), // Cap column to max
+          totalColumns: MAX_VISIBLE_EVENTS,
+          visible: isVisible
+        });
+      });
+    }
+
+    return { layout, overflowGroups };
+  }, []);
 
   // Calculate position and height for a date entry
   const getEntryStyle = (entry: DateEntry) => {
@@ -193,9 +304,11 @@ export function DatesWeekView({
                 {TIME_SLOTS.map((hour) => (
                   <div
                     key={hour}
-                    className="h-12 border-b text-xs text-muted-foreground pr-2 text-right -mt-2"
+                    className="h-12 border-b flex items-start justify-end"
                   >
-                    {format(setHours(new Date(), hour), "h a")}
+                    <span className="text-xs text-muted-foreground pr-2 -translate-y-2">
+                      {format(setHours(new Date(), hour), "h a")}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -242,66 +355,166 @@ export function DatesWeekView({
 
                         {/* Events */}
                         <div className="absolute inset-0 pointer-events-none">
-                          {dayDates.map((entry, index) => {
-                            const hour = entry.date.getHours();
-                            // Only show events within our time range
-                            if (hour < 6 || hour > 22) return null;
-
-                            const style = getEntryStyle(entry);
-                            const isCancelled = entry.status === "cancelled";
-                            const isCompleted = entry.status === "completed";
+                          {(() => {
+                            const { layout: overlapLayout, overflowGroups } = getOverlapLayout(dayDates);
+                            const renderedOverflowHours = new Set<number>();
 
                             return (
-                              <Draggable
-                                key={entry.id}
-                                draggableId={entry.id}
-                                index={index}
-                                isDragDisabled={!onDateMove}
-                              >
-                                {(dragProvided, dragSnapshot) => (
-                                  <div
-                                    ref={dragProvided.innerRef}
-                                    {...dragProvided.draggableProps}
-                                    {...dragProvided.dragHandleProps}
-                                    className={cn(
-                                      "absolute left-1 right-1 rounded px-1 py-0.5 text-left overflow-hidden pointer-events-auto transition-shadow cursor-grab",
-                                      isCancelled
-                                        ? "bg-muted opacity-60 line-through"
-                                        : isCompleted
-                                        ? "bg-green-500/20 border border-green-500/30"
-                                        : entry.color ||
-                                          "bg-primary/20 border border-primary/30",
-                                      dragSnapshot.isDragging &&
-                                        "shadow-lg cursor-grabbing ring-2 ring-primary"
-                                    )}
-                                    style={{
-                                      ...style,
-                                      ...dragProvided.draggableProps.style,
-                                      // Preserve top/height during drag
-                                      ...(dragSnapshot.isDragging
-                                        ? {}
-                                        : { top: style.top, height: style.height }),
-                                    }}
-                                    onClick={(e) => {
-                                      if (!dragSnapshot.isDragging) {
-                                        e.stopPropagation();
-                                        onDateClick?.(entry);
-                                      }
-                                    }}
-                                  >
-                                    <p className="text-xs font-medium truncate">
-                                      {entry.title}
-                                    </p>
-                                    <p className="text-[10px] text-muted-foreground truncate">
-                                      {format(entry.date, "h:mm a")}
-                                      {entry.entityName &&
-                                        ` • ${entry.entityName}`}
-                                    </p>
-                                  </div>
-                                )}
-                              </Draggable>
+                              <>
+                                {dayDates.map((entry, index) => {
+                                  const hour = entry.date.getHours();
+                                  // Only show events within our time range
+                                  if (hour < 6 || hour > 22) return null;
+
+                                  const layoutInfo = overlapLayout.get(entry.id) || { column: 0, totalColumns: 1, visible: true };
+
+                                  // Skip hidden events (they'll be in the popover)
+                                  if (!layoutInfo.visible) return null;
+
+                                  const style = getEntryStyle(entry);
+                                  const isCancelled = entry.status === "cancelled";
+                                  const isCompleted = entry.status === "completed";
+
+                                  // Get overlap layout for positioning
+                                  const widthPercent = 100 / layoutInfo.totalColumns;
+                                  const leftPercent = layoutInfo.column * widthPercent;
+
+                                  return (
+                                    <Draggable
+                                      key={entry.id}
+                                      draggableId={entry.id}
+                                      index={index}
+                                      isDragDisabled={!onDateMove}
+                                    >
+                                      {(dragProvided, dragSnapshot) => (
+                                        <div
+                                          ref={dragProvided.innerRef}
+                                          {...dragProvided.draggableProps}
+                                          {...dragProvided.dragHandleProps}
+                                          className={cn(
+                                            "absolute rounded px-1 py-0.5 text-left overflow-hidden pointer-events-auto transition-shadow cursor-grab",
+                                            isCancelled
+                                              ? "bg-muted opacity-60 line-through"
+                                              : isCompleted
+                                              ? "bg-green-500/20 border border-green-500/30"
+                                              : entry.color ||
+                                                "bg-primary/20 border border-primary/30",
+                                            dragSnapshot.isDragging &&
+                                              "shadow-lg cursor-grabbing ring-2 ring-primary"
+                                          )}
+                                          style={{
+                                            ...dragProvided.draggableProps.style,
+                                            // Position and size
+                                            ...(dragSnapshot.isDragging
+                                              ? {}
+                                              : {
+                                                  top: style.top,
+                                                  height: style.height,
+                                                  left: `calc(${leftPercent}% + 2px)`,
+                                                  width: `calc(${widthPercent}% - 4px)`,
+                                                }),
+                                          }}
+                                          onClick={(e) => {
+                                            if (!dragSnapshot.isDragging) {
+                                              e.stopPropagation();
+                                              onDateClick?.(entry);
+                                            }
+                                          }}
+                                        >
+                                          <p className="text-xs font-medium truncate">
+                                            {entry.title}
+                                          </p>
+                                          <p className="text-[10px] text-muted-foreground truncate">
+                                            {format(entry.date, "h:mm a")}
+                                            {entry.entityName &&
+                                              ` • ${entry.entityName}`}
+                                          </p>
+                                        </div>
+                                      )}
+                                    </Draggable>
+                                  );
+                                })}
+
+                                {/* "+X more" buttons for overflow groups - styled like date entries */}
+                                {Array.from(overflowGroups.entries()).map(([representativeHour, group]) => {
+                                  if (renderedOverflowHours.has(representativeHour)) return null;
+                                  renderedOverflowHours.add(representativeHour);
+
+                                  // Filter group to only include events within visible time range
+                                  const visibleGroup = group.filter(e => {
+                                    const h = e.date.getHours();
+                                    return h >= 6 && h <= 22;
+                                  });
+
+                                  // Skip if no visible events or not enough to overflow
+                                  if (visibleGroup.length <= MAX_VISIBLE_EVENTS) return null;
+
+                                  // We show MAX_VISIBLE_EVENTS - 1 events, rest go in the popover
+                                  const visibleCount = MAX_VISIBLE_EVENTS - 1;
+                                  const hiddenCount = visibleGroup.length - visibleCount;
+                                  const hiddenEntries = visibleGroup.slice(visibleCount); // Only the hidden ones
+
+                                  // Use the first visible event's actual time for positioning
+                                  const firstEvent = visibleGroup[0];
+                                  const firstEventHour = firstEvent.date.getHours();
+                                  const firstEventMinutes = firstEvent.date.getMinutes();
+                                  const startSlot = firstEventHour - 6;
+                                  const top = ((startSlot + firstEventMinutes / 60) * 100) / TIME_SLOTS.length;
+
+                                  // Position at the last column (after visible events)
+                                  const columnWidth = 100 / MAX_VISIBLE_EVENTS;
+                                  const leftPercent = visibleCount * columnWidth;
+
+                                  return (
+                                    <Popover key={`overflow-${representativeHour}`}>
+                                      <PopoverTrigger asChild>
+                                        <button
+                                          className="absolute rounded px-1 py-0.5 text-left overflow-hidden pointer-events-auto bg-muted/80 border border-border hover:bg-muted transition-colors"
+                                          style={{
+                                            top: `${Math.max(0, top)}%`,
+                                            height: `${Math.max(100 / TIME_SLOTS.length, 4)}%`,
+                                            left: `calc(${leftPercent}% + 2px)`,
+                                            width: `calc(${columnWidth}% - 4px)`,
+                                          }}
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          <p className="text-xs font-medium text-muted-foreground">
+                                            +{hiddenCount} more
+                                          </p>
+                                          <p className="text-[10px] text-muted-foreground/70">
+                                            {format(firstEvent.date, "h:mm a")}
+                                          </p>
+                                        </button>
+                                      </PopoverTrigger>
+                                      <PopoverContent className="w-72 p-3" align="end">
+                                        <p className="text-sm font-medium mb-3">
+                                          {hiddenCount} more events
+                                        </p>
+                                        <div className="space-y-1.5 max-h-[250px] overflow-y-auto">
+                                          {hiddenEntries.map((entry) => (
+                                            <button
+                                              key={entry.id}
+                                              className={cn(
+                                                "w-full text-left p-2.5 rounded-md text-sm hover:bg-muted transition-colors border",
+                                                entry.status === "cancelled" && "opacity-60 line-through"
+                                              )}
+                                              onClick={() => onDateClick?.(entry)}
+                                            >
+                                              <p className="font-medium truncate">{entry.title}</p>
+                                              <p className="text-xs text-muted-foreground truncate mt-0.5">
+                                                {format(entry.date, "h:mm a")}
+                                                {entry.entityName && ` • ${entry.entityName}`}
+                                              </p>
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </PopoverContent>
+                                    </Popover>
+                                  );
+                                })}
+                              </>
                             );
-                          })}
+                          })()}
                           {provided.placeholder}
                         </div>
                       </div>

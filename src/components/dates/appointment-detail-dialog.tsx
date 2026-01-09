@@ -50,6 +50,8 @@ import { updateAppointment, deleteAppointment, updateAppointmentNotes } from "@/
 import { formatDistanceToNow } from "@/lib/utils/format";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { Checkbox } from "@/components/ui/checkbox";
+import { OrganizationMember } from "@/components/dates/dates-view";
 
 interface AppointmentDetailDialogProps {
   appointment: AppointmentWithRelations | null;
@@ -57,6 +59,7 @@ interface AppointmentDetailDialogProps {
   onOpenChange: (open: boolean) => void;
   customers: Pick<Customer, "id" | "name" | "company" | "customer_number">[];
   appointmentTypes: AppointmentType[];
+  organizationMembers?: OrganizationMember[];
 }
 
 export function AppointmentDetailDialog({
@@ -65,6 +68,7 @@ export function AppointmentDetailDialog({
   onOpenChange,
   customers,
   appointmentTypes,
+  organizationMembers = [],
 }: AppointmentDetailDialogProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -72,9 +76,12 @@ export function AppointmentDetailDialog({
 
   // Form state
   const [title, setTitle] = useState("");
-  const [customerId, setCustomerId] = useState<string | null>(null);
+  const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
+  const [selectedAssigneeIds, setSelectedAssigneeIds] = useState<string[]>([]);
   const [peoplePopoverOpen, setPeoplePopoverOpen] = useState(false);
   const [peopleSearch, setPeopleSearch] = useState("");
+  const [assigneePopoverOpen, setAssigneePopoverOpen] = useState(false);
+  const [assigneeSearch, setAssigneeSearch] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [location, setLocation] = useState("");
@@ -95,16 +102,67 @@ export function AppointmentDetailDialog({
     );
   });
 
-  // Get selected customer
-  const selectedCustomer = customerId ? customers.find((c) => c.id === customerId) : null;
+  // Filter organization members based on search
+  const filteredAssignees = organizationMembers.filter((member) => {
+    if (!assigneeSearch) return true;
+    const searchLower = assigneeSearch.toLowerCase();
+    return (
+      member.name?.toLowerCase().includes(searchLower) ||
+      member.email.toLowerCase().includes(searchLower)
+    );
+  });
+
+  // Get selected customers and assignees
+  const selectedCustomers = customers.filter((c) => selectedCustomerIds.includes(c.id));
+  const selectedAssignees = organizationMembers.filter((m) => selectedAssigneeIds.includes(m.id));
+
+  // Toggle functions
+  const toggleCustomer = (customerId: string) => {
+    setSelectedCustomerIds((prev) =>
+      prev.includes(customerId)
+        ? prev.filter((id) => id !== customerId)
+        : [...prev, customerId]
+    );
+  };
+
+  const removeCustomer = (customerId: string) => {
+    setSelectedCustomerIds((prev) => prev.filter((id) => id !== customerId));
+  };
+
+  const toggleAssignee = (assigneeId: string) => {
+    setSelectedAssigneeIds((prev) =>
+      prev.includes(assigneeId)
+        ? prev.filter((id) => id !== assigneeId)
+        : [...prev, assigneeId]
+    );
+  };
+
+  const removeAssignee = (assigneeId: string) => {
+    setSelectedAssigneeIds((prev) => prev.filter((id) => id !== assigneeId));
+  };
+
+  // Helper to format date for datetime-local input (converts to local timezone)
+  const formatForDateTimeLocal = (isoString: string) => {
+    const date = new Date(isoString);
+    // Format as YYYY-MM-DDTHH:mm for datetime-local input
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
 
   // Reset form when appointment changes or dialog opens
   useEffect(() => {
     if (appointment) {
       setTitle(appointment.title);
-      setCustomerId(appointment.customer_id);
-      setStartTime(appointment.start_time.slice(0, 16));
-      setEndTime(appointment.end_time?.slice(0, 16) || "");
+      // Use customer_ids array if available, otherwise fall back to customer_id
+      const customerIds = appointment.customer_ids || (appointment.customer_id ? [appointment.customer_id] : []);
+      setSelectedCustomerIds(customerIds);
+      setSelectedAssigneeIds(appointment.assignee_ids || []);
+      setStartTime(formatForDateTimeLocal(appointment.start_time));
+      setEndTime(appointment.end_time ? formatForDateTimeLocal(appointment.end_time) : "");
       setLocation(appointment.location || "");
       setDescription(appointment.description || "");
       setStatus(appointment.status);
@@ -117,6 +175,8 @@ export function AppointmentDetailDialog({
       setIsEditingNotes(false);
       setPeopleSearch("");
       setPeoplePopoverOpen(false);
+      setAssigneeSearch("");
+      setAssigneePopoverOpen(false);
     }
   }, [appointment, open]);
 
@@ -126,7 +186,9 @@ export function AppointmentDetailDialog({
     startTransition(async () => {
       const result = await updateAppointment(appointment.id, {
         title,
-        customer_id: customerId,
+        customer_id: selectedCustomerIds.length > 0 ? selectedCustomerIds[0] : null,
+        customer_ids: selectedCustomerIds.length > 0 ? selectedCustomerIds : null,
+        assignee_ids: selectedAssigneeIds.length > 0 ? selectedAssigneeIds : null,
         start_time: startTime,
         end_time: endTime || null,
         location: location || null,
@@ -200,8 +262,8 @@ export function AppointmentDetailDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[550px] max-h-[90vh] flex flex-col">
-        <DialogHeader className="pr-20 shrink-0">
-          <DialogTitle className="flex items-center gap-2 min-w-0">
+        <DialogHeader className="shrink-0">
+          <DialogTitle className="flex items-center gap-2 min-w-0 pr-24">
             {isEditing ? (
               "Edit Date"
             ) : (
@@ -212,7 +274,7 @@ export function AppointmentDetailDialog({
                     appointment.appointment_types?.color || "border border-muted-foreground"
                   )}
                 />
-                <span className="truncate">{appointment.title}</span>
+                <span className="truncate block max-w-[calc(100%-2rem)]">{appointment.title}</span>
               </>
             )}
           </DialogTitle>
@@ -286,123 +348,201 @@ export function AppointmentDetailDialog({
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="edit-customer">Person</Label>
-              <Popover open={peoplePopoverOpen} onOpenChange={(open) => {
-                setPeoplePopoverOpen(open);
-                if (!open) setPeopleSearch("");
-              }}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    className="w-full justify-between font-normal"
-                  >
-                    {selectedCustomer ? (
-                      <span className="truncate">
-                        {selectedCustomer.name}
-                        {selectedCustomer.customer_number && (
-                          <span className="text-muted-foreground ml-2 font-mono text-xs">
-                            {selectedCustomer.customer_number}
-                          </span>
-                        )}
-                      </span>
-                    ) : (
-                      "Select a person"
-                    )}
-                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[280px] p-0" align="start">
-                  <div className="p-2 border-b">
-                    <div className="relative">
-                      <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        placeholder="Search people..."
-                        value={peopleSearch}
-                        onChange={(e) => setPeopleSearch(e.target.value)}
-                        className="pl-8 h-8"
-                      />
-                    </div>
-                  </div>
-                  <div className="max-h-[250px] overflow-y-auto p-1">
-                    {/* No person option */}
-                    <div
-                      className={cn(
-                        "flex items-center gap-2 p-2 hover:bg-muted rounded cursor-pointer",
-                        customerId === null && "bg-muted"
-                      )}
-                      onClick={() => {
-                        setCustomerId(null);
-                        setPeoplePopoverOpen(false);
-                        setPeopleSearch("");
-                      }}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>People</Label>
+                <Popover open={peoplePopoverOpen} onOpenChange={(open) => {
+                  setPeoplePopoverOpen(open);
+                  if (!open) setPeopleSearch("");
+                }}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className="w-full justify-between font-normal"
                     >
-                      <span className="text-sm text-muted-foreground">No person</span>
+                      {selectedCustomerIds.length === 0
+                        ? "Select people"
+                        : `${selectedCustomerIds.length} selected`}
+                      <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[280px] p-0" align="start">
+                    <div className="p-2 border-b">
+                      <div className="relative">
+                        <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          placeholder="Search people..."
+                          value={peopleSearch}
+                          onChange={(e) => setPeopleSearch(e.target.value)}
+                          className="pl-8 h-8"
+                        />
+                      </div>
                     </div>
-                    {filteredCustomers.length === 0 ? (
-                      <p className="p-2 text-sm text-muted-foreground text-center">
-                        {customers.length === 0 ? "No people found" : "No matches found"}
-                      </p>
-                    ) : (
-                      filteredCustomers.map((customer) => (
-                        <div
-                          key={customer.id}
-                          className={cn(
-                            "flex items-center gap-2 p-2 hover:bg-muted rounded cursor-pointer",
-                            customerId === customer.id && "bg-muted"
-                          )}
-                          onClick={() => {
-                            setCustomerId(customer.id);
-                            setPeoplePopoverOpen(false);
-                            setPeopleSearch("");
-                          }}
-                        >
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <p className="text-sm truncate">{customer.name}</p>
-                              {customer.customer_number && (
-                                <span className="text-xs text-muted-foreground font-mono">
-                                  {customer.customer_number}
-                                </span>
+                    <div className="max-h-[250px] overflow-y-auto p-1">
+                      {filteredCustomers.length === 0 ? (
+                        <p className="p-2 text-sm text-muted-foreground text-center">
+                          {customers.length === 0 ? "No people found" : "No matches found"}
+                        </p>
+                      ) : (
+                        filteredCustomers.map((customer) => (
+                          <div
+                            key={customer.id}
+                            className="flex items-center gap-2 p-2 hover:bg-muted rounded cursor-pointer"
+                            onClick={() => toggleCustomer(customer.id)}
+                          >
+                            <Checkbox
+                              checked={selectedCustomerIds.includes(customer.id)}
+                              onCheckedChange={() => toggleCustomer(customer.id)}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm truncate">{customer.name}</p>
+                                {customer.customer_number && (
+                                  <span className="text-xs text-muted-foreground font-mono">
+                                    {customer.customer_number}
+                                  </span>
+                                )}
+                              </div>
+                              {customer.company && (
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {customer.company}
+                                </p>
                               )}
                             </div>
-                            {customer.company && (
-                              <p className="text-xs text-muted-foreground truncate">
-                                {customer.company}
-                              </p>
-                            )}
                           </div>
-                        </div>
-                      ))
-                    )}
+                        ))
+                      )}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+                {selectedCustomers.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {selectedCustomers.map((customer) => (
+                      <Badge key={customer.id} variant="secondary" className="gap-1 max-w-full">
+                        <span className="truncate max-w-[80px]">{customer.name}</span>
+                        {customer.customer_number && (
+                          <span className="text-muted-foreground font-mono text-[10px] shrink-0">
+                            {customer.customer_number}
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => removeCustomer(customer.id)}
+                          className="ml-1 hover:text-destructive shrink-0"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
                   </div>
-                </PopoverContent>
-              </Popover>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Type</Label>
+                <Select
+                  value={appointmentTypeId || "none"}
+                  onValueChange={(v) => setAppointmentTypeId(v === "none" ? null : v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No type</SelectItem>
+                    {appointmentTypes.map((type) => (
+                      <SelectItem key={type.id} value={type.id}>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className={cn("w-2 h-2 rounded-full shrink-0", type.color)} />
+                          <span className="truncate">{type.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="edit-type">Type</Label>
-              <Select
-                value={appointmentTypeId || "none"}
-                onValueChange={(v) => setAppointmentTypeId(v === "none" ? null : v)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No type</SelectItem>
-                  {appointmentTypes.map((type) => (
-                    <SelectItem key={type.id} value={type.id}>
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className={cn("w-2 h-2 rounded-full shrink-0", type.color)} />
-                        <span className="truncate">{type.name}</span>
+            {/* Team Assignee field */}
+            {organizationMembers.length > 0 && (
+              <div className="space-y-2">
+                <Label>Team Assignee</Label>
+                <Popover open={assigneePopoverOpen} onOpenChange={(open) => {
+                  setAssigneePopoverOpen(open);
+                  if (!open) setAssigneeSearch("");
+                }}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className="w-full justify-between font-normal"
+                    >
+                      {selectedAssigneeIds.length === 0
+                        ? "Select team members"
+                        : `${selectedAssigneeIds.length} assigned`}
+                      <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[280px] p-0" align="start">
+                    <div className="p-2 border-b">
+                      <div className="relative">
+                        <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          placeholder="Search team members..."
+                          value={assigneeSearch}
+                          onChange={(e) => setAssigneeSearch(e.target.value)}
+                          className="pl-8 h-8"
+                        />
                       </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                    </div>
+                    <div className="max-h-[250px] overflow-y-auto p-1">
+                      {filteredAssignees.length === 0 ? (
+                        <p className="p-2 text-sm text-muted-foreground text-center">
+                          {organizationMembers.length === 0 ? "No team members found" : "No matches found"}
+                        </p>
+                      ) : (
+                        filteredAssignees.map((member) => (
+                          <div
+                            key={member.id}
+                            className="flex items-center gap-2 p-2 hover:bg-muted rounded cursor-pointer"
+                            onClick={() => toggleAssignee(member.id)}
+                          >
+                            <Checkbox
+                              checked={selectedAssigneeIds.includes(member.id)}
+                              onCheckedChange={() => toggleAssignee(member.id)}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm truncate">{member.name || member.email}</p>
+                              {member.name && (
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {member.email}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+                {selectedAssignees.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {selectedAssignees.map((member) => (
+                      <Badge key={member.id} variant="secondary" className="gap-1 max-w-full">
+                        <span className="truncate max-w-[100px]">{member.name || member.email}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeAssignee(member.id)}
+                          className="ml-1 hover:text-destructive shrink-0"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -491,17 +631,41 @@ export function AppointmentDetailDialog({
               </div>
             </div>
 
-            {/* Person */}
-            {appointment.customers && (
+            {/* People */}
+            {selectedCustomers.length > 0 && (
               <div className="flex items-start gap-3 overflow-hidden">
                 <User className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium truncate">{appointment.customers.name}</p>
-                  {appointment.customers.company && (
-                    <p className="text-sm text-muted-foreground truncate">
-                      {appointment.customers.company}
-                    </p>
-                  )}
+                  <p className="text-sm text-muted-foreground mb-1">People</p>
+                  <div className="flex flex-wrap gap-1">
+                    {selectedCustomers.map((customer) => (
+                      <Badge key={customer.id} variant="secondary" className="gap-1">
+                        <span className="truncate max-w-[100px]">{customer.name}</span>
+                        {customer.customer_number && (
+                          <span className="text-muted-foreground font-mono text-[10px]">
+                            {customer.customer_number}
+                          </span>
+                        )}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Assignees */}
+            {appointment.assignees && appointment.assignees.length > 0 && (
+              <div className="flex items-start gap-3 overflow-hidden">
+                <Clock className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-muted-foreground mb-1">Assigned To</p>
+                  <div className="flex flex-wrap gap-1">
+                    {appointment.assignees.map((assignee) => (
+                      <Badge key={assignee.id} variant="outline" className="truncate max-w-[150px]">
+                        {assignee.name || assignee.email}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
@@ -590,10 +754,10 @@ export function AppointmentDetailDialog({
               </div>
             )}
 
-            {/* Notes with user attribution */}
+            {/* Team Notes with user attribution */}
             <div className="pt-2 border-t">
               <div className="flex items-center justify-between mb-1">
-                <p className="text-sm text-muted-foreground">Notes</p>
+                <p className="text-sm text-muted-foreground">Team Notes</p>
                 {!isEditingNotes && (
                   <Button
                     variant="ghost"
@@ -651,10 +815,26 @@ export function AppointmentDetailDialog({
               )}
             </div>
 
-            {/* Timestamps */}
-            <div className="pt-2 border-t text-xs text-muted-foreground">
-              <p>Created: {format(new Date(appointment.created_at), "MMM d, yyyy 'at' h:mm a")}</p>
-              <p>Updated: {format(new Date(appointment.updated_at), "MMM d, yyyy 'at' h:mm a")}</p>
+            {/* Timestamps with user info */}
+            <div className="pt-2 border-t text-xs text-muted-foreground space-y-1">
+              <div className="flex items-center gap-1.5">
+                <Calendar className="h-3 w-3" />
+                <span>
+                  Created {formatDistanceToNow(new Date(appointment.created_at))}
+                  {appointment.created_by_user && (
+                    <span className="font-medium text-foreground"> by {appointment.created_by_user.name || appointment.created_by_user.email}</span>
+                  )}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Calendar className="h-3 w-3" />
+                <span>
+                  Updated {formatDistanceToNow(new Date(appointment.updated_at))}
+                  {appointment.updated_by_user && (
+                    <span className="font-medium text-foreground"> by {appointment.updated_by_user.name || appointment.updated_by_user.email}</span>
+                  )}
+                </span>
+              </div>
             </div>
           </div>
         )}

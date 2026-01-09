@@ -31,6 +31,8 @@ export type Database = {
           notes: string | null;
           notes_updated_by: string | null;
           notes_updated_at: string | null;
+          assignee_ids: string[] | null;
+          updated_by: string | null;
         };
         Insert: {
           id?: string;
@@ -50,6 +52,8 @@ export type Database = {
           notes?: string | null;
           notes_updated_by?: string | null;
           notes_updated_at?: string | null;
+          assignee_ids?: string[] | null;
+          updated_by?: string | null;
         };
         Update: {
           id?: string;
@@ -69,6 +73,8 @@ export type Database = {
           notes?: string | null;
           notes_updated_by?: string | null;
           notes_updated_at?: string | null;
+          assignee_ids?: string[] | null;
+          updated_by?: string | null;
         };
         Relationships: [
           {
@@ -621,6 +627,9 @@ export type AppointmentWithRelations = Appointment & {
   customers?: { name: string; company: string | null } | null;
   appointment_types?: { id: string; name: string; color: string } | null;
   notes_user?: { name: string | null; email: string } | null;
+  assignees?: { id: string; name: string | null; email: string }[] | null;
+  created_by_user?: { name: string | null; email: string } | null;
+  updated_by_user?: { name: string | null; email: string } | null;
 };
 
 export interface DocumentFlag {

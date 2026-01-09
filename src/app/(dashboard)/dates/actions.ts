@@ -28,15 +28,22 @@ export async function createAppointment(formData: FormData) {
   // Support both single customer_id and multiple customer_ids
   const customerIds = formData.getAll("customer_ids") as string[];
   const customerId = formData.get("customer_id") as string;
-  const startTime = formData.get("start_time") as string;
-  const endTime = formData.get("end_time") as string;
+  const assigneeIds = formData.getAll("assignee_ids") as string[];
+  const startTimeRaw = formData.get("start_time") as string;
+  const endTimeRaw = formData.get("end_time") as string;
   const location = formData.get("location") as string;
   const description = formData.get("description") as string;
   const appointmentTypeId = formData.get("appointment_type_id") as string;
 
-  if (!title || !startTime) {
+  if (!title || !startTimeRaw) {
     return { error: "Title and start time are required" };
   }
+
+  // Convert datetime-local values to ISO strings with proper timezone
+  // datetime-local format is "YYYY-MM-DDTHH:mm" (local time, no TZ)
+  // We need to convert to full ISO string to preserve the intended time
+  const startTime = new Date(startTimeRaw).toISOString();
+  const endTime = endTimeRaw ? new Date(endTimeRaw).toISOString() : null;
 
   // Use first customer_id for backward compatibility, store all in customer_ids array
   const primaryCustomerId = customerIds.length > 0 ? customerIds[0] : (customerId || null);
@@ -46,9 +53,10 @@ export async function createAppointment(formData: FormData) {
     organization_id: userData.organization_id,
     customer_id: primaryCustomerId,
     customer_ids: allCustomerIds.length > 0 ? allCustomerIds : null,
+    assignee_ids: assigneeIds.length > 0 ? assigneeIds : null,
     title,
     start_time: startTime,
-    end_time: endTime || null,
+    end_time: endTime,
     location: location || null,
     description: description || null,
     appointment_type_id: appointmentTypeId || null,
@@ -69,6 +77,8 @@ export async function updateAppointment(
   data: {
     title?: string;
     customer_id?: string | null;
+    customer_ids?: string[] | null;
+    assignee_ids?: string[] | null;
     start_time?: string;
     end_time?: string | null;
     location?: string | null;
@@ -79,11 +89,25 @@ export async function updateAppointment(
 ) {
   const supabase = await createClient();
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // Convert datetime-local values to ISO strings with proper timezone
+  const updateData = { ...data };
+  if (updateData.start_time) {
+    updateData.start_time = new Date(updateData.start_time).toISOString();
+  }
+  if (updateData.end_time) {
+    updateData.end_time = new Date(updateData.end_time).toISOString();
+  }
+
   const { error } = await supabase
     .from("appointments")
     .update({
-      ...data,
+      ...updateData,
       updated_at: new Date().toISOString(),
+      updated_by: user?.id || null,
     })
     .eq("id", id);
 
@@ -108,6 +132,46 @@ export async function deleteAppointment(id: string) {
   revalidatePath("/dates");
   revalidatePath("/people/appointments");
   return { success: true };
+}
+
+export async function bulkUpdateAppointmentStatus(
+  ids: string[],
+  status: "scheduled" | "completed" | "cancelled"
+) {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("appointments")
+    .update({
+      status,
+      updated_at: new Date().toISOString(),
+    })
+    .in("id", ids);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/dates");
+  revalidatePath("/people/appointments");
+  return { success: true, count: ids.length };
+}
+
+export async function bulkDeleteAppointments(ids: string[]) {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("appointments")
+    .delete()
+    .in("id", ids);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/dates");
+  revalidatePath("/people/appointments");
+  return { success: true, count: ids.length };
 }
 
 export async function updateAppointmentNotes(id: string, notes: string | null) {
@@ -181,6 +245,25 @@ export async function createAppointmentType(name: string, color: string) {
 
   revalidatePath("/dates");
   return { success: true, data };
+}
+
+export async function updateAppointmentType(
+  id: string,
+  data: { name?: string; color?: string }
+) {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("appointment_types")
+    .update(data)
+    .eq("id", id);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/dates");
+  return { success: true };
 }
 
 export async function deleteAppointmentType(id: string) {

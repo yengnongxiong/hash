@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useTransition } from "react";
+import { useState, useMemo, useCallback, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AppointmentWithRelations, AppointmentType, Customer } from "@/types/database";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -19,7 +19,8 @@ import { DatesCalendar } from "./dates-calendar";
 import { DatesWeekView } from "./dates-week-view";
 import { DatesCSVImportDialog } from "./csv-import-dialog";
 import { exportToCSV, formatDateTime } from "@/lib/export";
-import { updateAppointment } from "@/app/(dashboard)/dates/actions";
+import { updateAppointment, bulkUpdateAppointmentStatus, bulkDeleteAppointments } from "@/app/(dashboard)/dates/actions";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import {
   List,
@@ -31,8 +32,9 @@ import {
   ArrowUpDown,
   Circle,
   Download,
-  Printer,
   Check,
+  Trash2,
+  X,
 } from "lucide-react";
 import {
   format,
@@ -47,10 +49,17 @@ import { cn } from "@/lib/utils";
 type SortKey = "date" | "title" | "person" | "type" | "status" | "created" | "updated";
 type SortDirection = "asc" | "desc" | null;
 
+export interface OrganizationMember {
+  id: string;
+  name: string | null;
+  email: string;
+}
+
 interface DatesViewProps {
   appointments: AppointmentWithRelations[];
   customers: Pick<Customer, "id" | "name" | "company" | "customer_number">[];
   appointmentTypes: AppointmentType[];
+  organizationMembers: OrganizationMember[];
 }
 
 type TimeFilter = "all" | "overdue" | "today" | "upcoming" | "past";
@@ -67,19 +76,37 @@ function getComputedStatus(apt: AppointmentWithRelations): string {
   return "upcoming";
 }
 
-export function DatesView({ appointments, customers, appointmentTypes }: DatesViewProps) {
+const DATES_VIEW_STORAGE_KEY = "hash-dates-preferred-view";
+
+export function DatesView({ appointments, customers, appointmentTypes, organizationMembers }: DatesViewProps) {
   const [view, setView] = useState<"table" | "week" | "calendar">("table");
   const [search, setSearch] = useState("");
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
   const [selectedAppointment, setSelectedAppointment] = useState<AppointmentWithRelations | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
-  const [sortDirection, setSortDirection] = useState<SortDirection>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   // State for creating appointment from calendar
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  // State for bulk selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
+
+  // Load saved view preference from localStorage on mount
+  useEffect(() => {
+    const savedView = localStorage.getItem(DATES_VIEW_STORAGE_KEY);
+    if (savedView && ["table", "week", "calendar"].includes(savedView)) {
+      setView(savedView as "table" | "week" | "calendar");
+    }
+  }, []);
+
+  // Save view preference to localStorage when it changes
+  const handleViewChange = useCallback((newView: "table" | "week" | "calendar") => {
+    setView(newView);
+    localStorage.setItem(DATES_VIEW_STORAGE_KEY, newView);
+  }, []);
 
   // Quick status change handler
   const handleQuickStatusChange = useCallback((
@@ -98,11 +125,6 @@ export function DatesView({ appointments, customers, appointmentTypes }: DatesVi
       }
     });
   }, [router]);
-
-  // Print handler
-  const handlePrint = useCallback(() => {
-    window.print();
-  }, []);
 
   // Handle date move (drag-and-drop)
   const handleDateMove = useCallback(
@@ -171,7 +193,8 @@ export function DatesView({ appointments, customers, appointmentTypes }: DatesVi
           if (!isToday(aptDate)) return false;
           break;
         case "upcoming":
-          if (!isFuture(aptDate) && !isToday(aptDate)) return false;
+          // Upcoming should only show future dates, not today
+          if (!isFuture(aptDate)) return false;
           break;
         case "past":
           if (!isPast(aptDate)) return false;
@@ -184,10 +207,14 @@ export function DatesView({ appointments, customers, appointmentTypes }: DatesVi
 
   // Sorted appointments
   const sortedAppointments = useMemo(() => {
-    if (!sortKey || !sortDirection) return filteredAppointments;
-
     return [...filteredAppointments].sort((a, b) => {
       let comparison = 0;
+
+      // Default sort by updated_at descending when no column is selected
+      if (!sortKey) {
+        comparison = new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime();
+        return -comparison; // descending (most recent first)
+      }
 
       switch (sortKey) {
         case "date":
@@ -224,6 +251,65 @@ export function DatesView({ appointments, customers, appointmentTypes }: DatesVi
       return sortDirection === "asc" ? comparison : -comparison;
     });
   }, [filteredAppointments, sortKey, sortDirection]);
+
+  // Bulk selection handlers (must be after sortedAppointments)
+  const handleSelectAll = useCallback(() => {
+    if (selectedIds.size === sortedAppointments.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(sortedAppointments.map((apt) => apt.id)));
+    }
+  }, [sortedAppointments, selectedIds.size]);
+
+  const handleSelectOne = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleClearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+  }, []);
+
+  const handleBulkStatusChange = useCallback(
+    (status: "scheduled" | "completed" | "cancelled") => {
+      if (selectedIds.size === 0) return;
+      startTransition(async () => {
+        const result = await bulkUpdateAppointmentStatus(
+          Array.from(selectedIds),
+          status
+        );
+        if (result.error) {
+          toast.error("Failed to update status", { description: result.error });
+        } else {
+          toast.success(`Updated ${result.count} dates to ${status}`);
+          setSelectedIds(new Set());
+          router.refresh();
+        }
+      });
+    },
+    [selectedIds, router]
+  );
+
+  const handleBulkDelete = useCallback(() => {
+    if (selectedIds.size === 0) return;
+    startTransition(async () => {
+      const result = await bulkDeleteAppointments(Array.from(selectedIds));
+      if (result.error) {
+        toast.error("Failed to delete dates", { description: result.error });
+      } else {
+        toast.success(`Deleted ${result.count} dates`);
+        setSelectedIds(new Set());
+        router.refresh();
+      }
+    });
+  }, [selectedIds, router]);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -264,7 +350,7 @@ export function DatesView({ appointments, customers, appointmentTypes }: DatesVi
   ).length;
   const todayCount = appointments.filter((apt) => isToday(new Date(apt.start_time))).length;
   const upcomingCount = appointments.filter(
-    (apt) => isFuture(startOfDay(new Date(apt.start_time))) || isToday(new Date(apt.start_time))
+    (apt) => isFuture(startOfDay(new Date(apt.start_time)))
   ).length;
 
   // Convert appointments to date entries for calendar
@@ -370,7 +456,7 @@ export function DatesView({ appointments, customers, appointmentTypes }: DatesVi
         </div>
 
         {/* View Toggle */}
-        <Tabs value={view} onValueChange={(v) => setView(v as "table" | "week" | "calendar")}>
+        <Tabs value={view} onValueChange={(v) => handleViewChange(v as "table" | "week" | "calendar")}>
           <TabsList>
             <TabsTrigger value="table" className="gap-1.5">
               <List className="h-4 w-4" />
@@ -399,21 +485,74 @@ export function DatesView({ appointments, customers, appointmentTypes }: DatesVi
           Export
         </Button>
 
-        {/* Print */}
-        <Button variant="outline" size="sm" onClick={handlePrint} data-print-hide="true">
-          <Printer className="h-4 w-4 mr-2" />
-          Print
-        </Button>
-
         {/* Create Appointment */}
-        <CreateAppointmentDialog customers={customers} appointmentTypes={appointmentTypes} />
+        <CreateAppointmentDialog customers={customers} appointmentTypes={appointmentTypes} organizationMembers={organizationMembers} />
       </div>
 
-      {/* Results count */}
-      <p className="text-sm text-muted-foreground">
-        {sortedAppointments.length} of {appointments.length} dates
-        {timeFilter !== "all" && ` (${timeFilter})`}
-      </p>
+      {/* Results count and bulk actions */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          {sortedAppointments.length} of {appointments.length} dates
+          {timeFilter !== "all" && ` (${timeFilter})`}
+        </p>
+
+        {/* Bulk action bar - shown when items selected */}
+        {selectedIds.size > 0 && (
+          <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-1.5">
+            <span className="text-sm font-medium">
+              {selectedIds.size} selected
+            </span>
+            <div className="h-4 w-px bg-border" />
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" disabled={isPending}>
+                  Set Status
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-40 p-1" align="end">
+                <div className="flex flex-col">
+                  <button
+                    className="flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-muted text-left"
+                    onClick={() => handleBulkStatusChange("scheduled")}
+                  >
+                    Scheduled
+                  </button>
+                  <button
+                    className="flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-muted text-left"
+                    onClick={() => handleBulkStatusChange("completed")}
+                  >
+                    Completed
+                  </button>
+                  <button
+                    className="flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-muted text-left"
+                    onClick={() => handleBulkStatusChange("cancelled")}
+                  >
+                    Cancelled
+                  </button>
+                </div>
+              </PopoverContent>
+            </Popover>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-destructive hover:text-destructive"
+              onClick={handleBulkDelete}
+              disabled={isPending}
+            >
+              <Trash2 className="h-4 w-4 mr-1" />
+              Delete
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClearSelection}
+              disabled={isPending}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+      </div>
 
       {/* Content */}
       {view === "table" ? (
@@ -425,9 +564,21 @@ export function DatesView({ appointments, customers, appointmentTypes }: DatesVi
               <p className="text-sm">Try adjusting your filters or create a new date</p>
             </div>
           ) : (
-            <table className="w-full table-fixed min-w-[900px]">
+            <table className="w-full table-fixed min-w-[950px]">
               <thead className="bg-muted/50">
                 <tr>
+                  <th className="p-3 w-[40px] text-center align-middle">
+                    <div className="flex items-center justify-center">
+                      <Checkbox
+                        checked={
+                          sortedAppointments.length > 0 &&
+                          selectedIds.size === sortedAppointments.length
+                        }
+                        onCheckedChange={handleSelectAll}
+                        aria-label="Select all"
+                      />
+                    </div>
+                  </th>
                   <th className="text-left p-3 text-sm font-medium w-[140px]">
                     <SortableHeader sortKeyName="date">Date & Time</SortableHeader>
                   </th>
@@ -463,10 +614,20 @@ export function DatesView({ appointments, customers, appointmentTypes }: DatesVi
                       key={apt.id}
                       className={cn(
                         "hover:bg-muted/30 cursor-pointer",
-                        isOverdue && "bg-red-500/5"
+                        isOverdue && "bg-red-500/5",
+                        selectedIds.has(apt.id) && "bg-primary/5"
                       )}
                       onClick={() => handleViewAppointment(apt)}
                     >
+                      <td className="p-3 text-center align-middle" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-center">
+                          <Checkbox
+                            checked={selectedIds.has(apt.id)}
+                            onCheckedChange={() => handleSelectOne(apt.id)}
+                            aria-label={`Select ${apt.title}`}
+                          />
+                        </div>
+                      </td>
                       <td className="p-3">
                         <div className="flex items-center gap-2">
                           {/* Type indicator: blank circle if no type, colored if type exists */}
@@ -629,12 +790,14 @@ export function DatesView({ appointments, customers, appointmentTypes }: DatesVi
         onOpenChange={setDetailDialogOpen}
         customers={customers}
         appointmentTypes={appointmentTypes}
+        organizationMembers={organizationMembers}
       />
 
       {/* Create Dialog from Calendar */}
       <CreateAppointmentDialog
         customers={customers}
         appointmentTypes={appointmentTypes}
+        organizationMembers={organizationMembers}
         open={createDialogOpen}
         onOpenChange={(open) => {
           setCreateDialogOpen(open);

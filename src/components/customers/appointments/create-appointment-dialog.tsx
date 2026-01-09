@@ -33,10 +33,12 @@ import { toast } from "sonner";
 import { Customer, AppointmentType } from "@/types/database";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { OrganizationMember } from "@/components/dates/dates-view";
 
 interface CreateAppointmentDialogProps {
   customers: Pick<Customer, "id" | "name" | "company" | "customer_number">[];
   appointmentTypes?: AppointmentType[];
+  organizationMembers?: OrganizationMember[];
   // Controlled mode props
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -46,6 +48,7 @@ interface CreateAppointmentDialogProps {
 export function CreateAppointmentDialog({
   customers,
   appointmentTypes = [],
+  organizationMembers = [],
   open: controlledOpen,
   onOpenChange: controlledOnOpenChange,
   defaultDate,
@@ -53,8 +56,11 @@ export function CreateAppointmentDialog({
   const [internalOpen, setInternalOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
+  const [selectedAssigneeIds, setSelectedAssigneeIds] = useState<string[]>([]);
   const [peoplePopoverOpen, setPeoplePopoverOpen] = useState(false);
   const [peopleSearch, setPeopleSearch] = useState("");
+  const [assigneePopoverOpen, setAssigneePopoverOpen] = useState(false);
+  const [assigneeSearch, setAssigneeSearch] = useState("");
   const router = useRouter();
 
   // Support both controlled and uncontrolled modes
@@ -78,6 +84,12 @@ export function CreateAppointmentDialog({
       formData.append("customer_ids", id);
     });
 
+    // Add selected assignee IDs to form data
+    formData.delete("assignee_ids"); // Remove any existing
+    selectedAssigneeIds.forEach((id) => {
+      formData.append("assignee_ids", id);
+    });
+
     startTransition(async () => {
       const result = await createAppointment(formData);
       if (result.error) {
@@ -86,6 +98,7 @@ export function CreateAppointmentDialog({
         toast.success("Date created");
         setOpen(false);
         setSelectedCustomerIds([]);
+        setSelectedAssigneeIds([]);
         router.refresh();
       }
     });
@@ -103,7 +116,20 @@ export function CreateAppointmentDialog({
     setSelectedCustomerIds((prev) => prev.filter((id) => id !== customerId));
   };
 
+  const toggleAssignee = (assigneeId: string) => {
+    setSelectedAssigneeIds((prev) =>
+      prev.includes(assigneeId)
+        ? prev.filter((id) => id !== assigneeId)
+        : [...prev, assigneeId]
+    );
+  };
+
+  const removeAssignee = (assigneeId: string) => {
+    setSelectedAssigneeIds((prev) => prev.filter((id) => id !== assigneeId));
+  };
+
   const selectedCustomers = customers.filter((c) => selectedCustomerIds.includes(c.id));
+  const selectedAssignees = organizationMembers.filter((m) => selectedAssigneeIds.includes(m.id));
 
   // Filter customers based on search
   const filteredCustomers = customers.filter((customer) => {
@@ -116,24 +142,47 @@ export function CreateAppointmentDialog({
     );
   });
 
+  // Filter organization members based on search
+  const filteredAssignees = organizationMembers.filter((member) => {
+    if (!assigneeSearch) return true;
+    const searchLower = assigneeSearch.toLowerCase();
+    return (
+      member.name?.toLowerCase().includes(searchLower) ||
+      member.email.toLowerCase().includes(searchLower)
+    );
+  });
+
+  // Helper to format date for datetime-local input (in local timezone)
+  const formatForDateTimeLocal = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
   // Default to provided date at 9 AM, or tomorrow 9 AM
   const getDefaultStart = () => {
     if (defaultDate) {
       const date = new Date(defaultDate);
       date.setHours(9, 0, 0, 0);
-      return date.toISOString().slice(0, 16);
+      return formatForDateTimeLocal(date);
     }
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     tomorrow.setHours(9, 0, 0, 0);
-    return tomorrow.toISOString().slice(0, 16);
+    return formatForDateTimeLocal(tomorrow);
   };
   const defaultStart = getDefaultStart();
 
   return (
     <Dialog open={open} onOpenChange={(o) => {
       setOpen(o);
-      if (!o) setSelectedCustomerIds([]);
+      if (!o) {
+        setSelectedCustomerIds([]);
+        setSelectedAssigneeIds([]);
+      }
     }}>
       {!isControlled && (
         <DialogTrigger asChild>
@@ -271,6 +320,87 @@ export function CreateAppointmentDialog({
               </Select>
             </div>
           </div>
+
+          {/* Team Assignee field */}
+          {organizationMembers.length > 0 && (
+            <div className="space-y-2">
+              <Label>Team Assignee</Label>
+              <Popover open={assigneePopoverOpen} onOpenChange={(open) => {
+                setAssigneePopoverOpen(open);
+                if (!open) setAssigneeSearch("");
+              }}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between font-normal"
+                  >
+                    {selectedAssigneeIds.length === 0
+                      ? "Select team members"
+                      : `${selectedAssigneeIds.length} assigned`}
+                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[280px] p-0" align="start">
+                  <div className="p-2 border-b">
+                    <div className="relative">
+                      <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        placeholder="Search team members..."
+                        value={assigneeSearch}
+                        onChange={(e) => setAssigneeSearch(e.target.value)}
+                        className="pl-8 h-8"
+                      />
+                    </div>
+                  </div>
+                  <div className="max-h-[250px] overflow-y-auto p-1">
+                    {filteredAssignees.length === 0 ? (
+                      <p className="p-2 text-sm text-muted-foreground text-center">
+                        {organizationMembers.length === 0 ? "No team members found" : "No matches found"}
+                      </p>
+                    ) : (
+                      filteredAssignees.map((member) => (
+                        <div
+                          key={member.id}
+                          className="flex items-center gap-2 p-2 hover:bg-muted rounded cursor-pointer"
+                          onClick={() => toggleAssignee(member.id)}
+                        >
+                          <Checkbox
+                            checked={selectedAssigneeIds.includes(member.id)}
+                            onCheckedChange={() => toggleAssignee(member.id)}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm truncate">{member.name || member.email}</p>
+                            {member.name && (
+                              <p className="text-xs text-muted-foreground truncate">
+                                {member.email}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
+              {selectedAssignees.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {selectedAssignees.map((member) => (
+                    <Badge key={member.id} variant="secondary" className="gap-1 max-w-full">
+                      <span className="truncate max-w-[120px]">{member.name || member.email}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeAssignee(member.id)}
+                        className="ml-1 hover:text-destructive shrink-0"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
