@@ -79,9 +79,9 @@ interface TaskDetailDialogProps {
 }
 
 const STATUS_OPTIONS = [
-  { value: "todo", label: "To Do" },
-  { value: "in_progress", label: "In Progress" },
-  { value: "done", label: "Done" },
+  { value: "todo", label: "To Do", textClass: "text-yellow-600 dark:text-yellow-400" },
+  { value: "in_progress", label: "In Progress", textClass: "text-blue-600 dark:text-blue-400" },
+  { value: "done", label: "Done", textClass: "text-green-600 dark:text-green-400" },
 ];
 
 const PRIORITY_OPTIONS = [
@@ -154,7 +154,7 @@ export function TaskDetailDialog({
       priority: task.priority,
       due_date: task.due_date,
       color: task.color,
-      assigned_to: task.assigned_to,
+      assigned_to_ids: task.assigned_to_ids || [],
       labels: task.labels,
     });
     setIsEditing(true);
@@ -176,7 +176,7 @@ export function TaskDetailDialog({
         priority: currentTask.priority,
         due_date: currentTask.due_date,
         color: currentTask.color,
-        assigned_to: currentTask.assigned_to,
+        assigned_to_ids: currentTask.assigned_to_ids || [],
         labels: currentTask.labels,
       });
 
@@ -207,35 +207,36 @@ export function TaskDetailDialog({
     );
   });
 
-  // Get assignee name
-  const assignee = teamMembers.find((m) => m.id === currentTask?.assigned_to);
+  // Get selected assignees
+  const selectedAssignees = teamMembers.filter((m) => (currentTask?.assigned_to_ids || []).includes(m.id));
 
   if (!task || !currentTask) return null;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto overflow-x-hidden">
-        <DialogHeader className="pr-8">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex-1 min-w-0">
+        <DialogHeader>
+          <div className="flex items-start gap-2 pr-20">
+            <div className="flex-1 min-w-0 overflow-hidden">
               {isEditing ? (
                 <Input
                   value={currentTask.title}
                   onChange={(e) =>
                     setEditedTask((prev) => ({ ...prev, title: e.target.value }))
                   }
-                  className="text-lg font-semibold"
+                  className="text-lg font-semibold w-full"
                   placeholder="Task title"
                 />
               ) : (
-                <DialogTitle className="text-lg leading-tight pr-4">
+                <DialogTitle className="text-lg leading-tight" style={{ wordBreak: "break-word", overflowWrap: "anywhere" }}>
                   {currentTask.title}
                 </DialogTitle>
               )}
             </div>
-            {!isEditing && (
-              <TooltipProvider>
-                <div className="flex items-center gap-1 shrink-0">
+          </div>
+          {!isEditing && (
+            <TooltipProvider>
+              <div className="flex items-center gap-1 shrink-0 absolute right-6 top-4">
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
@@ -264,11 +265,11 @@ export function TaskDetailDialog({
                       </TooltipTrigger>
                       <TooltipContent>Delete task</TooltipContent>
                     </Tooltip>
-                    <AlertDialogContent>
+                    <AlertDialogContent className="max-w-md">
                       <AlertDialogHeader>
                         <AlertDialogTitle>Delete Task</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Are you sure you want to delete &quot;{task.title}&quot;? This
+                        <AlertDialogDescription className="break-all">
+                          Are you sure you want to delete &quot;{task.title.length > 50 ? task.title.slice(0, 50) + "..." : task.title}&quot;? This
                           action cannot be undone.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
@@ -286,7 +287,6 @@ export function TaskDetailDialog({
                 </div>
               </TooltipProvider>
             )}
-          </div>
           <VisuallyHidden.Root>
             <DialogDescription>
               View and edit task details
@@ -311,20 +311,24 @@ export function TaskDetailDialog({
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue>
+                      <span className={cn("font-medium", STATUS_OPTIONS.find((o) => o.value === currentTask.status)?.textClass)}>
+                        {STATUS_OPTIONS.find((o) => o.value === currentTask.status)?.label}
+                      </span>
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {STATUS_OPTIONS.map((opt) => (
                       <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
+                        <span className={cn("font-medium", opt.textClass)}>{opt.label}</span>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               ) : (
-                <Badge variant="secondary" className="font-normal">
+                <span className={cn("text-sm font-medium", STATUS_OPTIONS.find((o) => o.value === currentTask.status)?.textClass)}>
                   {STATUS_OPTIONS.find((o) => o.value === currentTask.status)?.label}
-                </Badge>
+                </span>
               )}
             </div>
 
@@ -404,11 +408,11 @@ export function TaskDetailDialog({
               )}
             </div>
 
-            {/* Assignee */}
+            {/* Assignees */}
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground flex items-center gap-1">
                 <UserIcon className="h-3 w-3" />
-                Assignee
+                Assignees
               </Label>
               {isEditing ? (
                 <Popover open={peoplePopoverOpen} onOpenChange={setPeoplePopoverOpen}>
@@ -416,21 +420,28 @@ export function TaskDetailDialog({
                     <Button
                       variant="outline"
                       role="combobox"
-                      className="w-full justify-between font-normal"
+                      className="w-full justify-between font-normal h-auto min-h-9"
                     >
-                      {assignee ? (
-                        <div className="flex items-center gap-2">
-                          <Avatar className="h-5 w-5">
-                            <AvatarFallback className="text-[9px]">
-                              {getInitials(assignee.name || assignee.email)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="truncate">
-                            {assignee.name || assignee.email}
-                          </span>
+                      {selectedAssignees.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {selectedAssignees.slice(0, 3).map((assignee) => (
+                            <div key={assignee.id} className="flex items-center gap-1 bg-muted rounded px-1.5 py-0.5">
+                              <Avatar className="h-4 w-4">
+                                <AvatarFallback className="text-[8px]">
+                                  {getInitials(assignee.name || assignee.email)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="text-xs truncate max-w-[60px]">
+                                {assignee.name || assignee.email}
+                              </span>
+                            </div>
+                          ))}
+                          {selectedAssignees.length > 3 && (
+                            <span className="text-xs text-muted-foreground">+{selectedAssignees.length - 3} more</span>
+                          )}
                         </div>
                       ) : (
-                        <span className="text-muted-foreground">Select person</span>
+                        <span className="text-muted-foreground">Select people</span>
                       )}
                       <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
@@ -448,51 +459,59 @@ export function TaskDetailDialog({
                       </div>
                     </div>
                     <div className="max-h-[200px] overflow-y-auto p-1">
-                      {/* Unassign option */}
-                      <button
-                        className={cn(
-                          "w-full flex items-center gap-2 p-2 rounded hover:bg-muted text-left",
-                          !currentTask.assigned_to && "bg-muted"
-                        )}
-                        onClick={() => {
-                          setEditedTask((prev) => ({ ...prev, assigned_to: null }));
-                          setPeoplePopoverOpen(false);
-                        }}
-                      >
-                        <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center">
-                          <X className="h-3 w-3" />
-                        </div>
-                        <span className="text-sm text-muted-foreground">Unassigned</span>
-                      </button>
-                      {filteredMembers.map((member) => (
+                      {/* Clear all option */}
+                      {(currentTask.assigned_to_ids || []).length > 0 && (
                         <button
-                          key={member.id}
-                          className={cn(
-                            "w-full flex items-center gap-2 p-2 rounded hover:bg-muted text-left",
-                            currentTask.assigned_to === member.id && "bg-muted"
-                          )}
-                          onClick={() => {
-                            setEditedTask((prev) => ({ ...prev, assigned_to: member.id }));
-                            setPeoplePopoverOpen(false);
-                          }}
+                          className="w-full flex items-center gap-2 p-2 rounded hover:bg-muted text-left text-sm text-muted-foreground"
+                          onClick={() => setEditedTask((prev) => ({ ...prev, assigned_to_ids: [] }))}
                         >
-                          <Avatar className="h-5 w-5">
-                            <AvatarFallback className="text-[9px]">
-                              {getInitials(member.name || member.email)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm truncate">
-                              {member.name || member.email}
-                            </p>
-                            {member.name && (
-                              <p className="text-xs text-muted-foreground truncate">
-                                {member.email}
-                              </p>
-                            )}
-                          </div>
+                          <X className="h-4 w-4" />
+                          Clear all ({(currentTask.assigned_to_ids || []).length})
                         </button>
-                      ))}
+                      )}
+                      {filteredMembers.map((member) => {
+                        const isSelected = (currentTask.assigned_to_ids || []).includes(member.id);
+                        return (
+                          <button
+                            key={member.id}
+                            className={cn(
+                              "w-full flex items-center gap-2 p-2 rounded hover:bg-muted text-left",
+                              isSelected && "bg-muted"
+                            )}
+                            onClick={() => {
+                              const currentIds = currentTask.assigned_to_ids || [];
+                              if (isSelected) {
+                                setEditedTask((prev) => ({
+                                  ...prev,
+                                  assigned_to_ids: currentIds.filter((id) => id !== member.id),
+                                }));
+                              } else {
+                                setEditedTask((prev) => ({
+                                  ...prev,
+                                  assigned_to_ids: [...currentIds, member.id],
+                                }));
+                              }
+                            }}
+                          >
+                            <Checkbox checked={isSelected} className="pointer-events-none" />
+                            <Avatar className="h-5 w-5">
+                              <AvatarFallback className="text-[9px]">
+                                {getInitials(member.name || member.email)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm truncate">
+                                {member.name || member.email}
+                              </p>
+                              {member.name && (
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {member.email}
+                                </p>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
                       {filteredMembers.length === 0 && (
                         <p className="text-sm text-muted-foreground text-center py-4">
                           No team members found
@@ -501,14 +520,18 @@ export function TaskDetailDialog({
                     </div>
                   </PopoverContent>
                 </Popover>
-              ) : assignee ? (
-                <div className="flex items-center gap-2">
-                  <Avatar className="h-6 w-6">
-                    <AvatarFallback className="text-[10px]">
-                      {getInitials(assignee.name || assignee.email)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="text-sm">{assignee.name || assignee.email}</span>
+              ) : selectedAssignees.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {selectedAssignees.map((assignee) => (
+                    <div key={assignee.id} className="flex items-center gap-1.5">
+                      <Avatar className="h-6 w-6">
+                        <AvatarFallback className="text-[10px]">
+                          {getInitials(assignee.name || assignee.email)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm">{assignee.name || assignee.email}</span>
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground italic">Unassigned</p>
@@ -558,9 +581,11 @@ export function TaskDetailDialog({
                 }
                 placeholder="Add a description..."
                 rows={4}
+                className="w-full resize-none"
+                style={{ wordBreak: "break-word", overflowWrap: "break-word" }}
               />
             ) : currentTask.description ? (
-              <p className="text-sm whitespace-pre-wrap">{currentTask.description}</p>
+              <p className="text-sm whitespace-pre-wrap" style={{ wordBreak: "break-all", overflowWrap: "anywhere" }}>{currentTask.description}</p>
             ) : (
               <p className="text-sm text-muted-foreground italic">No description</p>
             )}
@@ -574,16 +599,17 @@ export function TaskDetailDialog({
             </Label>
             {isEditing ? (
               <div className="space-y-2">
-                <div className="flex flex-wrap gap-1">
+                <div className="flex flex-wrap gap-1 max-w-full overflow-hidden">
                   {(currentTask.labels || []).map((label, i) => (
-                    <Badge key={i} variant="secondary" className="gap-1">
-                      {label}
+                    <Badge key={i} variant="secondary" className="gap-1 max-w-[150px]">
+                      <span className="truncate">{label}</span>
                       <button
                         onClick={() => {
                           const newLabels = [...(currentTask.labels || [])];
                           newLabels.splice(i, 1);
                           setEditedTask((prev) => ({ ...prev, labels: newLabels }));
                         }}
+                        className="shrink-0"
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -592,6 +618,7 @@ export function TaskDetailDialog({
                 </div>
                 <Input
                   placeholder="Add label and press Enter..."
+                  className="w-full"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
@@ -608,10 +635,10 @@ export function TaskDetailDialog({
                 />
               </div>
             ) : (currentTask.labels || []).length > 0 ? (
-              <div className="flex flex-wrap gap-1">
+              <div className="flex flex-wrap gap-1 overflow-hidden">
                 {(currentTask.labels || []).map((label, i) => (
-                  <Badge key={i} variant="secondary">
-                    {label}
+                  <Badge key={i} variant="secondary" className="max-w-[120px] shrink-0">
+                    <span className="truncate">{label}</span>
                   </Badge>
                 ))}
               </div>
@@ -642,18 +669,31 @@ export function TaskDetailDialog({
           <Separator />
 
           {/* Metadata */}
-          <div className="space-y-1 text-xs text-muted-foreground">
-            <div className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              <span>
-                Created {formatDistanceToNow(new Date(task.created_at))} ago
-              </span>
+          <div className="space-y-1 text-sm text-muted-foreground">
+            <div>
+              Created: {format(new Date(task.created_at), "MMM d, yyyy 'at' h:mm a")}
+              {task.created_by && (() => {
+                const creator = teamMembers.find((m) => m.id === task.created_by);
+                return creator ? (
+                  <span className="ml-1">
+                    by <span className="font-medium text-foreground">{creator.name || creator.email}</span>
+                  </span>
+                ) : null;
+              })()}
             </div>
-            <div className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              <span>
-                Updated {formatDistanceToNow(new Date(task.updated_at))} ago
-              </span>
+            <div>
+              Updated: {format(new Date(task.updated_at), "MMM d, yyyy 'at' h:mm a")}
+              {(() => {
+                // Show updated_by if available, otherwise show created_by
+                const updaterId = (task as any).updated_by || task.created_by;
+                if (!updaterId) return null;
+                const updater = teamMembers.find((m) => m.id === updaterId);
+                return updater ? (
+                  <span className="ml-1">
+                    by <span className="font-medium text-foreground">{updater.name || updater.email}</span>
+                  </span>
+                ) : null;
+              })()}
             </div>
           </div>
 

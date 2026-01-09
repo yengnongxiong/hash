@@ -17,6 +17,9 @@ interface DataTableToolbarProps<TData> {
   }[];
   selectedRowCount?: number;
   onDeleteSelected?: () => void;
+  onUnselectAll?: () => void;
+  globalFilter?: string;
+  onGlobalFilterChange?: (value: string) => void;
 }
 
 export function DataTableToolbar<TData>({
@@ -26,13 +29,24 @@ export function DataTableToolbar<TData>({
   filterableColumns = [],
   selectedRowCount = 0,
   onDeleteSelected,
+  onUnselectAll,
+  globalFilter,
+  onGlobalFilterChange,
 }: DataTableToolbarProps<TData>) {
-  const isFiltered = table.getState().columnFilters.length > 0;
+  const isFiltered = table.getState().columnFilters.length > 0 || (globalFilter && globalFilter.length > 0);
 
   return (
     <div className="flex items-center justify-between">
       <div className="flex flex-1 items-center space-x-2">
-        {searchKey && (
+        {/* Use global filter if available, otherwise fall back to column filter */}
+        {onGlobalFilterChange ? (
+          <Input
+            placeholder={searchPlaceholder}
+            value={globalFilter ?? ""}
+            onChange={(event) => onGlobalFilterChange(event.target.value)}
+            className="h-8 w-[150px] lg:w-[250px]"
+          />
+        ) : searchKey && (
           <Input
             placeholder={searchPlaceholder}
             value={
@@ -69,7 +83,12 @@ export function DataTableToolbar<TData>({
         {isFiltered && (
           <Button
             variant="ghost"
-            onClick={() => table.resetColumnFilters()}
+            onClick={() => {
+              table.resetColumnFilters();
+              if (onGlobalFilterChange) {
+                onGlobalFilterChange("");
+              }
+            }}
             className="h-8 px-2 lg:px-3"
           >
             Reset
@@ -78,16 +97,29 @@ export function DataTableToolbar<TData>({
         )}
       </div>
       <div className="flex items-center space-x-2">
-        {selectedRowCount > 0 && onDeleteSelected && (
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={onDeleteSelected}
-            className="h-8"
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete ({selectedRowCount})
-          </Button>
+        {selectedRowCount > 0 && (
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onUnselectAll}
+              className="h-8"
+            >
+              <X className="mr-2 h-4 w-4" />
+              Unselect
+            </Button>
+            {onDeleteSelected && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={onDeleteSelected}
+                className="h-8"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete ({selectedRowCount})
+              </Button>
+            )}
+          </>
         )}
       </div>
     </div>

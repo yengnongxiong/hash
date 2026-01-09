@@ -127,6 +127,7 @@ export type Database = {
           position_y: number;
           color: string;
           assigned_to: string | null;
+          assigned_to_ids: string[];
           created_by: string | null;
           priority: "low" | "medium" | "high" | "urgent";
           due_date: string | null;
@@ -144,6 +145,7 @@ export type Database = {
           position_y?: number;
           color?: string;
           assigned_to?: string | null;
+          assigned_to_ids?: string[];
           created_by?: string | null;
           priority?: "low" | "medium" | "high" | "urgent";
           due_date?: string | null;
@@ -161,6 +163,7 @@ export type Database = {
           position_y?: number;
           color?: string;
           assigned_to?: string | null;
+          assigned_to_ids?: string[];
           created_by?: string | null;
           priority?: "low" | "medium" | "high" | "urgent";
           due_date?: string | null;

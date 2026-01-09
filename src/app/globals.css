@@ -123,3 +123,10 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Fix datetime-local input calendar icon visibility in dark mode */
+.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+.dark input[type="date"]::-webkit-calendar-picker-indicator,
+.dark input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}

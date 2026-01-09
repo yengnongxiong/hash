@@ -21,13 +21,27 @@ export function DataTableColumnHeader<TData, TValue>({
     return <div className={cn(className)}>{title}</div>;
   }
 
+  const handleSort = () => {
+    const currentSort = column.getIsSorted();
+    if (currentSort === false) {
+      // Not sorted -> sort ascending
+      column.toggleSorting(false);
+    } else if (currentSort === "asc") {
+      // Ascending -> sort descending
+      column.toggleSorting(true);
+    } else {
+      // Descending -> clear sort (back to default)
+      column.clearSorting();
+    }
+  };
+
   return (
     <div className={cn("flex items-center space-x-2", className)}>
       <Button
         variant="ghost"
         size="sm"
         className="-ml-3 h-8 data-[state=open]:bg-accent"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+        onClick={handleSort}
       >
         <span>{title}</span>
         {column.getIsSorted() === "desc" ? (

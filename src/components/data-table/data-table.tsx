@@ -6,6 +6,7 @@ import {
   ColumnFiltersState,
   SortingState,
   VisibilityState,
+  FilterFn,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
@@ -38,6 +39,8 @@ interface DataTableProps<TData, TValue> {
     title: string;
     options: { label: string; value: string }[];
   }[];
+  initialSorting?: SortingState;
+  globalFilterFn?: FilterFn<TData>;
 }
 
 export function DataTable<TData, TValue>({
@@ -49,11 +52,14 @@ export function DataTable<TData, TValue>({
   onRowDelete,
   onViewRow,
   filterableColumns = [],
+  initialSorting = [],
+  globalFilterFn,
 }: DataTableProps<TData, TValue>) {
-  const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [sorting, setSorting] = React.useState<SortingState>(initialSorting);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
   );
+  const [globalFilter, setGlobalFilter] = React.useState("");
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
@@ -66,12 +72,15 @@ export function DataTable<TData, TValue>({
     onSortingChange: setSorting,
     getSortedRowModel: getSortedRowModel(),
     onColumnFiltersChange: setColumnFilters,
+    onGlobalFilterChange: setGlobalFilter,
     getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
+    globalFilterFn: globalFilterFn,
     state: {
       sorting,
       columnFilters,
+      globalFilter,
       columnVisibility,
       rowSelection,
     },
@@ -95,6 +104,7 @@ export function DataTable<TData, TValue>({
         searchPlaceholder={searchPlaceholder}
         filterableColumns={filterableColumns}
         selectedRowCount={selectedRows.length}
+        onUnselectAll={() => setRowSelection({})}
         onDeleteSelected={
           onRowDelete
             ? () => {
@@ -103,8 +113,10 @@ export function DataTable<TData, TValue>({
               }
             : undefined
         }
+        globalFilter={globalFilter}
+        onGlobalFilterChange={globalFilterFn ? setGlobalFilter : undefined}
       />
-      <div className="rounded-md border">
+      <div className="rounded-md border overflow-hidden">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (

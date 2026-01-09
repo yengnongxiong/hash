@@ -13,6 +13,7 @@ export async function createWhiteboardTask(
     due_date?: string | null;
     color?: string;
     assigned_to?: string | null;
+    assigned_to_ids?: string[];
     labels?: string[];
     position_x?: number;
     position_y?: number;
@@ -40,6 +41,7 @@ export async function createWhiteboardTask(
       due_date: options?.due_date || null,
       color: options?.color || "#ffffff",
       assigned_to: options?.assigned_to || null,
+      assigned_to_ids: options?.assigned_to_ids || [],
       labels: options?.labels || [],
       position_x: options?.position_x,
       position_y: options?.position_y,
@@ -61,14 +63,23 @@ export async function updateWhiteboardTaskStatus(
 ) {
   const supabase = await createClient();
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   const updateData: {
     status: "todo" | "in_progress" | "done";
     updated_at: string;
+    updated_by?: string;
     position?: number
   } = {
     status,
     updated_at: new Date().toISOString(),
   };
+
+  if (user) {
+    updateData.updated_by = user.id;
+  }
 
   if (position !== undefined) {
     updateData.position = position;
@@ -124,6 +135,7 @@ export async function updateWhiteboardTask(
     priority?: "low" | "medium" | "high" | "urgent";
     due_date?: string | null;
     assigned_to?: string | null;
+    assigned_to_ids?: string[];
     labels?: string[];
     position_x?: number;
     position_y?: number;
@@ -131,11 +143,16 @@ export async function updateWhiteboardTask(
 ) {
   const supabase = await createClient();
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   const { error } = await supabase
     .from("whiteboard_tasks")
     .update({
       ...updates,
       updated_at: new Date().toISOString(),
+      ...(user ? { updated_by: user.id } : {}),
     })
     .eq("id", taskId);
 
@@ -448,4 +465,160 @@ export async function saveSketchAsAttachment(
   }
 
   return { success: true, attachment: data };
+}
+
+// Import tasks from CSV
+export async function importTasksFromCSV(
+  organizationId: string,
+  tasks: {
+    title: string;
+    description?: string;
+    status?: string;
+    priority?: string;
+    due_date?: string;
+    color?: string;
+    labels?: string;
+    assignees?: string;
+  }[]
+) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Not authenticated" };
+  }
+
+  // Fetch organization members for assignee lookup
+  const { data: orgMembers } = await supabase
+    .from("users")
+    .select("id, email")
+    .eq("organization_id", organizationId);
+
+  const membersByEmail = new Map(
+    (orgMembers || []).map((m) => [m.email.toLowerCase(), m.id])
+  );
+
+  const validStatuses = ["todo", "in_progress", "done"];
+  const validPriorities = ["low", "medium", "high", "urgent"];
+  const colorRegex = /^#[0-9A-Fa-f]{6}$/;
+
+  const errors: string[] = [];
+  const validTasks: {
+    organization_id: string;
+    title: string;
+    description: string | null;
+    status: "todo" | "in_progress" | "done";
+    priority: "low" | "medium" | "high" | "urgent";
+    due_date: string | null;
+    color: string;
+    labels: string[];
+    assigned_to_ids: string[];
+    created_by: string;
+  }[] = [];
+
+  tasks.forEach((task, index) => {
+    const rowNum = index + 2; // Account for header row
+
+    if (!task.title || !task.title.trim()) {
+      errors.push(`Row ${rowNum}: Missing title`);
+      return;
+    }
+
+    // Validate and parse status
+    let status: "todo" | "in_progress" | "done" = "todo";
+    if (task.status) {
+      const normalizedStatus = task.status.toLowerCase().replace(/\s+/g, "_");
+      if (validStatuses.includes(normalizedStatus)) {
+        status = normalizedStatus as "todo" | "in_progress" | "done";
+      } else {
+        errors.push(`Row ${rowNum}: Invalid status "${task.status}"`);
+        return;
+      }
+    }
+
+    // Validate and parse priority
+    let priority: "low" | "medium" | "high" | "urgent" = "medium";
+    if (task.priority) {
+      const normalizedPriority = task.priority.toLowerCase();
+      if (validPriorities.includes(normalizedPriority)) {
+        priority = normalizedPriority as "low" | "medium" | "high" | "urgent";
+      } else {
+        errors.push(`Row ${rowNum}: Invalid priority "${task.priority}"`);
+        return;
+      }
+    }
+
+    // Validate and parse color
+    let color = "#3b82f6"; // Default blue
+    if (task.color) {
+      if (colorRegex.test(task.color)) {
+        color = task.color;
+      } else {
+        errors.push(`Row ${rowNum}: Invalid color format "${task.color}"`);
+        return;
+      }
+    }
+
+    // Parse due date
+    let due_date: string | null = null;
+    if (task.due_date) {
+      const parsed = new Date(task.due_date);
+      if (!isNaN(parsed.getTime())) {
+        due_date = parsed.toISOString();
+      } else {
+        errors.push(`Row ${rowNum}: Invalid date format "${task.due_date}"`);
+        return;
+      }
+    }
+
+    // Parse labels (comma-separated)
+    const labels = task.labels
+      ? task.labels.split(",").map((l) => l.trim()).filter(Boolean)
+      : [];
+
+    // Parse assignees (comma-separated emails)
+    const assigned_to_ids: string[] = [];
+    if (task.assignees) {
+      const emails = task.assignees.split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+      for (const email of emails) {
+        const userId = membersByEmail.get(email);
+        if (userId) {
+          assigned_to_ids.push(userId);
+        }
+        // Silently skip unknown emails - don't add an error for this
+      }
+    }
+
+    validTasks.push({
+      organization_id: organizationId,
+      title: task.title.trim(),
+      description: task.description?.trim() || null,
+      status,
+      priority,
+      due_date,
+      color,
+      labels,
+      assigned_to_ids,
+      created_by: user.id,
+    });
+  });
+
+  if (validTasks.length === 0) {
+    return { error: "No valid tasks to import", errors };
+  }
+
+  const { data, error } = await supabase
+    .from("whiteboard_tasks")
+    .insert(validTasks)
+    .select();
+
+  if (error) {
+    return { error: error.message, errors };
+  }
+
+  revalidatePath("/whiteboard");
+  return { success: true, imported: data.length, tasks: data, errors };
 }
