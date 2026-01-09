@@ -63,7 +63,7 @@ export function TagSelector({
   };
 
   return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
+    <Popover open={open} onOpenChange={handleOpenChange} modal={false}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -109,15 +109,15 @@ export function TagSelector({
           <ChevronDown className="h-4 w-4 shrink-0 opacity-50 ml-2" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[280px] p-0" align="start">
+      <PopoverContent className="w-[280px] p-0 max-h-[300px] overflow-hidden" align="start">
         {personTags.length === 0 ? (
           <div className="p-4 text-sm text-muted-foreground text-center">
             No tags available. Create tags using the Tags button.
           </div>
         ) : (
-          <div className="flex flex-col">
+          <div className="flex flex-col max-h-[300px]">
             {/* Search input */}
-            <div className="p-2 border-b">
+            <div className="p-2 border-b shrink-0">
               <div className="relative">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -128,8 +128,8 @@ export function TagSelector({
                 />
               </div>
             </div>
-            {/* Tags list */}
-            <div className="max-h-[200px] overflow-y-auto p-2 space-y-1">
+            {/* Tags list - scrollable */}
+            <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-1 overscroll-contain scrollbar-thin">
               {filteredTags.length === 0 ? (
                 <div className="py-2 text-sm text-muted-foreground text-center">
                   No tags found
