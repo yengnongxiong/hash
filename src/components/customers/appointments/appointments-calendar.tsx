@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type CustomerInfo = { name: string; company: string | null };
+type CustomerInfo = { id?: string; name: string | null; company: string | null; customer_number?: string };
 type AppointmentWithCustomer = Appointment & {
   customers?: CustomerInfo | CustomerInfo[] | null;
 };

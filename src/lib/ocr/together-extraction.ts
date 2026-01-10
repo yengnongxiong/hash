@@ -1,44 +1,18 @@
 /**
  * Together.ai Fine-Tuned Model Integration
  *
- * Uses our fine-tuned Mistral-7B model for document extraction.
- * Falls back to standard Mistral API if fine-tuned model is unavailable.
+ * Uses our fine-tuned Llama 3.1 8B model for document extraction.
+ * Falls back to base Llama 3.1 8B if fine-tuned model is unavailable.
  */
 
-// Document types supported by the extraction model
-type DocumentType =
-  | "invoice"
-  | "receipt"
-  | "contract"
-  | "w2"
-  | "form"
-  | "bank_statement"
-  | "purchase_order"
-  | "other";
+import { ExtractedDocumentData, DocumentType, ConfidenceLevel } from "./types";
 
 // Together.ai API configuration
 const TOGETHER_API_URL = "https://api.together.xyz/v1/chat/completions";
 
-// Fine-tuned model ID (set after training completes)
-// Format: <org>/<model-name> e.g., "yourorg/hash-document-extraction"
+// Fine-tuned model ID (serverless LoRA on Llama 3.1 8B)
 const FINE_TUNED_MODEL = process.env.TOGETHER_FINE_TUNED_MODEL;
-const FALLBACK_MODEL = "mistralai/Mistral-7B-Instruct-v0.2";
-
-interface ExtractionResult {
-  document_type: DocumentType;
-  confidence: number;
-  fields: Record<string, FieldValue>;
-}
-
-interface FieldValue {
-  value: string | number | object;
-  confidence?: number;
-}
-
-interface TogetherMessage {
-  role: "system" | "user" | "assistant";
-  content: string;
-}
+const FALLBACK_MODEL = "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo";
 
 interface TogetherResponse {
   choices: Array<{
@@ -53,29 +27,49 @@ interface TogetherResponse {
   };
 }
 
-const SYSTEM_PROMPT = `You are an expert document extraction assistant. Your task is to analyze document text (from OCR) and extract structured data. Always respond with valid JSON containing the document type and extracted fields. Be precise and extract all available information.
+// Comprehensive extraction prompt matching Mistral's capabilities
+const EXTRACTION_PROMPT = `You are an expert document extraction assistant. Your task is to analyze document text (from OCR) and extract structured data. Always respond with valid JSON.
 
-For each field, include the extracted value. Focus on accuracy over completeness - it's better to leave a field empty than to guess incorrectly.
+First, identify the document type from these categories:
+- FINANCIAL: invoice, receipt, purchase_order, bank_statement, credit_card_statement, check
+- LEGAL: contract, amendment, nda, terms_of_service
+- HR: w2, 1099, pay_stub, offer_letter, i9
+- INSURANCE: policy_declaration, claim_form, certificate_of_insurance
+- HEALTHCARE: eob, medical_bill, prescription
+- REAL_ESTATE: lease, mortgage_statement, property_tax
+- SHIPPING: bill_of_lading, packing_list, customs_declaration
+- other (if none match)
 
-Document types: invoice, receipt, contract, w2, form, bank_statement, purchase_order, other
+Extract all relevant fields based on document type. Include confidence levels for each field.
 
-Common fields by type:
-- Invoice: invoice_number, invoice_date, due_date, vendor_name, customer_name, line_items, subtotal, tax, total, payment_terms
-- Receipt: merchant_name, date, time, line_items, subtotal, tax, total, payment_method
-- Contract: contract_type, parties, effective_date, expiration_date, contract_value, terms
-- W2: tax_year, employer_name, employer_ein, employee_name, wages, federal_tax_withheld`;
+For INVOICES: invoiceNumber, vendorName, invoiceDate, dueDate, totalAmount, currency, paymentTerms, poNumber, lineItems
+For RECEIPTS: merchantName, transactionDate, subtotal, tax, total, paymentMethod, lineItems
+For CONTRACTS: partyA, partyB, effectiveDate, expirationDate, contractValue, contractType, terms
+For W-2: employeeName, employeeSsnLast4, employerName, employerEin, taxYear, wagesTipsCompensation, federalIncomeTaxWithheld
+For BANK STATEMENTS: accountNumber, bankName, statementPeriodStart, statementPeriodEnd, openingBalance, closingBalance, transactions
+
+Return JSON with this structure:
+{
+  "documentType": "invoice|receipt|contract|...",
+  "documentTypeConfidence": "high|medium|low",
+  "fieldConfidence": { "fieldName": "high|medium|low", ... },
+  ...extracted fields
+}
+
+Focus on accuracy - it's better to leave a field empty than guess incorrectly.
+PII HANDLING: For SSN, only extract the last 4 digits.`;
 
 /**
  * Extract structured data from document text using fine-tuned model
+ * Returns data in ExtractedDocumentData format for compatibility with existing system
  */
 export async function extractWithFineTunedModel(
   ocrText: string,
   options?: {
-    expectedType?: DocumentType;
     maxTokens?: number;
     temperature?: number;
   }
-): Promise<ExtractionResult> {
+): Promise<ExtractedDocumentData> {
   const apiKey = process.env.TOGETHER_API_KEY;
 
   if (!apiKey) {
@@ -85,17 +79,7 @@ export async function extractWithFineTunedModel(
   // Use fine-tuned model if available, otherwise fallback
   const model = FINE_TUNED_MODEL || FALLBACK_MODEL;
 
-  // Build the user prompt
-  let userPrompt = "Extract structured data from this document:\n\n" + ocrText;
-
-  if (options?.expectedType) {
-    userPrompt = `Extract structured data from this ${options.expectedType}:\n\n${ocrText}`;
-  }
-
-  const messages: TogetherMessage[] = [
-    { role: "system", content: SYSTEM_PROMPT },
-    { role: "user", content: userPrompt },
-  ];
+  const userPrompt = `${EXTRACTION_PROMPT}\n\nDocument text:\n${ocrText}`;
 
   try {
     const response = await fetch(TOGETHER_API_URL, {
@@ -106,8 +90,8 @@ export async function extractWithFineTunedModel(
       },
       body: JSON.stringify({
         model,
-        messages,
-        max_tokens: options?.maxTokens ?? 2000,
+        messages: [{ role: "user", content: userPrompt }],
+        max_tokens: options?.maxTokens ?? 4096,
         temperature: options?.temperature ?? 0.1,
         response_format: { type: "json_object" },
       }),
@@ -125,112 +109,267 @@ export async function extractWithFineTunedModel(
       throw new Error("No response content from Together API");
     }
 
-    // Parse the JSON response
-    const result = JSON.parse(content);
-
-    // Normalize the response format
-    return normalizeExtractionResult(result);
+    // Parse and normalize to ExtractedDocumentData format
+    const parsed = JSON.parse(content);
+    return normalizeToExtractedDocumentData(parsed);
   } catch (error) {
     console.error("Together extraction error:", error);
-    throw error;
-  }
-}
-
-/**
- * Classify document type using fine-tuned model
- */
-export async function classifyDocumentType(
-  ocrText: string
-): Promise<{ type: DocumentType; confidence: number }> {
-  const apiKey = process.env.TOGETHER_API_KEY;
-
-  if (!apiKey) {
-    throw new Error("TOGETHER_API_KEY environment variable not set");
-  }
-
-  const model = FINE_TUNED_MODEL || FALLBACK_MODEL;
-
-  const messages: TogetherMessage[] = [
-    {
-      role: "system",
-      content:
-        "You are a document classification expert. Classify the document type and respond with JSON: {\"document_type\": \"type\", \"confidence\": 0.95}",
-    },
-    {
-      role: "user",
-      content: `Classify this document into one of: invoice, receipt, contract, w2, form, bank_statement, purchase_order, other.\n\n${ocrText.slice(0, 2000)}`,
-    },
-  ];
-
-  try {
-    const response = await fetch(TOGETHER_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        max_tokens: 100,
-        temperature: 0.1,
-        response_format: { type: "json_object" },
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Together API error: ${response.status}`);
-    }
-
-    const data: TogetherResponse = await response.json();
-    const content = data.choices[0]?.message?.content;
-
-    if (!content) {
-      return { type: "other", confidence: 0.5 };
-    }
-
-    const result = JSON.parse(content);
+    // Return minimal valid ExtractedDocumentData on error
     return {
-      type: (result.document_type || "other") as DocumentType,
-      confidence: result.confidence ?? 0.8,
+      documentType: "other",
+      pageCount: 1,
+      hasImages: false,
+      hasTables: false,
     };
-  } catch (error) {
-    console.error("Document classification error:", error);
-    return { type: "other", confidence: 0.5 };
   }
 }
 
 /**
- * Normalize extraction result to consistent format
+ * Normalize Together.ai response to ExtractedDocumentData format
  */
-function normalizeExtractionResult(result: Record<string, unknown>): ExtractionResult {
-  // Handle different response formats
-  const documentType = (result.document_type ||
-    result.type ||
-    "other") as DocumentType;
+function normalizeToExtractedDocumentData(
+  parsed: Record<string, unknown>
+): ExtractedDocumentData {
+  // Calculate overall confidence from field confidences
+  const fieldConfidence = parsed.fieldConfidence as Record<string, ConfidenceLevel> | undefined;
+  let overallConfidence: ConfidenceLevel = "high";
 
-  // Extract fields, removing document_type from fields object
-  const fields: Record<string, FieldValue> = {};
+  if (fieldConfidence) {
+    const confidenceValues = Object.values(fieldConfidence);
+    const lowCount = confidenceValues.filter((c) => c === "low").length;
+    const mediumCount = confidenceValues.filter((c) => c === "medium").length;
 
-  const rawFields = result.fields || result;
-
-  for (const [key, value] of Object.entries(rawFields)) {
-    if (key === "document_type" || key === "type" || key === "confidence") {
-      continue;
-    }
-
-    // Normalize field value
-    if (typeof value === "object" && value !== null && "value" in value) {
-      fields[key] = value as FieldValue;
-    } else {
-      fields[key] = { value: value as string | number | object };
+    if (lowCount > confidenceValues.length * 0.3) {
+      overallConfidence = "low";
+    } else if (mediumCount > confidenceValues.length * 0.3 || lowCount > 0) {
+      overallConfidence = "medium";
     }
   }
+
+  const hasTables =
+    (Array.isArray(parsed.lineItems) && parsed.lineItems.length > 0) ||
+    (Array.isArray(parsed.transactions) && parsed.transactions.length > 0) ||
+    (Array.isArray(parsed.deductions) && parsed.deductions.length > 0);
 
   return {
-    document_type: documentType,
-    confidence: (result.confidence as number) ?? 0.85,
-    fields,
+    documentType: (parsed.documentType as DocumentType) || "other",
+    documentTypeConfidence:
+      (parsed.documentTypeConfidence as ConfidenceLevel) || "high",
+    pageCount: 1,
+    hasImages: false,
+    hasTables,
+    overallConfidence,
+    fieldConfidence: fieldConfidence || {},
+
+    // Invoice fields
+    invoiceNumber: parsed.invoiceNumber as string | undefined,
+    vendorName: parsed.vendorName as string | undefined,
+    invoiceDate: parsed.invoiceDate as string | undefined,
+    dueDate: parsed.dueDate as string | undefined,
+    totalAmount: parsed.totalAmount as number | undefined,
+    currency: (parsed.currency as string) || "USD",
+    lineItems: parsed.lineItems as ExtractedDocumentData["lineItems"],
+    paymentTerms: parsed.paymentTerms as string | undefined,
+    poNumber: parsed.poNumber as string | undefined,
+
+    // Receipt fields
+    merchantName: parsed.merchantName as string | undefined,
+    transactionDate: parsed.transactionDate as string | undefined,
+    subtotal: parsed.subtotal as number | undefined,
+    tax: parsed.tax as number | undefined,
+    total: parsed.total as number | undefined,
+    paymentMethod: parsed.paymentMethod as string | undefined,
+
+    // Purchase Order fields
+    poDate: parsed.poDate as string | undefined,
+    deliveryDate: parsed.deliveryDate as string | undefined,
+    shippingAddress: parsed.shippingAddress as ExtractedDocumentData["shippingAddress"],
+    billingAddress: parsed.billingAddress as ExtractedDocumentData["billingAddress"],
+
+    // Bank Statement fields
+    accountNumber: parsed.accountNumber as string | undefined,
+    bankName: parsed.bankName as string | undefined,
+    statementPeriodStart: parsed.statementPeriodStart as string | undefined,
+    statementPeriodEnd: parsed.statementPeriodEnd as string | undefined,
+    openingBalance: parsed.openingBalance as number | undefined,
+    closingBalance: parsed.closingBalance as number | undefined,
+    transactions: parsed.transactions as ExtractedDocumentData["transactions"],
+
+    // Credit Card Statement fields
+    cardholderName: parsed.cardholderName as string | undefined,
+    statementDate: parsed.statementDate as string | undefined,
+    creditLimit: parsed.creditLimit as number | undefined,
+    currentBalance: parsed.currentBalance as number | undefined,
+    minimumPayment: parsed.minimumPayment as number | undefined,
+
+    // Check fields
+    checkNumber: parsed.checkNumber as string | undefined,
+    checkDate: parsed.checkDate as string | undefined,
+    amount: parsed.amount as number | undefined,
+    payee: parsed.payee as string | undefined,
+    payer: parsed.payer as string | undefined,
+    memo: parsed.memo as string | undefined,
+    routingNumber: parsed.routingNumber as string | undefined,
+
+    // Contract fields
+    partyA: parsed.partyA as string | undefined,
+    partyB: parsed.partyB as string | undefined,
+    effectiveDate: parsed.effectiveDate as string | undefined,
+    expirationDate: parsed.expirationDate as string | undefined,
+    contractValue: parsed.contractValue as number | undefined,
+    contractType: parsed.contractType as string | undefined,
+    terms: parsed.terms as string | undefined,
+
+    // Amendment fields
+    originalContractRef: parsed.originalContractRef as string | undefined,
+    amendmentDate: parsed.amendmentDate as string | undefined,
+    changes: parsed.changes as string | undefined,
+
+    // NDA fields
+    term: parsed.term as string | undefined,
+    scope: parsed.scope as string | undefined,
+    jurisdiction: parsed.jurisdiction as string | undefined,
+
+    // Terms of Service fields
+    version: parsed.version as string | undefined,
+    companyName: parsed.companyName as string | undefined,
+    keyTerms: parsed.keyTerms as string[] | undefined,
+
+    // W-2 fields
+    employeeName: parsed.employeeName as string | undefined,
+    employeeSsnLast4: parsed.employeeSsnLast4 as string | undefined,
+    employerName: parsed.employerName as string | undefined,
+    employerEin: parsed.employerEin as string | undefined,
+    taxYear: parsed.taxYear as number | undefined,
+    wagesTipsCompensation: parsed.wagesTipsCompensation as number | undefined,
+    federalIncomeTaxWithheld: parsed.federalIncomeTaxWithheld as number | undefined,
+    socialSecurityWages: parsed.socialSecurityWages as number | undefined,
+    socialSecurityTaxWithheld: parsed.socialSecurityTaxWithheld as number | undefined,
+    medicareWages: parsed.medicareWages as number | undefined,
+    medicareTaxWithheld: parsed.medicareTaxWithheld as number | undefined,
+    state: parsed.state as string | undefined,
+    stateWages: parsed.stateWages as number | undefined,
+    stateIncomeTax: parsed.stateIncomeTax as number | undefined,
+
+    // 1099 fields
+    recipientName: parsed.recipientName as string | undefined,
+    payerName: parsed.payerName as string | undefined,
+    recipientTin: parsed.recipientTin as string | undefined,
+    payerTin: parsed.payerTin as string | undefined,
+    form1099Type: parsed.form1099Type as string | undefined,
+
+    // Pay Stub fields
+    payPeriodStart: parsed.payPeriodStart as string | undefined,
+    payPeriodEnd: parsed.payPeriodEnd as string | undefined,
+    payDate: parsed.payDate as string | undefined,
+    grossPay: parsed.grossPay as number | undefined,
+    netPay: parsed.netPay as number | undefined,
+    deductions: parsed.deductions as ExtractedDocumentData["deductions"],
+    ytdGross: parsed.ytdGross as number | undefined,
+    ytdNet: parsed.ytdNet as number | undefined,
+
+    // Offer Letter fields
+    candidateName: parsed.candidateName as string | undefined,
+    position: parsed.position as string | undefined,
+    salary: parsed.salary as number | undefined,
+    startDate: parsed.startDate as string | undefined,
+    benefits: parsed.benefits as string | undefined,
+    supervisorName: parsed.supervisorName as string | undefined,
+
+    // I-9 fields
+    citizenshipStatus: parsed.citizenshipStatus as string | undefined,
+    documentNumbers: parsed.documentNumbers as string[] | undefined,
+    documentExpirationDates: parsed.documentExpirationDates as string[] | undefined,
+    listADocument: parsed.listADocument as string | undefined,
+    listBDocument: parsed.listBDocument as string | undefined,
+    listCDocument: parsed.listCDocument as string | undefined,
+
+    // Insurance fields
+    policyNumber: parsed.policyNumber as string | undefined,
+    insured: parsed.insured as string | undefined,
+    insurer: parsed.insurer as string | undefined,
+    coverageType: parsed.coverageType as string | undefined,
+    coverageLimits: parsed.coverageLimits as number | undefined,
+    premium: parsed.premium as number | undefined,
+    policyPeriodStart: parsed.policyPeriodStart as string | undefined,
+    policyPeriodEnd: parsed.policyPeriodEnd as string | undefined,
+    claimNumber: parsed.claimNumber as string | undefined,
+    dateOfLoss: parsed.dateOfLoss as string | undefined,
+    claimDescription: parsed.claimDescription as string | undefined,
+    amountClaimed: parsed.amountClaimed as number | undefined,
+    claimant: parsed.claimant as string | undefined,
+    certificateHolder: parsed.certificateHolder as string | undefined,
+    coverageTypes: parsed.coverageTypes as string[] | undefined,
+    additionalInsured: parsed.additionalInsured as string | undefined,
+
+    // Healthcare fields
+    patientName: parsed.patientName as string | undefined,
+    providerName: parsed.providerName as string | undefined,
+    serviceDate: parsed.serviceDate as string | undefined,
+    billedAmount: parsed.billedAmount as number | undefined,
+    allowedAmount: parsed.allowedAmount as number | undefined,
+    patientResponsibility: parsed.patientResponsibility as number | undefined,
+    insurancePaid: parsed.insurancePaid as number | undefined,
+    claimStatus: parsed.claimStatus as string | undefined,
+    diagnosisCodes: parsed.diagnosisCodes as string[] | undefined,
+    procedureCodes: parsed.procedureCodes as string[] | undefined,
+    facilityName: parsed.facilityName as string | undefined,
+    admissionDate: parsed.admissionDate as string | undefined,
+    dischargeDate: parsed.dischargeDate as string | undefined,
+    charges: parsed.charges as number | undefined,
+    prescriber: parsed.prescriber as string | undefined,
+    medication: parsed.medication as string | undefined,
+    dosage: parsed.dosage as string | undefined,
+    quantity: parsed.quantity as number | undefined,
+    refills: parsed.refills as number | undefined,
+    pharmacyName: parsed.pharmacyName as string | undefined,
+    rxNumber: parsed.rxNumber as string | undefined,
+    dispensedDate: parsed.dispensedDate as string | undefined,
+
+    // Real Estate fields
+    landlord: parsed.landlord as string | undefined,
+    tenant: parsed.tenant as string | undefined,
+    propertyAddress: parsed.propertyAddress as ExtractedDocumentData["propertyAddress"],
+    leaseTermStart: parsed.leaseTermStart as string | undefined,
+    leaseTermEnd: parsed.leaseTermEnd as string | undefined,
+    monthlyRent: parsed.monthlyRent as number | undefined,
+    securityDeposit: parsed.securityDeposit as number | undefined,
+    loanNumber: parsed.loanNumber as string | undefined,
+    propertyValue: parsed.propertyValue as number | undefined,
+    principalBalance: parsed.principalBalance as number | undefined,
+    interestRate: parsed.interestRate as number | undefined,
+    escrowBalance: parsed.escrowBalance as number | undefined,
+    nextPaymentDue: parsed.nextPaymentDue as string | undefined,
+    nextPaymentAmount: parsed.nextPaymentAmount as number | undefined,
+    assessedValue: parsed.assessedValue as number | undefined,
+    taxAmount: parsed.taxAmount as number | undefined,
+    taxYear2: parsed.taxYear2 as number | undefined,
+    parcelNumber: parsed.parcelNumber as string | undefined,
+    taxingAuthority: parsed.taxingAuthority as string | undefined,
+
+    // Shipping fields
+    shipper: parsed.shipper as string | undefined,
+    consignee: parsed.consignee as string | undefined,
+    carrier: parsed.carrier as string | undefined,
+    origin: parsed.origin as ExtractedDocumentData["origin"],
+    destination: parsed.destination as ExtractedDocumentData["destination"],
+    weight: parsed.weight as number | undefined,
+    bolNumber: parsed.bolNumber as string | undefined,
+    shipDate: parsed.shipDate as string | undefined,
+    orderNumber: parsed.orderNumber as string | undefined,
+    items: parsed.items as ExtractedDocumentData["items"],
+    packageCount: parsed.packageCount as number | undefined,
+    totalWeight: parsed.totalWeight as number | undefined,
+    declaredValue: parsed.declaredValue as number | undefined,
+    countryOfOrigin: parsed.countryOfOrigin as string | undefined,
+    hsCodes: parsed.hsCodes as string[] | undefined,
+    importerName: parsed.importerName as string | undefined,
+    exporterName: parsed.exporterName as string | undefined,
+    customsEntryNumber: parsed.customsEntryNumber as string | undefined,
+
+    // General fields
+    dates: parsed.dates as ExtractedDocumentData["dates"],
+    amounts: parsed.amounts as ExtractedDocumentData["amounts"],
   };
 }
 
@@ -249,62 +388,8 @@ export function getCurrentModel(): string {
 }
 
 /**
- * Test the fine-tuned model with a sample document
+ * Check if using fine-tuned model vs fallback
  */
-export async function testFineTunedModel(): Promise<{
-  success: boolean;
-  model: string;
-  latencyMs: number;
-  result?: ExtractionResult;
-  error?: string;
-}> {
-  const start = Date.now();
-  const model = getCurrentModel();
-
-  const sampleInvoice = `
-ACME Corporation
-123 Business Street
-New York, NY 10001
-
-INVOICE
-
-Invoice #: INV-2024-001
-Date: January 15, 2024
-Due Date: February 14, 2024
-
-Bill To:
-XYZ Company
-456 Client Avenue
-Los Angeles, CA 90001
-
-Description                    Qty    Price     Amount
-Consulting Services            10     $150.00   $1,500.00
-Software License               1      $500.00   $500.00
-
-                               Subtotal:        $2,000.00
-                               Tax (8%):        $160.00
-                               Total:           $2,160.00
-
-Payment Terms: Net 30
-`;
-
-  try {
-    const result = await extractWithFineTunedModel(sampleInvoice, {
-      expectedType: "invoice",
-    });
-
-    return {
-      success: true,
-      model,
-      latencyMs: Date.now() - start,
-      result,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      model,
-      latencyMs: Date.now() - start,
-      error: error instanceof Error ? error.message : String(error),
-    };
-  }
+export function isUsingFineTunedModel(): boolean {
+  return !!FINE_TUNED_MODEL;
 }

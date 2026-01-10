@@ -215,7 +215,7 @@ export function DatesView({ appointments, customers, appointmentTypes, organizat
           // Team Notes
           apt.notes?.toLowerCase().includes(searchLower) ||
           // Type
-          apt.appointment_type?.name?.toLowerCase().includes(searchLower) ||
+          apt.appointment_types?.name?.toLowerCase().includes(searchLower) ||
           // Dates and times
           formattedStartDate.includes(searchLower) ||
           formattedStartTime.includes(searchLower) ||
@@ -281,8 +281,8 @@ export function DatesView({ appointments, customers, appointmentTypes, organizat
           comparison = nameA.localeCompare(nameB);
           break;
         case "type":
-          const typeA = a.appointment_type?.name || "";
-          const typeB = b.appointment_type?.name || "";
+          const typeA = a.appointment_types?.name || "";
+          const typeB = b.appointment_types?.name || "";
           comparison = typeA.localeCompare(typeB);
           break;
         case "status":
@@ -445,7 +445,7 @@ export function DatesView({ appointments, customers, appointmentTypes, organizat
       title: apt.title,
       date: new Date(apt.start_time),
       endDate: apt.end_time ? new Date(apt.end_time) : undefined,
-      color: apt.appointment_type?.color || undefined,
+      color: apt.appointment_types?.color || undefined,
       entityName: apt.customers
         ? Array.isArray(apt.customers)
           ? apt.customers[0]?.name
@@ -499,8 +499,8 @@ export function DatesView({ appointments, customers, appointmentTypes, organizat
         }
         return "";
       }},
-      { key: "appointment_type", label: "Type", format: (v) => {
-        const type = v as AppointmentWithDetails["appointment_type"];
+      { key: "appointment_types", label: "Type", format: (v) => {
+        const type = v as AppointmentWithDetails["appointment_types"];
         return type?.name || "";
       }},
       { key: "location", label: "Location", format: (v) => (v as string) || "" },
@@ -753,8 +753,8 @@ export function DatesView({ appointments, customers, appointmentTypes, organizat
                       <td className="p-3">
                         <div className="flex items-center gap-2">
                           {/* Type indicator: blank circle if no type, colored if type exists */}
-                          {apt.appointment_type ? (
-                            <div className={cn("w-2 h-2 rounded-full", apt.appointment_type.color)} />
+                          {apt.appointment_types ? (
+                            <div className={cn("w-2 h-2 rounded-full", apt.appointment_types.color)} />
                           ) : (
                             <Circle className="w-2 h-2 text-muted-foreground/50" />
                           )}
@@ -801,10 +801,10 @@ export function DatesView({ appointments, customers, appointmentTypes, organizat
                         )}
                       </td>
                       <td className="p-3 max-w-0">
-                        {apt.appointment_type ? (
-                          <Badge variant="outline" className="gap-1.5 max-w-[90px]" title={apt.appointment_type.name}>
-                            <div className={cn("w-2 h-2 rounded-full shrink-0", apt.appointment_type.color)} />
-                            <span className="truncate">{apt.appointment_type.name}</span>
+                        {apt.appointment_types ? (
+                          <Badge variant="outline" className="gap-1.5 max-w-[90px]" title={apt.appointment_types.name}>
+                            <div className={cn("w-2 h-2 rounded-full shrink-0", apt.appointment_types.color)} />
+                            <span className="truncate">{apt.appointment_types.name}</span>
                           </Badge>
                         ) : (
                           <span className="text-sm text-muted-foreground">-</span>

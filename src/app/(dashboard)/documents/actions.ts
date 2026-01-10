@@ -38,12 +38,15 @@ export async function uploadDocument(formData: FormData) {
   // Validate file type
   const allowedTypes = [
     "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // DOCX
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation", // PPTX
     "image/png",
     "image/jpeg",
     "image/webp",
+    "image/avif",
   ];
   if (!allowedTypes.includes(file.type)) {
-    return { error: "Invalid file type. Allowed: PDF, PNG, JPG, WebP" };
+    return { error: "Invalid file type. Allowed: PDF, DOCX, PPTX, PNG, JPG, WebP, AVIF" };
   }
 
   // Validate file size (50MB)
@@ -693,6 +696,34 @@ export async function bulkApproveDocuments(documentIds: string[]) {
   }));
 
   await supabase.from("document_audit_log").insert(auditEntries);
+
+  // Get extracted data for all approved documents for embedding/entity learning
+  const { data: docsData } = await supabase
+    .from("documents")
+    .select("id, extracted_data")
+    .in("id", pendingIds);
+
+  // Generate embeddings and learn entities for each approved document (async, don't block)
+  if (docsData) {
+    for (const doc of docsData) {
+      // Generate document embedding for semantic search
+      generateDocumentEmbedding(doc.id).catch(err => {
+        console.error(`Error generating embedding for doc ${doc.id}:`, err);
+      });
+
+      // Learn entities from approved document
+      if (doc.extracted_data) {
+        learnEntitiesFromDocument(doc.id, doc.extracted_data as Record<string, unknown>).catch(err => {
+          console.error(`Error learning entities for doc ${doc.id}:`, err);
+        });
+
+        // Validate entities for this document
+        validateDocumentEntities(doc.id, doc.extracted_data as Record<string, unknown>).catch(err => {
+          console.error(`Error validating entities for doc ${doc.id}:`, err);
+        });
+      }
+    }
+  }
 
   revalidatePath("/documents");
   revalidatePath("/documents/review");

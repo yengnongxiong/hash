@@ -40,14 +40,15 @@ PROCESSED_DIR = BASE_DIR / "processed"
 TOGETHER_DIR = BASE_DIR / "together-ai"
 
 # Together.ai configuration
-MODEL_NAME = "mistralai/Mistral-7B-Instruct-v0.2"
+# Using Llama 3.1 8B for serverless LoRA support
+MODEL_NAME = "meta-llama/Meta-Llama-3.1-8B-Instruct-Reference"
 FINE_TUNED_SUFFIX = "hash-document-extraction"
 
 # Training hyperparameters (from PRD section 7.1)
 TRAINING_CONFIG = {
     "n_epochs": 3,
     "learning_rate": 2e-4,
-    "batch_size": 4,  # Adjust based on Together.ai limits
+    "batch_size": 8,  # Together.ai minimum is 8
     "warmup_ratio": 0.1,
 }
 
@@ -70,10 +71,12 @@ def convert_to_together_format(input_path: Path, output_path: Path):
     """
     Convert JSONL to Together.ai chat format.
 
+    Note: Mistral-7B-Instruct-v0.2 doesn't support system role,
+    so we prepend the system prompt to the user message.
+
     Together.ai expects:
     {
         "messages": [
-            {"role": "system", "content": "You are a document extraction assistant."},
             {"role": "user", "content": "instruction + input"},
             {"role": "assistant", "content": "output"}
         ]
@@ -89,12 +92,12 @@ def convert_to_together_format(input_path: Path, output_path: Path):
             try:
                 data = json.loads(line.strip())
 
-                # Combine instruction and input
-                user_content = f"{data['instruction']}\n\n{data['input']}"
+                # Combine system prompt, instruction and input into user message
+                # (Mistral Instruct doesn't support system role)
+                user_content = f"{system_prompt}\n\n{data['instruction']}\n\n{data['input']}"
 
                 together_format = {
                     "messages": [
-                        {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_content},
                         {"role": "assistant", "content": data["output"]}
                     ]
@@ -159,14 +162,12 @@ def upload_data(train_path: Path, val_path: Path):
 
     # Upload training file
     print(f"\nUploading {train_path}...")
-    with open(train_path, "rb") as f:
-        train_file = client.files.upload(file=f, purpose="fine-tune")
+    train_file = client.files.upload(file=str(train_path), purpose="fine-tune")
     print(f"  Training file ID: {train_file.id}")
 
     # Upload validation file
     print(f"\nUploading {val_path}...")
-    with open(val_path, "rb") as f:
-        val_file = client.files.upload(file=f, purpose="fine-tune")
+    val_file = client.files.upload(file=str(val_path), purpose="fine-tune")
     print(f"  Validation file ID: {val_file.id}")
 
     # Save file IDs for later

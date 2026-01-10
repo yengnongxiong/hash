@@ -124,6 +124,14 @@ function getFileIcon(fileType: string | null) {
   if (fileType === "application/pdf") {
     return <FileText className="h-4 w-4 text-red-500" />;
   }
+  // DOCX - Word documents
+  if (fileType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+    return <FileText className="h-4 w-4 text-blue-600" />;
+  }
+  // PPTX - PowerPoint presentations
+  if (fileType === "application/vnd.openxmlformats-officedocument.presentationml.presentation") {
+    return <FileText className="h-4 w-4 text-orange-500" />;
+  }
   return <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />;
 }
 
@@ -228,6 +236,16 @@ export function DocumentsView({ documents }: DocumentsViewProps) {
   // Count documents with flags
   const flaggedDocumentsCount = useMemo(() => {
     return documents.filter(d => d.unresolved_flag_count && d.unresolved_flag_count > 0).length;
+  }, [documents]);
+
+  // Count failed documents
+  const failedDocuments = useMemo(() => {
+    return documents.filter(d => d.status === "failed");
+  }, [documents]);
+
+  // Count pending review documents
+  const pendingReviewCount = useMemo(() => {
+    return documents.filter(d => d.status === "pending_review").length;
   }, [documents]);
 
   const hasActiveFilters =
@@ -491,6 +509,52 @@ export function DocumentsView({ documents }: DocumentsViewProps) {
 
       {/* Upload Dialog */}
       <UploadDialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen} />
+
+      {/* Alert Banners */}
+      <div className="space-y-2">
+        {/* Failed Documents Alert */}
+        {failedDocuments.length > 0 && (
+          <div className="flex items-center justify-between gap-3 p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400 shrink-0" />
+              <span className="text-sm text-red-800 dark:text-red-200">
+                <span className="font-medium">{failedDocuments.length} document{failedDocuments.length !== 1 ? "s" : ""} failed</span>
+                {" "}processing and need{failedDocuments.length === 1 ? "s" : ""} attention
+              </span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setStatusFilter("failed")}
+              className="border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/30 shrink-0"
+            >
+              <RotateCw className="h-3 w-3 mr-1" />
+              View Failed
+            </Button>
+          </div>
+        )}
+
+        {/* Pending Review Alert */}
+        {pendingReviewCount > 0 && (
+          <div className="flex items-center justify-between gap-3 p-3 bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-lg">
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-purple-600 dark:text-purple-400 shrink-0" />
+              <span className="text-sm text-purple-800 dark:text-purple-200">
+                <span className="font-medium">{pendingReviewCount} document{pendingReviewCount !== 1 ? "s" : ""}</span>
+                {" "}awaiting your review
+              </span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setStatusFilter("pending_review")}
+              className="border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/30 shrink-0"
+            >
+              Review Now
+            </Button>
+          </div>
+        )}
+      </div>
 
       {/* Results info */}
       <div className="flex items-center justify-between">

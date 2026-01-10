@@ -789,6 +789,7 @@ export type Database = {
           created_at: string
           customer_id: string | null
           deleted_at: string | null
+          deleted_reason: string | null
           document_number: string | null
           document_type: string | null
           extracted_data: Json | null
@@ -813,6 +814,7 @@ export type Database = {
           created_at?: string
           customer_id?: string | null
           deleted_at?: string | null
+          deleted_reason?: string | null
           document_number?: string | null
           document_type?: string | null
           extracted_data?: Json | null
@@ -837,6 +839,7 @@ export type Database = {
           created_at?: string
           customer_id?: string | null
           deleted_at?: string | null
+          deleted_reason?: string | null
           document_number?: string | null
           document_type?: string | null
           extracted_data?: Json | null
@@ -1415,6 +1418,103 @@ export type Database = {
             columns: ["document_id"]
             isOneToOne: false
             referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      retention_jobs: {
+        Row: {
+          completed_at: string | null
+          documents_archived: number | null
+          documents_deleted: number | null
+          documents_processed: number | null
+          errors: string[] | null
+          id: string
+          policy_id: string | null
+          started_at: string | null
+          status: string
+        }
+        Insert: {
+          completed_at?: string | null
+          documents_archived?: number | null
+          documents_deleted?: number | null
+          documents_processed?: number | null
+          errors?: string[] | null
+          id?: string
+          policy_id?: string | null
+          started_at?: string | null
+          status: string
+        }
+        Update: {
+          completed_at?: string | null
+          documents_archived?: number | null
+          documents_deleted?: number | null
+          documents_processed?: number | null
+          errors?: string[] | null
+          id?: string
+          policy_id?: string | null
+          started_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "retention_jobs_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "retention_policies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      retention_policies: {
+        Row: {
+          action: string
+          created_at: string | null
+          criteria: Json | null
+          description: string | null
+          enabled: boolean | null
+          id: string
+          name: string
+          notify_before: number | null
+          notify_emails: string[] | null
+          organization_id: string | null
+          retention_days: number
+          updated_at: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          criteria?: Json | null
+          description?: string | null
+          enabled?: boolean | null
+          id?: string
+          name: string
+          notify_before?: number | null
+          notify_emails?: string[] | null
+          organization_id?: string | null
+          retention_days?: number
+          updated_at?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          criteria?: Json | null
+          description?: string | null
+          enabled?: boolean | null
+          id?: string
+          name?: string
+          notify_before?: number | null
+          notify_emails?: string[] | null
+          organization_id?: string | null
+          retention_days?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "retention_policies_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -2037,39 +2137,48 @@ export const Constants = {
   },
 } as const
 
-// Custom type aliases for convenience
+// Custom type exports for convenience
+export type SystemAlert = Database["public"]["Tables"]["system_alerts"]["Row"]
 export type Customer = Database["public"]["Tables"]["customers"]["Row"]
-export type PersonTag = Database["public"]["Tables"]["person_tags"]["Row"]
-export type Document = Database["public"]["Tables"]["documents"]["Row"]
-export type DocumentAuditLog = Database["public"]["Tables"]["document_audit_log"]["Row"]
-export type WhiteboardTask = Database["public"]["Tables"]["whiteboard_tasks"]["Row"]
+export type Organization = Database["public"]["Tables"]["organizations"]["Row"]
 export type User = Database["public"]["Tables"]["users"]["Row"]
-export type TaskAttachment = Database["public"]["Tables"]["task_attachments"]["Row"]
-export type TaskSubtask = Database["public"]["Tables"]["task_subtasks"]["Row"]
+export type Document = Database["public"]["Tables"]["documents"]["Row"]
 export type Appointment = Database["public"]["Tables"]["appointments"]["Row"]
 export type AppointmentType = Database["public"]["Tables"]["appointment_types"]["Row"]
-export type Organization = Database["public"]["Tables"]["organizations"]["Row"]
-export type SystemAlert = Database["public"]["Tables"]["system_alerts"]["Row"]
+export type PersonTag = Database["public"]["Tables"]["person_tags"]["Row"]
+export type WhiteboardTask = Database["public"]["Tables"]["whiteboard_tasks"]["Row"]
+export type TaskAttachment = Database["public"]["Tables"]["task_attachments"]["Row"]
+export type TaskSubtask = Database["public"]["Tables"]["task_subtasks"]["Row"]
+export type DocumentAuditLog = Database["public"]["Tables"]["document_audit_log"]["Row"]
 
-// Phase 4: Smart Automation types
-export type AccuracyMetric = Database["public"]["Tables"]["accuracy_metrics"]["Row"]
-export type AnomalyDetection = Database["public"]["Tables"]["anomaly_detections"]["Row"]
-export type OrganizationAISettings = Database["public"]["Tables"]["organization_ai_settings"]["Row"]
-export type ValidationRule = Database["public"]["Tables"]["validation_rules"]["Row"]
+// Nested user type for joins (allows more flexible nullable fields)
+type NestedUser = {
+  id: string;
+  name: string | null;
+  email: string | null;
+  avatar_url?: string | null;
+  role?: string | null;
+};
 
-// Extended types with user info
+// Nested appointment type for joins
+type NestedAppointmentType = {
+  id: string;
+  name: string;
+  color: string;
+};
+
+// Composite types with joins
 export type CustomerWithUserInfo = Customer & {
-  created_by_user?: { name: string | null; email: string | null } | null
-  updated_by_user?: { name: string | null; email: string | null } | null
-}
+  users?: NestedUser | null;
+  created_by_user?: NestedUser | null;
+  updated_by_user?: NestedUser | null;
+};
 
-// Appointment with all details
 export type AppointmentWithDetails = Appointment & {
-  assignees?: Array<{ id: string; name: string | null; email: string }> | null
-  notes_user?: { id: string; name: string | null; email: string } | null
-  created_by_user?: { id: string; name: string | null; email: string } | null
-  updated_by_user?: { id: string; name: string | null; email: string } | null
-  customers?: { name: string; company: string | null } | null
-  appointment_type?: { id: string; name: string; color: string } | null
-  appointment_types?: { id: string; name: string; color: string } | null
+  appointment_types?: NestedAppointmentType | null;
+  notes_user?: NestedUser | null;
+  created_by_user?: NestedUser | null;
+  updated_by_user?: NestedUser | null;
+  assignees?: NestedUser[] | null;
+  customers?: { id?: string; name: string | null; company: string | null; customer_number?: string } | null;
 }

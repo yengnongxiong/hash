@@ -6,6 +6,10 @@ import {
   DocumentType,
   ConfidenceLevel,
 } from "./types";
+import {
+  extractWithFineTunedModel,
+  isTogetherConfigured,
+} from "./together-extraction";
 
 const EXTRACTION_PROMPT = `You are an expert document analyst. Analyze this document and extract structured information with confidence scores.
 
@@ -154,10 +158,14 @@ export class MistralOCRProvider implements OCRProvider {
   name = "mistral";
   private apiKey: string;
   private model: string;
+  private useTogetherExtraction: boolean;
 
-  constructor(apiKey?: string, model?: string) {
+  constructor(apiKey?: string, model?: string, useTogetherExtraction?: boolean) {
     this.apiKey = apiKey || process.env.MISTRAL_API_KEY || "";
     this.model = model || "pixtral-12b-2409";
+    // Use Together.ai fine-tuned model for extraction if configured
+    // Falls back to Mistral if Together API key is not set
+    this.useTogetherExtraction = useTogetherExtraction ?? isTogetherConfigured();
   }
 
   async processDocument(fileUrl: string, fileType: string): Promise<OCRResult> {
@@ -201,58 +209,22 @@ export class MistralOCRProvider implements OCRProvider {
       // Combine all page text for extraction
       const rawText = pages.map(p => p.markdown).join("\n\n---\n\n");
 
-      // Now use chat completion to extract structured data from the OCR text
-      const extractionResponse = await fetch("https://api.mistral.ai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "mistral-small-latest",
-          messages: [
-            {
-              role: "user",
-              content: `${EXTRACTION_PROMPT}\n\nDocument text:\n${rawText}`,
-            },
-          ],
-          max_tokens: 4096,
-          response_format: { type: "json_object" },
-        }),
-      });
-
-      if (!extractionResponse.ok) {
-        // OCR succeeded but extraction failed - still return OCR results
-        console.error("Extraction failed, returning raw OCR");
-        return {
-          success: true,
-          rawText,
-          pages,
-          extractedData: {
-            documentType: "other",
-            pageCount: pages.length,
-            hasImages: false,
-            hasTables: false,
-          },
-        };
-      }
-
-      const extractionData = await extractionResponse.json();
-      const content = extractionData.choices?.[0]?.message?.content || "";
-
-      // Parse the extracted data
+      // Extract structured data - use Together.ai fine-tuned model if configured
       let extractedData: ExtractedDocumentData;
-      try {
-        const parsed = JSON.parse(content);
-        extractedData = this.normalizeExtractedData(parsed);
-        extractedData.pageCount = pages.length;
-      } catch {
-        extractedData = {
-          documentType: "other",
-          pageCount: pages.length,
-          hasImages: false,
-          hasTables: false,
-        };
+
+      if (this.useTogetherExtraction) {
+        // Use Together.ai fine-tuned Llama 3.1 8B model for extraction
+        try {
+          extractedData = await extractWithFineTunedModel(rawText);
+          extractedData.pageCount = pages.length;
+        } catch (togetherError) {
+          console.error("Together.ai extraction failed, falling back to Mistral:", togetherError);
+          // Fall back to Mistral extraction
+          extractedData = await this.extractWithMistral(rawText, pages.length);
+        }
+      } else {
+        // Use Mistral for extraction
+        extractedData = await this.extractWithMistral(rawText, pages.length);
       }
 
       return {
@@ -280,63 +252,62 @@ export class MistralOCRProvider implements OCRProvider {
 
   async processImage(imageUrl: string): Promise<OCRResult> {
     try {
-      const response = await fetch("https://api.mistral.ai/v1/chat/completions", {
+      // Step 1: Use Mistral OCR to extract raw text from the image
+      const ocrResponse = await fetch("https://api.mistral.ai/v1/ocr", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${this.apiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: this.model,
-          messages: [
-            {
-              role: "user",
-              content: [
-                {
-                  type: "text",
-                  text: EXTRACTION_PROMPT,
-                },
-                {
-                  type: "image_url",
-                  image_url: imageUrl,
-                },
-              ],
-            },
-          ],
-          max_tokens: 4096,
-          response_format: { type: "json_object" },
+          model: "mistral-ocr-latest",
+          document: {
+            type: "image_url",
+            image_url: imageUrl,
+          },
         }),
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Mistral API error: ${response.status} - ${errorText}`);
+      if (!ocrResponse.ok) {
+        const errorText = await ocrResponse.text();
+        throw new Error(`Mistral OCR API error: ${ocrResponse.status} - ${errorText}`);
       }
 
-      const data = await response.json();
-      const content = data.choices?.[0]?.message?.content || "";
+      const ocrData = await ocrResponse.json();
 
+      // Extract text from OCR result
+      const pages: OCRPage[] = (ocrData.pages || []).map((page: { index: number; markdown: string }, idx: number) => ({
+        pageNumber: page.index ?? idx + 1,
+        markdown: page.markdown || "",
+        images: [imageUrl],
+      }));
+
+      // Combine all page text
+      const rawText = pages.map(p => p.markdown).join("\n\n---\n\n") || "No text extracted from image.";
+
+      // Step 2: Extract structured data using Together.ai fine-tuned model or Mistral
       let extractedData: ExtractedDocumentData;
-      let rawText = "";
-      try {
-        const parsed = JSON.parse(content);
-        extractedData = this.normalizeExtractedData(parsed);
-        // Generate human-readable text from extracted data for images
-        rawText = this.generateRawTextFromExtraction(extractedData);
-      } catch {
-        extractedData = {
-          documentType: "other",
-          pageCount: 1,
-          hasImages: true,
-          hasTables: false,
-        };
-        rawText = "Image processed but text extraction failed.";
+
+      if (this.useTogetherExtraction) {
+        // Use Together.ai fine-tuned Llama 3.1 8B model for extraction
+        try {
+          extractedData = await extractWithFineTunedModel(rawText);
+          extractedData.pageCount = pages.length || 1;
+          extractedData.hasImages = true;
+        } catch (togetherError) {
+          console.error("Together.ai extraction failed, falling back to Mistral:", togetherError);
+          extractedData = await this.extractWithMistral(rawText, pages.length || 1);
+          extractedData.hasImages = true;
+        }
+      } else {
+        extractedData = await this.extractWithMistral(rawText, pages.length || 1);
+        extractedData.hasImages = true;
       }
 
       return {
         success: true,
         rawText,
-        pages: [
+        pages: pages.length > 0 ? pages : [
           {
             pageNumber: 1,
             markdown: rawText,
@@ -358,6 +329,58 @@ export class MistralOCRProvider implements OCRProvider {
           hasTables: false,
         },
         error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  }
+
+  /**
+   * Extract structured data using Mistral's chat completion API
+   * Used as fallback when Together.ai is not configured or fails
+   */
+  private async extractWithMistral(rawText: string, pageCount: number): Promise<ExtractedDocumentData> {
+    const extractionResponse = await fetch("https://api.mistral.ai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "mistral-small-latest",
+        messages: [
+          {
+            role: "user",
+            content: `${EXTRACTION_PROMPT}\n\nDocument text:\n${rawText}`,
+          },
+        ],
+        max_tokens: 4096,
+        response_format: { type: "json_object" },
+      }),
+    });
+
+    if (!extractionResponse.ok) {
+      console.error("Mistral extraction failed");
+      return {
+        documentType: "other",
+        pageCount,
+        hasImages: false,
+        hasTables: false,
+      };
+    }
+
+    const extractionData = await extractionResponse.json();
+    const content = extractionData.choices?.[0]?.message?.content || "";
+
+    try {
+      const parsed = JSON.parse(content);
+      const extractedData = this.normalizeExtractedData(parsed);
+      extractedData.pageCount = pageCount;
+      return extractedData;
+    } catch {
+      return {
+        documentType: "other",
+        pageCount,
+        hasImages: false,
+        hasTables: false,
       };
     }
   }

@@ -23,7 +23,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
-type CustomerInfo = { name: string; company: string | null };
+type CustomerInfo = { id?: string; name: string | null; company: string | null; customer_number?: string };
 type AppointmentWithCustomer = Appointment & {
   customers?: CustomerInfo | CustomerInfo[] | null;
 };

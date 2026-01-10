@@ -17,6 +17,8 @@ import {
   Shield,
   Clock,
   Brain,
+  FlaskConical,
+  AlertCircle,
 } from "lucide-react";
 import { format } from "date-fns";
 import { logoutAdmin } from "@/app/admin/actions";
@@ -97,7 +99,7 @@ export function AdminDashboard({ stats, recentUsers, recentDocuments }: AdminDas
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Navigation */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-8">
           <Link href="/admin/alerts">
             <Card className="bg-slate-800/50 border-slate-700 hover:bg-slate-700/50 transition-colors cursor-pointer">
               <CardContent className="p-4 flex items-center gap-3">
@@ -106,7 +108,7 @@ export function AdminDashboard({ stats, recentUsers, recentDocuments }: AdminDas
                 </div>
                 <div>
                   <p className="text-sm font-medium text-white">Alerts</p>
-                  <p className="text-xs text-slate-400">Manage system alerts</p>
+                  <p className="text-xs text-slate-400">System alerts</p>
                 </div>
               </CardContent>
             </Card>
@@ -145,7 +147,33 @@ export function AdminDashboard({ stats, recentUsers, recentDocuments }: AdminDas
                 </div>
                 <div>
                   <p className="text-sm font-medium text-white">AI Settings</p>
-                  <p className="text-xs text-slate-400">Configure AI features</p>
+                  <p className="text-xs text-slate-400">Configure AI</p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/admin/experiments">
+            <Card className="bg-slate-800/50 border-slate-700 hover:bg-slate-700/50 transition-colors cursor-pointer">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-pink-500/10 flex items-center justify-center">
+                  <FlaskConical className="h-5 w-5 text-pink-500" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-white">Experiments</p>
+                  <p className="text-xs text-slate-400">A/B testing</p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/admin/failed-documents">
+            <Card className="bg-slate-800/50 border-slate-700 hover:bg-slate-700/50 transition-colors cursor-pointer">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-red-500/10 flex items-center justify-center">
+                  <AlertCircle className="h-5 w-5 text-red-500" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-white">Failed Docs</p>
+                  <p className="text-xs text-slate-400">Dead letter queue</p>
                 </div>
               </CardContent>
             </Card>

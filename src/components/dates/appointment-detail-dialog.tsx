@@ -174,7 +174,7 @@ export function AppointmentDetailDialog({
       setLocation(appointment.location || "");
       setDescription(appointment.description || "");
       setStatus((appointment.status || "scheduled") as "scheduled" | "completed" | "cancelled");
-      setAppointmentTypeId(appointment.appointment_type?.id || null);
+      setAppointmentTypeId(appointment.appointment_types?.id || null);
       setNotes(appointment.notes || "");
     }
     // Always reset to view mode and clear search when dialog opens
@@ -281,7 +281,7 @@ export function AppointmentDetailDialog({
                 <div
                   className={cn(
                     "w-3 h-3 rounded-full shrink-0",
-                    appointment.appointment_type?.color || "border border-muted-foreground"
+                    appointment.appointment_types?.color || "border border-muted-foreground"
                   )}
                 />
                 <span className="truncate block max-w-[calc(100%-2rem)]">{appointment.title}</span>
@@ -787,10 +787,10 @@ export function AppointmentDetailDialog({
 
             {/* Type & Status */}
             <div className="flex items-center gap-3">
-              {appointment.appointment_type && (
-                <Badge variant="outline" className="gap-1.5 max-w-[180px]" title={appointment.appointment_type.name}>
-                  <div className={cn("w-2 h-2 rounded-full shrink-0", appointment.appointment_type.color)} />
-                  <span className="truncate">{appointment.appointment_type.name}</span>
+              {appointment.appointment_types && (
+                <Badge variant="outline" className="gap-1.5 max-w-[180px]" title={appointment.appointment_types.name}>
+                  <div className={cn("w-2 h-2 rounded-full shrink-0", appointment.appointment_types.color)} />
+                  <span className="truncate">{appointment.appointment_types.name}</span>
                 </Badge>
               )}
               {/* Clickable status badge with colors */}

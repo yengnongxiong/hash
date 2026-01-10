@@ -11,6 +11,7 @@ import { DocumentAuditLog } from "@/components/documents/document-audit-log";
 import { DocumentFlagsWrapper } from "@/components/documents/document-flags-wrapper";
 import { DocumentApproval } from "@/components/documents/document-approval";
 import { RetryButton } from "@/components/documents/retry-button";
+import { DuplicateWarning } from "@/components/documents/duplicate-warning";
 import { formatDistanceToNow, formatFileSize } from "@/lib/utils/format";
 import { logDocumentView, getDocumentAuditLog, getDocumentFlags } from "../actions";
 
@@ -172,6 +173,9 @@ export default async function DocumentDetailPage({
           </div>
         </div>
       )}
+
+      {/* Duplicate Detection Warning */}
+      <DuplicateWarning documentId={document.id} status={document.status || ""} />
 
       {/* Split View - 3 columns */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 min-h-0">
