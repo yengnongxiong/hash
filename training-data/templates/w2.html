@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {
+            font-family: {{ styles.font_family }};
+            font-size: 11px;
+            margin: 30px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            font-size: 18px;
+            color: {{ styles.header_color }};
+            margin: 0;
+        }
+        .header .subtitle { font-size: 12px; color: #666; }
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            border: 2px solid #333;
+            padding: 10px;
+        }
+        .box {
+            border: 1px solid #999;
+            padding: 8px;
+            min-height: 50px;
+        }
+        .box-number {
+            font-size: 9px;
+            color: #666;
+            margin-bottom: 3px;
+        }
+        .box-value {
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .box-label { font-size: 9px; color: #666; }
+        .full-width { grid-column: span 2; }
+        .amount { color: {{ styles.accent_color }}; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Form W-2</h1>
+        <div class="subtitle">Wage and Tax Statement {{ data.tax_year }}</div>
+    </div>
+
+    <div class="form-grid">
+        <div class="box">
+            <div class="box-number">a Employee's social security number</div>
+            <div class="box-value">XXX-XX-{{ data.employee_ssn_last4 }}</div>
+        </div>
+        <div class="box">
+            <div class="box-number">b Employer identification number (EIN)</div>
+            <div class="box-value">{{ data.employer_ein }}</div>
+        </div>
+
+        <div class="box full-width">
+            <div class="box-number">c Employer's name, address, and ZIP code</div>
+            <div class="box-value">{{ data.employer_name }}</div>
+            <div>{{ data.employer_address.street }}</div>
+            <div>{{ data.employer_address.city }}, {{ data.employer_address.state }} {{ data.employer_address.zip }}</div>
+        </div>
+
+        <div class="box full-width">
+            <div class="box-number">e Employee's name and address</div>
+            <div class="box-value">{{ data.employee_name }}</div>
+            <div>{{ data.employee_address.street }}</div>
+            <div>{{ data.employee_address.city }}, {{ data.employee_address.state }} {{ data.employee_address.zip }}</div>
+        </div>
+
+        <div class="box">
+            <div class="box-number">1 Wages, tips, other compensation</div>
+            <div class="box-value amount">${{ "{:,.2f}".format(data.box_1_wages) }}</div>
+        </div>
+        <div class="box">
+            <div class="box-number">2 Federal income tax withheld</div>
+            <div class="box-value amount">${{ "{:,.2f}".format(data.box_2_federal_tax) }}</div>
+        </div>
+
+        <div class="box">
+            <div class="box-number">3 Social security wages</div>
+            <div class="box-value amount">${{ "{:,.2f}".format(data.box_3_ss_wages) }}</div>
+        </div>
+        <div class="box">
+            <div class="box-number">4 Social security tax withheld</div>
+            <div class="box-value amount">${{ "{:,.2f}".format(data.box_4_ss_tax) }}</div>
+        </div>
+
+        <div class="box">
+            <div class="box-number">5 Medicare wages and tips</div>
+            <div class="box-value amount">${{ "{:,.2f}".format(data.box_5_medicare_wages) }}</div>
+        </div>
+        <div class="box">
+            <div class="box-number">6 Medicare tax withheld</div>
+            <div class="box-value amount">${{ "{:,.2f}".format(data.box_6_medicare_tax) }}</div>
+        </div>
+
+        <div class="box">
+            <div class="box-number">15 State</div>
+            <div class="box-value">{{ data.state }}</div>
+        </div>
+        <div class="box">
+            <div class="box-number">16 State wages, tips, etc.</div>
+            <div class="box-value amount">${{ "{:,.2f}".format(data.state_wages) }}</div>
+        </div>
+
+        <div class="box full-width">
+            <div class="box-number">17 State income tax</div>
+            <div class="box-value amount">${{ "{:,.2f}".format(data.state_income_tax) }}</div>
+        </div>
+    </div>
+</body>
+</html>

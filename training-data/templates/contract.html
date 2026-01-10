@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {
+            font-family: {{ styles.font_family }};
+            font-size: {{ styles.font_size }};
+            margin: 50px;
+            line-height: 1.6;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .header h1 {
+            color: {{ styles.header_color }};
+            margin-bottom: 10px;
+        }
+        .header h2 {
+            font-weight: normal;
+            font-size: 16px;
+            color: #666;
+        }
+        .parties {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .party h3 {
+            color: {{ styles.accent_color }};
+            margin-bottom: 10px;
+        }
+        .terms { margin-bottom: 30px; }
+        .term-item {
+            margin-bottom: 15px;
+            padding-left: 20px;
+            border-left: 3px solid {{ styles.accent_color }};
+        }
+        .signatures {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 60px;
+        }
+        .signature-block {
+            width: 40%;
+        }
+        .signature-line {
+            border-top: 1px solid #333;
+            margin-top: 50px;
+            padding-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{{ data.contract_type|upper }}</h1>
+        <h2>Contract Number: {{ data.contract_number }}</h2>
+    </div>
+
+    <div class="parties">
+        <div class="party">
+            <h3>Party A</h3>
+            <div><strong>{{ data.party_a_name }}</strong></div>
+            <div>{{ data.party_a_address.street }}</div>
+            <div>{{ data.party_a_address.city }}, {{ data.party_a_address.state }} {{ data.party_a_address.zip }}</div>
+        </div>
+        <div class="party">
+            <h3>Party B</h3>
+            <div><strong>{{ data.party_b_name }}</strong></div>
+            <div>{{ data.party_b_address.street }}</div>
+            <div>{{ data.party_b_address.city }}, {{ data.party_b_address.state }} {{ data.party_b_address.zip }}</div>
+        </div>
+    </div>
+
+    <div class="terms">
+        <div class="term-item">
+            <strong>Effective Date:</strong> {{ data.effective_date }}
+        </div>
+        <div class="term-item">
+            <strong>Expiration Date:</strong> {{ data.expiration_date }}
+        </div>
+        <div class="term-item">
+            <strong>Term:</strong> {{ data.term_years }} year(s)
+        </div>
+        <div class="term-item">
+            <strong>Contract Value:</strong> ${{ "{:,.2f}".format(data.contract_value) }} {{ data.currency }}
+        </div>
+        <div class="term-item">
+            <strong>Governing Law:</strong> State of {{ data.governing_law }}
+        </div>
+    </div>
+
+    <div class="signatures">
+        {% for sig in data.signatures %}
+        <div class="signature-block">
+            <div class="signature-line">
+                <div><strong>{{ sig.name }}</strong></div>
+                <div>{{ sig.title }}</div>
+                <div>Party {{ sig.party }}</div>
+                <div>Date: ________________</div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</body>
+</html>

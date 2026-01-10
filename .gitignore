@@ -39,3 +39,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# playwright test artifacts
+.playwright-mcp/
+
+# training data (large files - regenerate with scripts)
+training-data/public-datasets/
+training-data/synthetic/
+training-data/together-ai/
+training-data/processed/
