@@ -414,7 +414,7 @@ export function AdminAlertsManager({ alerts, organizations }: AdminAlertsManager
                           {isTargeted ? (
                             <Badge variant="outline" className="gap-1">
                               <Building2 className="h-3 w-3" />
-                              {alert.target_organization_ids.length} org{alert.target_organization_ids.length !== 1 ? "s" : ""}
+                              {alert.target_organization_ids!.length} org{alert.target_organization_ids!.length !== 1 ? "s" : ""}
                             </Badge>
                           ) : (
                             <Badge variant="outline" className="gap-1">
@@ -426,7 +426,7 @@ export function AdminAlertsManager({ alerts, organizations }: AdminAlertsManager
                         <p className="text-sm text-slate-400 mb-2">{alert.message}</p>
                         <div className="flex items-center gap-4 text-xs text-slate-500">
                           <span>
-                            Starts: {format(new Date(alert.starts_at || alert.created_at), "MMM d, yyyy h:mm a")}
+                            Starts: {format(new Date(alert.starts_at || alert.created_at || new Date()), "MMM d, yyyy h:mm a")}
                           </span>
                           {alert.ends_at && (
                             <span>

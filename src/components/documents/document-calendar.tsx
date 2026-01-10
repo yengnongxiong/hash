@@ -8,13 +8,14 @@ import {
   endOfMonth,
   eachDayOfInterval,
   isSameMonth,
-  isSameDay,
   addMonths,
   subMonths,
   isToday,
   isPast,
+  subYears,
+  isAfter,
 } from "date-fns";
-import { ChevronLeft, ChevronRight, FileText, AlertCircle, Calendar as CalendarIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileText, AlertCircle, Calendar as CalendarIcon, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -22,6 +23,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 interface DocumentDate {
@@ -38,6 +46,8 @@ interface DocumentCalendarProps {
   dates: DocumentDate[];
 }
 
+type DateRangeFilter = "all" | "1year" | "2years" | "future";
+
 const DATE_TYPE_COLORS: Record<string, string> = {
   due_date: "bg-red-500",
   expiration: "bg-orange-500",
@@ -49,6 +59,23 @@ const DATE_TYPE_COLORS: Record<string, string> = {
 
 export function DocumentCalendar({ dates }: DocumentCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [dateRangeFilter, setDateRangeFilter] = useState<DateRangeFilter>("2years");
+
+  // Filter dates based on selected range
+  const filteredDates = useMemo(() => {
+    const now = new Date();
+    switch (dateRangeFilter) {
+      case "1year":
+        return dates.filter((d) => isAfter(d.date, subYears(now, 1)));
+      case "2years":
+        return dates.filter((d) => isAfter(d.date, subYears(now, 2)));
+      case "future":
+        return dates.filter((d) => !isPast(d.date) || isToday(d.date));
+      case "all":
+      default:
+        return dates;
+    }
+  }, [dates, dateRangeFilter]);
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -60,10 +87,10 @@ export function DocumentCalendar({ dates }: DocumentCalendarProps) {
   // Create padding days for the start of the month
   const paddingDays = Array.from({ length: startDayOfWeek }, (_, i) => i);
 
-  // Group dates by day
+  // Group dates by day (using filtered dates)
   const datesByDay = useMemo(() => {
     const map = new Map<string, DocumentDate[]>();
-    for (const d of dates) {
+    for (const d of filteredDates) {
       const key = format(d.date, "yyyy-MM-dd");
       if (!map.has(key)) {
         map.set(key, []);
@@ -71,27 +98,27 @@ export function DocumentCalendar({ dates }: DocumentCalendarProps) {
       map.get(key)!.push(d);
     }
     return map;
-  }, [dates]);
+  }, [filteredDates]);
 
-  // Get upcoming dates (next 30 days)
+  // Get upcoming dates (next 30 days) - from filtered dates
   const upcomingDates = useMemo(() => {
     const now = new Date();
     const thirtyDaysFromNow = addMonths(now, 1);
-    return dates.filter(
+    return filteredDates.filter(
       (d) => d.date >= now && d.date <= thirtyDaysFromNow
     );
-  }, [dates]);
+  }, [filteredDates]);
 
-  // Get overdue dates
+  // Get overdue dates - from filtered dates
   const overdueDates = useMemo(() => {
     const now = new Date();
-    return dates.filter(
+    return filteredDates.filter(
       (d) =>
         isPast(d.date) &&
         !isToday(d.date) &&
         (d.type === "due_date" || d.type === "expiration")
     );
-  }, [dates]);
+  }, [filteredDates]);
 
   const goToPreviousMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
   const goToNextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
@@ -107,6 +134,18 @@ export function DocumentCalendar({ dates }: DocumentCalendarProps) {
             {format(currentMonth, "MMMM yyyy")}
           </h2>
           <div className="flex items-center gap-2">
+            <Select value={dateRangeFilter} onValueChange={(value) => setDateRangeFilter(value as DateRangeFilter)}>
+              <SelectTrigger className="w-[140px] h-8">
+                <Filter className="h-3.5 w-3.5 mr-2" />
+                <SelectValue placeholder="Filter dates" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="future">Future only</SelectItem>
+                <SelectItem value="1year">Last 1 year</SelectItem>
+                <SelectItem value="2years">Last 2 years</SelectItem>
+                <SelectItem value="all">All dates</SelectItem>
+              </SelectContent>
+            </Select>
             <Button variant="outline" size="sm" onClick={goToToday}>
               Today
             </Button>
@@ -327,8 +366,8 @@ export function DocumentCalendar({ dates }: DocumentCalendarProps) {
           <h3 className="font-medium mb-3">Summary</h3>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Total dates</span>
-              <span className="font-medium">{dates.length}</span>
+              <span className="text-muted-foreground">Showing</span>
+              <span className="font-medium">{filteredDates.length} of {dates.length}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Upcoming</span>
@@ -339,6 +378,11 @@ export function DocumentCalendar({ dates }: DocumentCalendarProps) {
               <span className="font-medium text-red-500">{overdueDates.length}</span>
             </div>
           </div>
+          {dateRangeFilter !== "all" && filteredDates.length < dates.length && (
+            <p className="text-xs text-muted-foreground mt-3 pt-3 border-t">
+              {dates.length - filteredDates.length} date{dates.length - filteredDates.length !== 1 ? "s" : ""} hidden by filter
+            </p>
+          )}
         </div>
       </div>
     </div>

@@ -26,7 +26,7 @@ const pages = [
   { name: "People", href: "/people", icon: Users, keywords: ["crm", "contacts", "customers", "clients"] },
   { name: "Dates", href: "/dates", icon: Calendar, keywords: ["appointments", "meetings", "schedule", "due", "calendar"] },
   { name: "Documents", href: "/documents", icon: FileText, keywords: ["files", "pdfs"] },
-  { name: "Whiteboard", href: "/whiteboard", icon: Kanban, keywords: ["tasks", "board"] },
+  { name: "Tasks", href: "/tasks", icon: Kanban, keywords: ["whiteboard", "board", "kanban"] },
   { name: "Settings", href: "/settings", icon: Settings, keywords: ["preferences", "config"] },
 ];
 

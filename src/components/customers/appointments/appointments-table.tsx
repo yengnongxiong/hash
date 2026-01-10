@@ -125,7 +125,7 @@ export function AppointmentsTable({ data }: AppointmentsTableProps) {
               <TableCell>{formatDateTime(appointment.start_time)}</TableCell>
               <TableCell>{appointment.end_time ? formatDateTime(appointment.end_time) : "—"}</TableCell>
               <TableCell>{appointment.location || "—"}</TableCell>
-              <TableCell>{getStatusBadge(appointment.status)}</TableCell>
+              <TableCell>{getStatusBadge(appointment.status || "scheduled")}</TableCell>
               <TableCell>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

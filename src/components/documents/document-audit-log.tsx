@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Upload,
   Eye,
@@ -28,9 +28,12 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { DocumentAuditLog as AuditLogType } from "@/types/database";
 
+const PAGE_SIZE = 20;
+
 interface DocumentAuditLogProps {
   documentId: string;
   initialLogs?: AuditLogWithUser[];
+  initialTotal?: number;
 }
 
 interface AuditLogWithUser extends AuditLogType {
@@ -84,6 +87,14 @@ const actionConfig: Record<string, {
     color: "text-red-600 dark:text-red-400",
     bgColor: "bg-red-100 dark:bg-red-900/40",
     borderColor: "border-red-300 dark:border-red-700",
+    category: "lifecycle",
+  },
+  restored: {
+    icon: <RefreshCw className="h-3.5 w-3.5" />,
+    label: "Document restored",
+    color: "text-green-600 dark:text-green-400",
+    bgColor: "bg-green-100 dark:bg-green-900/40",
+    borderColor: "border-green-300 dark:border-green-700",
     category: "lifecycle",
   },
   ocr_started: {
@@ -304,10 +315,14 @@ function groupLogs(logs: AuditLogWithUser[]): Array<AuditLogWithUser | { type: "
 export function DocumentAuditLog({
   documentId,
   initialLogs = [],
+  initialTotal,
 }: DocumentAuditLogProps) {
   const [logs, setLogs] = useState<AuditLogWithUser[]>(initialLogs);
+  const [total, setTotal] = useState(initialTotal ?? initialLogs.length);
   const [isLoading, setIsLoading] = useState(initialLogs.length === 0);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [hasMore, setHasMore] = useState(initialTotal ? initialLogs.length < initialTotal : false);
 
   useEffect(() => {
     if (initialLogs.length === 0) {
@@ -317,10 +332,12 @@ export function DocumentAuditLog({
 
   const fetchLogs = async () => {
     try {
-      const response = await fetch(`/api/documents/${documentId}/audit-log`);
+      const response = await fetch(`/api/documents/${documentId}/audit-log?limit=${PAGE_SIZE}`);
       if (response.ok) {
         const data = await response.json();
-        setLogs(data);
+        setLogs(data.logs);
+        setTotal(data.total);
+        setHasMore(data.hasMore);
       }
     } catch (error) {
       console.error("Failed to fetch audit logs:", error);
@@ -328,6 +345,25 @@ export function DocumentAuditLog({
       setIsLoading(false);
     }
   };
+
+  const loadMore = useCallback(async () => {
+    if (isLoadingMore || !hasMore) return;
+    setIsLoadingMore(true);
+    try {
+      const response = await fetch(
+        `/api/documents/${documentId}/audit-log?offset=${logs.length}&limit=${PAGE_SIZE}`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setLogs((prev) => [...prev, ...data.logs]);
+        setHasMore(data.hasMore);
+      }
+    } catch (error) {
+      console.error("Failed to load more audit logs:", error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [documentId, logs.length, isLoadingMore, hasMore]);
 
   if (isLoading) {
     return (
@@ -349,7 +385,7 @@ export function DocumentAuditLog({
 
   const groupedLogs = groupLogs(logs);
   const displayLogs = showAll ? groupedLogs : groupedLogs.slice(0, 5);
-  const hasMore = groupedLogs.length > 5;
+  const hasMoreInMemory = groupedLogs.length > 5;
 
   return (
     <div className="space-y-1">
@@ -357,7 +393,7 @@ export function DocumentAuditLog({
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-medium text-muted-foreground">Activity Timeline</h3>
         <Badge variant="secondary" className="text-xs">
-          {logs.length} event{logs.length !== 1 ? "s" : ""}
+          {logs.length}{total > logs.length ? ` of ${total}` : ""} event{total !== 1 ? "s" : ""}
         </Badge>
       </div>
 
@@ -435,8 +471,8 @@ export function DocumentAuditLog({
         </div>
       </div>
 
-      {/* Show more/less button */}
-      {hasMore && (
+      {/* Show more/less button - for in-memory pagination */}
+      {hasMoreInMemory && (
         <Button
           variant="ghost"
           size="sm"
@@ -452,6 +488,29 @@ export function DocumentAuditLog({
             <>
               <ChevronDown className="h-4 w-4 mr-1" />
               Show {groupedLogs.length - 5} more
+            </>
+          )}
+        </Button>
+      )}
+
+      {/* Load more from server button */}
+      {hasMore && showAll && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full mt-2"
+          onClick={loadMore}
+          disabled={isLoadingMore}
+        >
+          {isLoadingMore ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              Loading...
+            </>
+          ) : (
+            <>
+              <ChevronDown className="h-4 w-4 mr-1" />
+              Load more ({total - logs.length} remaining)
             </>
           )}
         </Button>

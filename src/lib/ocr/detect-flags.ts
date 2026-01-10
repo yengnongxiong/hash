@@ -37,13 +37,16 @@ export async function detectDocumentFlags(
     }
   }
 
-  // Check for duplicate invoice numbers
+  // Check for duplicate invoice numbers using indexed query
   if (extractedData.invoiceNumber) {
+    // Use a targeted query filtering by document_type for better performance
     const { data: existingDocs } = await supabase
       .from("documents")
       .select("id, file_name, extracted_data")
       .neq("id", documentId)
-      .eq("status", "completed");
+      .eq("status", "completed")
+      .eq("document_type", "invoice")
+      .limit(100); // Limit results for safety
 
     if (existingDocs) {
       for (const doc of existingDocs) {

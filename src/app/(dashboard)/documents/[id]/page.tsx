@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Download, History, RotateCw, CheckCircle, User } from "lucide-react";
+import { ArrowLeft, Download, History, CheckCircle, User } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,7 @@ import { ProcessingStatus } from "@/components/documents/processing-status";
 import { DocumentAuditLog } from "@/components/documents/document-audit-log";
 import { DocumentFlagsWrapper } from "@/components/documents/document-flags-wrapper";
 import { DocumentApproval } from "@/components/documents/document-approval";
+import { RetryButton } from "@/components/documents/retry-button";
 import { formatDistanceToNow, formatFileSize } from "@/lib/utils/format";
 import { logDocumentView, getDocumentAuditLog, getDocumentFlags } from "../actions";
 
@@ -25,9 +26,20 @@ export default async function DocumentDetailPage({
 
   const { data: document, error } = await supabase
     .from("documents")
-    .select("*, customers(id, name, company)")
+    .select("*")
     .eq("id", id)
     .single();
+
+  // Fetch linked customer if exists
+  let linkedCustomer: { id: string; name: string; company: string | null } | null = null;
+  if (document?.customer_id) {
+    const { data: customer } = await supabase
+      .from("customers")
+      .select("id, name, company")
+      .eq("id", document.customer_id)
+      .single();
+    linkedCustomer = customer;
+  }
 
   if (error || !document) {
     notFound();
@@ -37,16 +49,18 @@ export default async function DocumentDetailPage({
   await logDocumentView(id);
 
   // Fetch audit log and flags
-  const [auditLogs, flags] = await Promise.all([
+  const [auditLogData, flags] = await Promise.all([
     getDocumentAuditLog(id),
     getDocumentFlags(id),
   ]);
+  const { logs: auditLogs, total: auditLogTotal } = auditLogData;
 
   const isProcessing = document.status === "processing";
   const isFailed = document.status === "failed";
   const isPendingReview = document.status === "pending_review";
   const isCompleted = document.status === "completed";
-  const hasUnresolvedFlags = flags.some((f) => !f.resolved);
+  const unresolvedFlags = flags.filter((f) => !f.resolved);
+  const hasUnresolvedFlags = unresolvedFlags.length > 0;
 
   return (
     <div className="min-h-[calc(100vh-8rem)] flex flex-col">
@@ -71,12 +85,12 @@ export default async function DocumentDetailPage({
               <span>{formatFileSize(document.file_size || 0)}</span>
               <span className="hidden sm:inline">•</span>
               <span>Uploaded {formatDistanceToNow(new Date(document.created_at))}</span>
-              {document.customers && (
+              {linkedCustomer && (
                 <>
                   <span className="hidden sm:inline">•</span>
                   <span className="basis-full sm:basis-auto">
-                    Linked to {document.customers.name}
-                    {document.customers.company && ` (${document.customers.company})`}
+                    Linked to {linkedCustomer.name}
+                    {linkedCustomer.company && ` (${linkedCustomer.company})`}
                   </span>
                 </>
               )}
@@ -84,9 +98,9 @@ export default async function DocumentDetailPage({
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <ProcessingStatus status={document.status} />
+          <ProcessingStatus status={document.status as "pending" | "processing" | "pending_review" | "completed" | "failed" | "rejected"} />
           {isPendingReview && (
-            <DocumentApproval documentId={document.id} hasUnresolvedFlags={hasUnresolvedFlags} />
+            <DocumentApproval documentId={document.id} hasUnresolvedFlags={hasUnresolvedFlags} unresolvedFlagCount={unresolvedFlags.length} />
           )}
           {isCompleted && document.approved_by && document.approved_at && (
             <span className="text-xs text-muted-foreground flex items-center gap-1">
@@ -151,12 +165,10 @@ export default async function DocumentDetailPage({
                   "An unknown error occurred during processing"}
               </p>
             </div>
-            <form action={`/documents/${id}/retry`} method="POST">
-              <Button variant="outline" size="sm">
-                <RotateCw className="h-4 w-4 mr-2" />
-                Retry
-              </Button>
-            </form>
+            <RetryButton
+              documentId={document.id}
+              hasExtractedData={!!document.extracted_data}
+            />
           </div>
         </div>
       )}
@@ -219,7 +231,7 @@ export default async function DocumentDetailPage({
           </div>
           <div className="p-4 space-y-4">
             <DocumentFlagsWrapper documentId={document.id} initialFlags={flags} />
-            <DocumentAuditLog documentId={document.id} initialLogs={auditLogs} />
+            <DocumentAuditLog documentId={document.id} initialLogs={auditLogs} initialTotal={auditLogTotal} />
           </div>
         </div>
       </div>

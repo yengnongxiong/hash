@@ -14,7 +14,7 @@ import {
   updateTaskSubtask,
   deleteTaskSubtask,
   getTaskSubtasks,
-} from "@/app/(dashboard)/whiteboard/actions";
+} from "@/app/(dashboard)/tasks/actions";
 
 interface TaskSubtasksProps {
   taskId: string;

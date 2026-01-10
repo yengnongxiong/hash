@@ -82,7 +82,7 @@ src/
 │   │   │   ├── [id]/          # Document detail
 │   │   │   ├── calendar/      # Dates calendar view
 │   │   │   └── upload/        # Upload page
-│   │   ├── whiteboard/        # Team kanban board (kanban + gallery views)
+│   │   ├── tasks/             # Team tasks (kanban + table views)
 │   │   ├── settings/          # User settings + read-only system alerts
 │   │   └── page.tsx           # Dashboard home
 │   ├── admin/                 # Developer admin panel (email 2FA protected)
@@ -287,7 +287,7 @@ npx supabase gen types typescript --project-id hbsmvvxdyvzbhetofnbu > src/types/
 | `/dates` | Unified dates/appointments view |
 | `/documents` | Document list with filters and OCR status |
 | `/documents/calendar` | Document dates calendar view |
-| `/whiteboard` | Realtime kanban board |
+| `/tasks` | Team tasks with kanban board |
 | `/settings` | User profile + system alerts |
 | `/admin` | Admin dashboard (email 2FA, ADMIN_EMAIL only) |
 

@@ -367,8 +367,8 @@ export function WhiteboardTable({
 
   // Pre-sort tasks by most recently updated (default order)
   const sortedTasks = [...tasks].sort((a, b) => {
-    const dateA = new Date(a.updated_at).getTime();
-    const dateB = new Date(b.updated_at).getTime();
+    const dateA = new Date(a.updated_at || new Date()).getTime();
+    const dateB = new Date(b.updated_at || new Date()).getTime();
     return dateB - dateA; // Most recent first
   });
 
@@ -385,11 +385,13 @@ export function WhiteboardTable({
       if (task.description?.toLowerCase().includes(search)) return true;
 
       // Search in status (label)
-      const statusLabel = STATUS_CONFIG[task.status]?.label || "";
+      const statusKey = (task.status || "todo") as keyof typeof STATUS_CONFIG;
+      const statusLabel = STATUS_CONFIG[statusKey]?.label || "";
       if (statusLabel.toLowerCase().includes(search)) return true;
 
       // Search in priority (label)
-      const priorityLabel = PRIORITY_CONFIG[task.priority || "medium"]?.label || "";
+      const priorityKey = (task.priority || "medium") as keyof typeof PRIORITY_CONFIG;
+      const priorityLabel = PRIORITY_CONFIG[priorityKey]?.label || "";
       if (priorityLabel.toLowerCase().includes(search)) return true;
 
       // Search in due date (formatted)

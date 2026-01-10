@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AppointmentWithRelations, AppointmentType, Customer } from "@/types/database";
+import { AppointmentWithDetails, AppointmentType, Customer } from "@/types/database";
 import { AppointmentsTable } from "./appointments-table";
 import { AppointmentsCalendar } from "./appointments-calendar";
 import { CreateAppointmentDialog } from "./create-appointment-dialog";
@@ -9,7 +9,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { List, Calendar as CalendarIcon } from "lucide-react";
 
 interface AppointmentsViewProps {
-  initialData: AppointmentWithRelations[];
+  initialData: AppointmentWithDetails[];
   customers: Pick<Customer, "id" | "name" | "company" | "customer_number">[];
   appointmentTypes: AppointmentType[];
 }

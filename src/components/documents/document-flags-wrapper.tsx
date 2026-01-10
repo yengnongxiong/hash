@@ -29,13 +29,13 @@ export function DocumentFlagsWrapper({
     id: flag.id,
     document_id: flag.document_id || documentId,
     flag_type: flag.flag_type,
-    severity: flag.severity,
+    severity: flag.severity || "info",
     message: flag.message,
     details: (flag.details as Record<string, unknown>) || {},
-    resolved: flag.resolved,
+    resolved: flag.resolved ?? false,
     resolved_at: flag.resolved_at ?? undefined,
     resolved_by_user: flag.resolved_by_user,
-    created_at: flag.created_at,
+    created_at: flag.created_at || new Date().toISOString(),
   }));
 
   return <DocumentFlags flags={flags} onFlagResolved={handleFlagResolved} />;

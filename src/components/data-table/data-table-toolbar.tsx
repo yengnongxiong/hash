@@ -1,7 +1,7 @@
 "use client";
 
 import { Table } from "@tanstack/react-table";
-import { X, Trash2, SlidersHorizontal } from "lucide-react";
+import { X, Trash2, SlidersHorizontal, Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,10 @@ import {
 // Column name mappings for display
 const columnNameMap: Record<string, string> = {
   customer_number: "ID",
+  assigned_to_ids: "Assignees",
+  due_date: "Due Date",
+  created_at: "Created",
+  updated_at: "Updated",
 };
 
 interface DataTableToolbarProps<TData> {
@@ -64,23 +68,29 @@ export function DataTableToolbar<TData>({
       <div className="flex flex-1 items-center space-x-2">
         {/* Use global filter if available, otherwise fall back to column filter */}
         {onGlobalFilterChange ? (
-          <Input
-            placeholder={searchPlaceholder}
-            value={globalFilter ?? ""}
-            onChange={(event) => onGlobalFilterChange(event.target.value)}
-            className="h-8 w-[150px] lg:w-[250px]"
-          />
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder={searchPlaceholder}
+              value={globalFilter ?? ""}
+              onChange={(event) => onGlobalFilterChange(event.target.value)}
+              className="h-8 w-[150px] lg:w-[250px] pl-8"
+            />
+          </div>
         ) : searchKey && (
-          <Input
-            placeholder={searchPlaceholder}
-            value={
-              (table.getColumn(searchKey)?.getFilterValue() as string) ?? ""
-            }
-            onChange={(event) =>
-              table.getColumn(searchKey)?.setFilterValue(event.target.value)
-            }
-            className="h-8 w-[150px] lg:w-[250px]"
-          />
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder={searchPlaceholder}
+              value={
+                (table.getColumn(searchKey)?.getFilterValue() as string) ?? ""
+              }
+              onChange={(event) =>
+                table.getColumn(searchKey)?.setFilterValue(event.target.value)
+              }
+              className="h-8 w-[150px] lg:w-[250px] pl-8"
+            />
+          </div>
         )}
         {filterableColumns.map((column) => {
           const tableColumn = table.getColumn(column.id);

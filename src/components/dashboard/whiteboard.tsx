@@ -11,7 +11,7 @@ import {
   updateWhiteboardTaskStatus,
   deleteWhiteboardTask,
   reorderWhiteboardTasks,
-} from "@/app/(dashboard)/whiteboard/actions";
+} from "@/app/(dashboard)/tasks/actions";
 import { toast } from "sonner";
 import { DragDropContext, DropResult } from "@hello-pangea/dnd";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -155,11 +155,13 @@ export function Whiteboard({ initialTasks, organizationId, teamMembers = [] }: W
     if (task.description?.toLowerCase().includes(query)) return true;
 
     // Search in status label
-    const statusLabel = STATUS_LABELS[task.status] || "";
+    const statusKey = (task.status || "todo") as keyof typeof STATUS_LABELS;
+    const statusLabel = STATUS_LABELS[statusKey] || "";
     if (statusLabel.toLowerCase().includes(query)) return true;
 
     // Search in priority label
-    const priorityLabel = PRIORITY_LABELS[task.priority || "medium"] || "";
+    const priorityKey = (task.priority || "medium") as keyof typeof PRIORITY_LABELS;
+    const priorityLabel = PRIORITY_LABELS[priorityKey] || "";
     if (priorityLabel.toLowerCase().includes(query)) return true;
 
     // Search in due date (formatted)
@@ -479,7 +481,7 @@ export function Whiteboard({ initialTasks, organizationId, teamMembers = [] }: W
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search tasks, status, priority, assignees..."
+              placeholder="Search tasks..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9"
@@ -540,7 +542,7 @@ export function Whiteboard({ initialTasks, organizationId, teamMembers = [] }: W
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium truncate">{task.title}</p>
                         <p className="text-xs text-muted-foreground">
-                          {STATUS_LABELS[task.status]}
+                          {STATUS_LABELS[(task.status || "todo") as keyof typeof STATUS_LABELS]}
                         </p>
                       </div>
                       <TooltipProvider delayDuration={200}>

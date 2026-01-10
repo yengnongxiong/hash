@@ -97,11 +97,11 @@ export default async function DashboardPage() {
   // Get upcoming appointments
   const { data: appointments } = await supabase
     .from("appointments")
-    .select("id, title, start_time, status, customers(name)")
+    .select("id, title, start_time, status, customer_id")
     .gte("start_time", todayStart.toISOString())
     .lte("start_time", nextWeek.toISOString())
     .order("start_time", { ascending: true })
-    .limit(5);
+    .limit(5) as { data: Array<{ id: string; title: string; start_time: string; status: string | null; customer_id: string | null }> | null };
 
   // Get documents with due dates
   const { data: documentsWithDates } = await supabase
@@ -275,7 +275,6 @@ export default async function DashboardPage() {
                         <p className="font-medium text-sm truncate">{apt.title}</p>
                         <p className="text-xs text-muted-foreground">
                           {format(new Date(apt.start_time), "MMM d, h:mm a")}
-                          {apt.customers && ` • ${apt.customers.name}`}
                         </p>
                       </div>
                     </div>
@@ -403,12 +402,12 @@ export default async function DashboardPage() {
                 </div>
               </Button>
             </Link>
-            <Link href="/whiteboard">
+            <Link href="/tasks">
               <Button variant="outline" className="w-full justify-start h-auto py-4">
                 <LayoutGrid className="h-5 w-5 mr-3" />
                 <div className="text-left">
-                  <div className="font-medium">Team Whiteboard</div>
-                  <div className="text-xs text-muted-foreground">Collaborate in realtime</div>
+                  <div className="font-medium">Tasks</div>
+                  <div className="text-xs text-muted-foreground">Manage team tasks</div>
                 </div>
               </Button>
             </Link>

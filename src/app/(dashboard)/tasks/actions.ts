@@ -160,7 +160,7 @@ export async function updateWhiteboardTask(
     return { error: error.message };
   }
 
-  revalidatePath("/whiteboard");
+  revalidatePath("/tasks");
   return { success: true };
 }
 
@@ -619,6 +619,6 @@ export async function importTasksFromCSV(
     return { error: error.message, errors };
   }
 
-  revalidatePath("/whiteboard");
+  revalidatePath("/tasks");
   return { success: true, imported: data.length, tasks: data, errors };
 }

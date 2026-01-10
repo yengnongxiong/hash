@@ -22,7 +22,7 @@ import {
   uploadTaskAttachment,
   deleteTaskAttachment,
   getTaskAttachments,
-} from "@/app/(dashboard)/whiteboard/actions";
+} from "@/app/(dashboard)/tasks/actions";
 
 interface TaskAttachmentsProps {
   taskId: string;

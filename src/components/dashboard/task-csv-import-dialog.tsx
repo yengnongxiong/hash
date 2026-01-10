@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle, Download } from "lucide-react";
-import { importTasksFromCSV } from "@/app/(dashboard)/whiteboard/actions";
+import { importTasksFromCSV } from "@/app/(dashboard)/tasks/actions";
 import { toast } from "sonner";
 import { WhiteboardTask } from "@/types/database";
 

@@ -107,7 +107,7 @@ export default function ReviewQueuePage() {
           document_type,
           status,
           created_at,
-          customers(name, company)
+          customer_id
         `)
         .in("status", ["pending_review", "rejected"])
         .order("created_at", { ascending: false });
@@ -118,35 +118,55 @@ export default function ReviewQueuePage() {
         return;
       }
 
-      // Fetch flag counts for each document
-      if (data && data.length > 0) {
-        const { data: flags } = await supabase
-          .from("document_flags")
-          .select("document_id, resolved")
-          .in("document_id", data.map((d) => d.id));
-
-        const flagCounts: Record<string, { total: number; unresolved: number }> = {};
-        flags?.forEach((f) => {
-          if (!flagCounts[f.document_id]) {
-            flagCounts[f.document_id] = { total: 0, unresolved: 0 };
-          }
-          flagCounts[f.document_id].total++;
-          if (!f.resolved) {
-            flagCounts[f.document_id].unresolved++;
-          }
-        });
-
-        const docsWithFlags = data.map((doc) => ({
-          ...doc,
-          status: doc.status as "pending_review" | "rejected",
-          flag_count: flagCounts[doc.id]?.total || 0,
-          unresolved_flag_count: flagCounts[doc.id]?.unresolved || 0,
-        }));
-
-        setDocuments(docsWithFlags);
-      } else {
+      if (!data || data.length === 0) {
         setDocuments([]);
+        setIsLoading(false);
+        return;
       }
+
+      // Fetch customers separately to avoid TypeScript join issues
+      const customerIds = [...new Set(data.filter(d => d.customer_id).map(d => d.customer_id as string))];
+      let customersMap: Record<string, { name: string; company: string | null }> = {};
+
+      if (customerIds.length > 0) {
+        const { data: customers } = await supabase
+          .from("customers")
+          .select("id, name, company")
+          .in("id", customerIds);
+
+        if (customers) {
+          customersMap = Object.fromEntries(
+            customers.map(c => [c.id, { name: c.name, company: c.company }])
+          );
+        }
+      }
+
+      // Fetch flag counts for each document
+      const { data: flags } = await supabase
+        .from("document_flags")
+        .select("document_id, resolved")
+        .in("document_id", data.map((d) => d.id));
+
+      const flagCounts: Record<string, { total: number; unresolved: number }> = {};
+      flags?.forEach((f) => {
+        if (!flagCounts[f.document_id]) {
+          flagCounts[f.document_id] = { total: 0, unresolved: 0 };
+        }
+        flagCounts[f.document_id].total++;
+        if (!f.resolved) {
+          flagCounts[f.document_id].unresolved++;
+        }
+      });
+
+      const docsWithFlags = data.map((doc) => ({
+        ...doc,
+        status: doc.status as "pending_review" | "rejected",
+        customers: doc.customer_id ? customersMap[doc.customer_id] || null : null,
+        flag_count: flagCounts[doc.id]?.total || 0,
+        unresolved_flag_count: flagCounts[doc.id]?.unresolved || 0,
+      }));
+
+      setDocuments(docsWithFlags);
       setIsLoading(false);
     }
 

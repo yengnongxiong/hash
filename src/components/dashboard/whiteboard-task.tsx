@@ -15,7 +15,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
   Tooltip,
@@ -30,7 +29,6 @@ import {
   CheckSquare,
   AlertCircle,
   EyeOff,
-  GripVertical,
 } from "lucide-react";
 import { Draggable } from "@hello-pangea/dnd";
 import { formatDistanceToNow } from "@/lib/utils/format";
@@ -53,25 +51,21 @@ const PRIORITY_CONFIG = {
     border: "border-l-slate-400 dark:border-l-slate-500",
     badge: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
     label: "Low",
-    glow: "rgba(148, 163, 184, 0.2)",
   },
   medium: {
     border: "border-l-blue-500 dark:border-l-blue-400",
     badge: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
     label: "Medium",
-    glow: "rgba(59, 130, 246, 0.2)",
   },
   high: {
     border: "border-l-orange-500 dark:border-l-orange-400",
     badge: "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
     label: "High",
-    glow: "rgba(249, 115, 22, 0.2)",
   },
   urgent: {
     border: "border-l-red-500 dark:border-l-red-400",
     badge: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
     label: "Urgent",
-    glow: "rgba(239, 68, 68, 0.3)",
   },
 };
 
@@ -97,14 +91,6 @@ function shouldUseDarkText(hexColor: string): boolean {
 
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
   return luminance > 0.6;
-}
-
-// Get a subtle background color based on the card color
-function getCardBackground(color: string | undefined, isDragging: boolean): string {
-  if (!color || color === "#ffffff") {
-    return isDragging ? "hsl(var(--card))" : "hsl(var(--card))";
-  }
-  return color;
 }
 
 export function WhiteboardTaskCard({
@@ -160,101 +146,38 @@ export function WhiteboardTaskCard({
         <div
           ref={provided.innerRef}
           {...provided.draggableProps}
+          style={provided.draggableProps.style}
           className="mb-2 last:mb-0"
         >
           <Card
+            {...provided.dragHandleProps}
             onClick={onClick}
             className={cn(
-              "cursor-pointer transition-all duration-200 group border-l-4 overflow-hidden",
+              "cursor-grab active:cursor-grabbing transition-shadow duration-200 group border-l-4 overflow-hidden relative",
               priorityConfig.border,
               snapshot.isDragging
-                ? "shadow-2xl ring-2 ring-primary/50 scale-[1.02] z-50"
-                : "hover:shadow-lg hover:scale-[1.01] hover:-translate-y-0.5",
-              !snapshot.isDragging && "active:scale-[0.98]"
+                ? "shadow-2xl ring-2 ring-primary/50 cursor-grabbing"
+                : "hover:shadow-md"
             )}
             style={{
-              ...provided.draggableProps.style,
-              backgroundColor: getCardBackground(task.color, snapshot.isDragging),
-              boxShadow: snapshot.isDragging
-                ? `0 25px 50px -12px ${priorityConfig.glow}, 0 0 0 2px hsl(var(--primary) / 0.3)`
-                : undefined,
+              backgroundColor: hasColor ? task.color! : undefined,
             }}
           >
             <CardContent className="p-3">
               <div className="space-y-2">
-                {/* Drag handle and actions row */}
-                <div className="flex items-start gap-1">
-                  {/* Drag handle */}
-                  <div
-                    {...provided.dragHandleProps}
-                    className={cn(
-                      "shrink-0 p-0.5 rounded cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-60 transition-opacity",
-                      snapshot.isDragging && "opacity-100"
-                    )}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <GripVertical className={cn(
-                      "h-4 w-4",
-                      hasColor && useDarkText ? "text-gray-600" : hasColor ? "text-white/70" : "text-muted-foreground"
-                    )} />
-                  </div>
-
-                  {/* Title */}
-                  <div className="flex-1 min-w-0 overflow-hidden">
-                    <p className={cn(
-                      "text-sm font-medium leading-tight line-clamp-2",
-                      hasColor && useDarkText && "text-gray-900",
-                      hasColor && !useDarkText && "text-white"
-                    )} style={{ wordBreak: "break-word", overflowWrap: "anywhere" }}>
-                      {task.title}
-                    </p>
-                  </div>
-
-                  {/* Action buttons */}
-                  <div className={cn(
-                    "flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity",
-                    snapshot.isDragging && "opacity-0"
-                  )}>
-                    <TooltipProvider delayDuration={300}>
-                      {onHide && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 hover:bg-muted/50"
-                              onClick={handleHideClick}
-                            >
-                              <EyeOff className={cn(
-                                "h-3 w-3",
-                                hasColor && useDarkText ? "text-gray-600" : hasColor ? "text-white/70" : "text-muted-foreground"
-                              )} />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent side="top">Hide from Kanban</TooltipContent>
-                        </Tooltip>
-                      )}
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 hover:bg-destructive/10"
-                            onClick={handleDeleteClick}
-                          >
-                            <Trash2 className="h-3 w-3 text-destructive" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">Delete task</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                </div>
+                {/* Title */}
+                <p className={cn(
+                  "text-sm font-medium leading-tight line-clamp-2 pr-20",
+                  hasColor && useDarkText && "text-gray-900",
+                  hasColor && !useDarkText && "text-white"
+                )} style={{ wordBreak: "break-word", overflowWrap: "anywhere" }}>
+                  {task.title}
+                </p>
 
                 {/* Description */}
                 {task.description && (
                   <p className={cn(
-                    "text-xs line-clamp-2 pl-5",
+                    "text-xs line-clamp-2",
                     hasColor && useDarkText ? "text-gray-700" : hasColor ? "text-white/80" : "text-muted-foreground"
                   )} style={{ wordBreak: "break-word", overflowWrap: "anywhere" }}>
                     {task.description}
@@ -263,7 +186,7 @@ export function WhiteboardTaskCard({
 
                 {/* Labels */}
                 {labels.length > 0 && (
-                  <div className="flex flex-wrap gap-1 pl-5">
+                  <div className="flex flex-wrap gap-1">
                     {labels.slice(0, 2).map((label, i) => (
                       <Badge
                         key={i}
@@ -291,7 +214,7 @@ export function WhiteboardTaskCard({
                 )}
 
                 {/* Footer with metadata */}
-                <div className="flex items-center justify-between pt-1 pl-5">
+                <div className="flex items-center justify-between pt-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     {/* Due date */}
                     {dueDate && (
@@ -376,13 +299,50 @@ export function WhiteboardTaskCard({
 
                 {/* Timestamp */}
                 <p className={cn(
-                  "text-[10px] pl-5",
+                  "text-[10px]",
                   hasColor && useDarkText ? "text-gray-500" : hasColor ? "text-white/60" : "text-muted-foreground"
                 )}>
-                  {formatDistanceToNow(new Date(task.created_at))}
+                  {formatDistanceToNow(new Date(task.created_at || new Date()))}
                 </p>
               </div>
             </CardContent>
+
+            {/* Hover action buttons - positioned absolutely in top-right corner */}
+            <div className={cn(
+              "absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity",
+              snapshot.isDragging && "!opacity-0"
+            )}>
+              <TooltipProvider delayDuration={300}>
+                {onHide && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        className="h-7 w-7 rounded-full shadow-md bg-background/95 backdrop-blur-sm hover:bg-background"
+                        onClick={handleHideClick}
+                      >
+                        <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">Hide from Kanban</TooltipContent>
+                  </Tooltip>
+                )}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="h-7 w-7 rounded-full shadow-md bg-background/95 backdrop-blur-sm hover:bg-red-50 dark:hover:bg-red-950"
+                      onClick={handleDeleteClick}
+                    >
+                      <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">Delete task</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
           </Card>
 
           {/* Delete Confirmation Dialog */}

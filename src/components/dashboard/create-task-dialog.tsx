@@ -60,7 +60,7 @@ import {
   createTaskSubtask,
   uploadTaskAttachment,
   saveSketchAsAttachment,
-} from "@/app/(dashboard)/whiteboard/actions";
+} from "@/app/(dashboard)/tasks/actions";
 import { ReactSketchCanvas, ReactSketchCanvasRef } from "react-sketch-canvas";
 import { Slider } from "@/components/ui/slider";
 
@@ -304,7 +304,7 @@ export function CreateTaskDialog({
         <DialogHeader>
           <DialogTitle>Create New Task</DialogTitle>
           <DialogDescription>
-            Add a new task to your whiteboard
+            Add a new task for your team to track
           </DialogDescription>
         </DialogHeader>
 

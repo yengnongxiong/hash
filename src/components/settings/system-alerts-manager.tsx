@@ -93,7 +93,7 @@ export function SystemAlertsManager({ alerts }: SystemAlertsManagerProps) {
                     </p>
                     <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                       <span>
-                        Posted: {format(new Date(alert.starts_at || alert.created_at), "MMM d, yyyy")}
+                        Posted: {format(new Date(alert.starts_at || alert.created_at || new Date()), "MMM d, yyyy")}
                       </span>
                       {alert.ends_at && (
                         <span>

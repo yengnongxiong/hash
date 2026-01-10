@@ -56,11 +56,11 @@ export function useKeyboardShortcuts(
         description: "Upload Document",
       },
       {
-        key: "w",
+        key: "t",
         meta: true,
         shift: true,
-        action: () => router.push("/whiteboard"),
-        description: "Go to Whiteboard",
+        action: () => router.push("/tasks"),
+        description: "Go to Tasks",
       },
       {
         key: "s",
@@ -111,7 +111,7 @@ export const KEYBOARD_SHORTCUTS = [
   { keys: "⌘ + Shift + A", description: "Go to Dates" },
   { keys: "⌘ + Shift + O", description: "Go to Documents" },
   { keys: "⌘ + Shift + U", description: "Upload Document" },
-  { keys: "⌘ + Shift + W", description: "Go to Whiteboard" },
+  { keys: "⌘ + Shift + T", description: "Go to Tasks" },
   { keys: "⌘ + Shift + S", description: "Go to Settings" },
   { keys: "?", description: "Show keyboard shortcuts" },
 ];

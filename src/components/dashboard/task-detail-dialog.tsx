@@ -63,7 +63,7 @@ import {
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
-import { updateWhiteboardTask, deleteWhiteboardTask } from "@/app/(dashboard)/whiteboard/actions";
+import { updateWhiteboardTask, deleteWhiteboardTask } from "@/app/(dashboard)/tasks/actions";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import { TaskSubtasks } from "./task-subtasks";
 import { TaskAttachments } from "./task-attachments";
@@ -172,12 +172,12 @@ export function TaskDetailDialog({
       const result = await updateWhiteboardTask(task.id, {
         title: currentTask.title,
         description: currentTask.description,
-        status: currentTask.status,
-        priority: currentTask.priority,
-        due_date: currentTask.due_date,
-        color: currentTask.color,
+        status: (currentTask.status || "todo") as "todo" | "in_progress" | "done",
+        priority: (currentTask.priority || "medium") as "low" | "medium" | "high",
+        due_date: currentTask.due_date ?? undefined,
+        color: currentTask.color ?? undefined,
         assigned_to_ids: currentTask.assigned_to_ids || [],
-        labels: currentTask.labels,
+        labels: currentTask.labels ?? undefined,
       });
 
       if (result.error) {
@@ -302,7 +302,7 @@ export function TaskDetailDialog({
               <Label className="text-xs text-muted-foreground">Status</Label>
               {isEditing ? (
                 <Select
-                  value={currentTask.status}
+                  value={currentTask.status ?? undefined}
                   onValueChange={(v) =>
                     setEditedTask((prev) => ({
                       ...prev,
@@ -671,7 +671,7 @@ export function TaskDetailDialog({
           {/* Metadata */}
           <div className="space-y-1 text-sm text-muted-foreground">
             <div>
-              Created: {format(new Date(task.created_at), "MMM d, yyyy 'at' h:mm a")}
+              Created: {format(new Date(task.created_at || new Date()), "MMM d, yyyy 'at' h:mm a")}
               {task.created_by && (() => {
                 const creator = teamMembers.find((m) => m.id === task.created_by);
                 return creator ? (
@@ -682,7 +682,7 @@ export function TaskDetailDialog({
               })()}
             </div>
             <div>
-              Updated: {format(new Date(task.updated_at), "MMM d, yyyy 'at' h:mm a")}
+              Updated: {format(new Date(task.updated_at || new Date()), "MMM d, yyyy 'at' h:mm a")}
               {(() => {
                 // Show updated_by if available, otherwise show created_by
                 const updaterId = (task as any).updated_by || task.created_by;

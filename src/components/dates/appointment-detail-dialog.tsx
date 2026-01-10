@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { AppointmentWithRelations, AppointmentType, Customer } from "@/types/database";
+import { AppointmentWithDetails, AppointmentType, Customer } from "@/types/database";
 import {
   Dialog,
   DialogContent,
@@ -54,7 +54,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { OrganizationMember } from "@/components/dates/dates-view";
 
 interface AppointmentDetailDialogProps {
-  appointment: AppointmentWithRelations | null;
+  appointment: AppointmentWithDetails | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   customers: Pick<Customer, "id" | "name" | "company" | "customer_number">[];
@@ -173,8 +173,8 @@ export function AppointmentDetailDialog({
       setEndTime(appointment.end_time ? formatForDateTimeLocal(appointment.end_time) : "");
       setLocation(appointment.location || "");
       setDescription(appointment.description || "");
-      setStatus(appointment.status);
-      setAppointmentTypeId(appointment.appointment_types?.id || null);
+      setStatus((appointment.status || "scheduled") as "scheduled" | "completed" | "cancelled");
+      setAppointmentTypeId(appointment.appointment_type?.id || null);
       setNotes(appointment.notes || "");
     }
     // Always reset to view mode and clear search when dialog opens
@@ -281,7 +281,7 @@ export function AppointmentDetailDialog({
                 <div
                   className={cn(
                     "w-3 h-3 rounded-full shrink-0",
-                    appointment.appointment_types?.color || "border border-muted-foreground"
+                    appointment.appointment_type?.color || "border border-muted-foreground"
                   )}
                 />
                 <span className="truncate block max-w-[calc(100%-2rem)]">{appointment.title}</span>
@@ -787,10 +787,10 @@ export function AppointmentDetailDialog({
 
             {/* Type & Status */}
             <div className="flex items-center gap-3">
-              {appointment.appointment_types && (
-                <Badge variant="outline" className="gap-1.5 max-w-[180px]" title={appointment.appointment_types.name}>
-                  <div className={cn("w-2 h-2 rounded-full shrink-0", appointment.appointment_types.color)} />
-                  <span className="truncate">{appointment.appointment_types.name}</span>
+              {appointment.appointment_type && (
+                <Badge variant="outline" className="gap-1.5 max-w-[180px]" title={appointment.appointment_type.name}>
+                  <div className={cn("w-2 h-2 rounded-full shrink-0", appointment.appointment_type.color)} />
+                  <span className="truncate">{appointment.appointment_type.name}</span>
                 </Badge>
               )}
               {/* Clickable status badge with colors */}
@@ -953,7 +953,7 @@ export function AppointmentDetailDialog({
               <div className="flex items-center gap-1.5">
                 <Calendar className="h-3 w-3" />
                 <span>
-                  Created on {format(new Date(appointment.created_at), "MMM d, yyyy 'at' h:mm a")}
+                  Created on {format(new Date(appointment.created_at || new Date()), "MMM d, yyyy 'at' h:mm a")}
                   {appointment.created_by_user && (
                     <> by <span className="font-medium text-foreground">{appointment.created_by_user.name || appointment.created_by_user.email}</span></>
                   )}
@@ -962,7 +962,7 @@ export function AppointmentDetailDialog({
               <div className="flex items-center gap-1.5">
                 <Calendar className="h-3 w-3" />
                 <span>
-                  Updated on {format(new Date(appointment.updated_at), "MMM d, yyyy 'at' h:mm a")}
+                  Updated on {format(new Date(appointment.updated_at || new Date()), "MMM d, yyyy 'at' h:mm a")}
                   {(() => {
                     const updatedUser = appointment.updated_by_user || appointment.created_by_user;
                     return updatedUser ? (

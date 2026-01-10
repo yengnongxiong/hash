@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { AppointmentWithRelations, AppointmentType, Customer } from "@/types/database";
+import { AppointmentWithDetails, AppointmentType, Customer } from "@/types/database";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -74,7 +74,7 @@ export interface OrganizationMember {
 }
 
 interface DatesViewProps {
-  appointments: AppointmentWithRelations[];
+  appointments: AppointmentWithDetails[];
   customers: Pick<Customer, "id" | "name" | "company" | "customer_number">[];
   appointmentTypes: AppointmentType[];
   organizationMembers: OrganizationMember[];
@@ -83,7 +83,7 @@ interface DatesViewProps {
 type TimeFilter = "all" | "overdue" | "today" | "upcoming" | "past";
 
 // Helper to get computed status for sorting/filtering
-function getComputedStatus(apt: AppointmentWithRelations): string {
+function getComputedStatus(apt: AppointmentWithDetails): string {
   if (apt.status === "cancelled") return "cancelled";
   if (apt.status === "completed") return "completed";
   const startDate = new Date(apt.start_time);
@@ -102,7 +102,7 @@ export function DatesView({ appointments, customers, appointmentTypes, organizat
   const [view, setView] = useState<"table" | "week" | "calendar">("table");
   const [search, setSearch] = useState("");
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
-  const [selectedAppointment, setSelectedAppointment] = useState<AppointmentWithRelations | null>(null);
+  const [selectedAppointment, setSelectedAppointment] = useState<AppointmentWithDetails | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
@@ -164,38 +164,6 @@ export function DatesView({ appointments, customers, appointmentTypes, organizat
     });
   }, [router]);
 
-  // Handle date move (drag-and-drop)
-  const handleDateMove = useCallback(
-    (entryId: string, newDate: Date) => {
-      startTransition(async () => {
-        // Find the appointment to get its end_time and calculate the new end_time
-        const apt = appointments.find((a) => a.id === entryId);
-        if (!apt) return;
-
-        // Calculate new end_time if original had one
-        let newEndTime: string | null = null;
-        if (apt.end_time) {
-          const originalDuration =
-            new Date(apt.end_time).getTime() - new Date(apt.start_time).getTime();
-          newEndTime = new Date(newDate.getTime() + originalDuration).toISOString();
-        }
-
-        const result = await updateAppointment(entryId, {
-          start_time: newDate.toISOString(),
-          end_time: newEndTime,
-        });
-
-        if (result.error) {
-          toast.error("Failed to reschedule date", { description: result.error });
-        } else {
-          toast.success("Date rescheduled");
-          router.refresh();
-        }
-      });
-    },
-    [appointments, router]
-  );
-
   const filteredAppointments = useMemo(() => {
     return appointments.filter((apt) => {
       // Search filter - includes all fields
@@ -249,7 +217,7 @@ export function DatesView({ appointments, customers, appointmentTypes, organizat
           formattedEndTime.includes(searchLower) ||
           // Status
           computedStatus.includes(searchLower) ||
-          apt.status.toLowerCase().includes(searchLower);
+          (apt.status || "").toLowerCase().includes(searchLower);
         if (!matchesSearch) return false;
       }
 
@@ -284,13 +252,13 @@ export function DatesView({ appointments, customers, appointmentTypes, organizat
 
       // Default sort by updated_at descending when no column is selected
       if (!sortKey) {
-        comparison = new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime();
+        comparison = new Date(a.updated_at || new Date()).getTime() - new Date(b.updated_at || new Date()).getTime();
         return -comparison; // descending (most recent first)
       }
 
       switch (sortKey) {
         case "date":
-          comparison = new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
+          comparison = new Date(a.start_time || new Date()).getTime() - new Date(b.start_time || new Date()).getTime();
           break;
         case "title":
           comparison = a.title.localeCompare(b.title);
@@ -313,10 +281,10 @@ export function DatesView({ appointments, customers, appointmentTypes, organizat
                        (statusOrder[statusB as keyof typeof statusOrder] || 5);
           break;
         case "created":
-          comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+          comparison = new Date(a.created_at || new Date()).getTime() - new Date(b.created_at || new Date()).getTime();
           break;
         case "updated":
-          comparison = new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime();
+          comparison = new Date(a.updated_at || new Date()).getTime() - new Date(b.updated_at || new Date()).getTime();
           break;
       }
 
@@ -468,11 +436,11 @@ export function DatesView({ appointments, customers, appointmentTypes, organizat
       color: apt.appointment_types?.color || undefined,
       entityName: apt.customers?.name,
       location: apt.location || undefined,
-      status: apt.status,
+      status: (apt.status || undefined) as "completed" | "scheduled" | "cancelled" | undefined,
     }));
   }, [sortedAppointments]);
 
-  const handleViewAppointment = (apt: AppointmentWithRelations) => {
+  const handleViewAppointment = (apt: AppointmentWithDetails) => {
     setSelectedAppointment(apt);
     setDetailDialogOpen(true);
   };
@@ -489,12 +457,12 @@ export function DatesView({ appointments, customers, appointmentTypes, organizat
       customerLookup.set(c.id, c.name);
     });
 
-    exportToCSV(sortedAppointments, "dates", [
+    exportToCSV(sortedAppointments as unknown as Record<string, unknown>[], "dates", [
       { key: "title", label: "Title" },
       { key: "start_time", label: "Date", format: (v) => formatDateTime(v as string) },
       { key: "end_time", label: "End Time", format: (v) => v ? formatDateTime(v as string) : "" },
       { key: "customer_ids", label: "People", format: (v, row) => {
-        const apt = row as AppointmentWithRelations;
+        const apt = row as unknown as AppointmentWithDetails;
         // Use customer_ids array if available, otherwise fall back to legacy customers
         if (apt.customer_ids && apt.customer_ids.length > 0) {
           return apt.customer_ids
@@ -505,14 +473,14 @@ export function DatesView({ appointments, customers, appointmentTypes, organizat
         return apt.customers?.name || "";
       }},
       { key: "assignees", label: "Assignees", format: (v) => {
-        const assignees = v as AppointmentWithRelations["assignees"];
+        const assignees = v as AppointmentWithDetails["assignees"];
         if (assignees && assignees.length > 0) {
           return assignees.map(a => a.name || a.email).join("; ");
         }
         return "";
       }},
       { key: "appointment_types", label: "Type", format: (v) => {
-        const type = v as AppointmentWithRelations["appointment_types"];
+        const type = v as AppointmentWithDetails["appointment_types"];
         return type?.name || "";
       }},
       { key: "location", label: "Location", format: (v) => (v as string) || "" },
@@ -891,10 +859,10 @@ export function DatesView({ appointments, customers, appointmentTypes, organizat
                         </Popover>
                       </td>
                       <td className="p-3 text-xs text-muted-foreground">
-                        {formatDistanceToNow(new Date(apt.created_at))}
+                        {formatDistanceToNow(new Date(apt.created_at || new Date()))}
                       </td>
                       <td className="p-3 text-xs text-muted-foreground">
-                        {formatDistanceToNow(new Date(apt.updated_at))}
+                        {formatDistanceToNow(new Date(apt.updated_at || new Date()))}
                       </td>
                       <td className="p-3">
                         <Button
@@ -994,7 +962,6 @@ export function DatesView({ appointments, customers, appointmentTypes, organizat
             if (fullApt) handleViewAppointment(fullApt);
           }}
           onEmptySlotClick={handleEmptyDayClick}
-          onDateMove={handleDateMove}
         />
       ) : (
         <DatesCalendar

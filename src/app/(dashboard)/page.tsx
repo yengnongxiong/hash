@@ -107,13 +107,13 @@ async function DashboardStats() {
 async function RecentDocuments() {
   const supabase = await createClient();
 
-  const { data: documents } = await supabase
+  const { data: rawDocuments } = await supabase
     .from("documents")
-    .select("id, file_name, status, document_type, created_at, customers(name)")
+    .select("id, file_name, status, document_type, created_at, customer_id")
     .order("created_at", { ascending: false })
     .limit(5);
 
-  if (!documents || documents.length === 0) {
+  if (!rawDocuments || rawDocuments.length === 0) {
     return (
       <Card>
         <CardHeader>
@@ -139,6 +139,27 @@ async function RecentDocuments() {
       </Card>
     );
   }
+
+  // Fetch customers separately for documents that have customer_id
+  const customerIds = [...new Set(rawDocuments.filter(d => d.customer_id).map(d => d.customer_id as string))];
+  let customersMap: Record<string, { name: string }> = {};
+
+  if (customerIds.length > 0) {
+    const { data: customers } = await supabase
+      .from("customers")
+      .select("id, name")
+      .in("id", customerIds);
+
+    if (customers) {
+      customersMap = Object.fromEntries(customers.map(c => [c.id, { name: c.name }]));
+    }
+  }
+
+  // Attach customers to documents
+  const documents = rawDocuments.map(doc => ({
+    ...doc,
+    customers: doc.customer_id ? customersMap[doc.customer_id] || null : null,
+  }));
 
   const statusStyles = {
     completed: "bg-emerald-100 text-emerald-800",
@@ -276,15 +297,15 @@ async function UpcomingAppointments() {
   const today = startOfDay(new Date()).toISOString();
   const nextWeek = addDays(new Date(), 7).toISOString();
 
-  const { data: appointments } = await supabase
+  const { data: rawAppointments } = await supabase
     .from("appointments")
-    .select("id, title, start_time, status, customers(name)")
+    .select("id, title, start_time, status, customer_id")
     .gte("start_time", today)
     .lte("start_time", nextWeek)
     .order("start_time", { ascending: true })
     .limit(5);
 
-  if (!appointments || appointments.length === 0) {
+  if (!rawAppointments || rawAppointments.length === 0) {
     return (
       <Card>
         <CardHeader>
@@ -310,6 +331,27 @@ async function UpcomingAppointments() {
       </Card>
     );
   }
+
+  // Fetch customers separately for appointments that have customer_id
+  const customerIds = [...new Set(rawAppointments.filter(a => a.customer_id).map(a => a.customer_id as string))];
+  let customersMap: Record<string, { name: string }> = {};
+
+  if (customerIds.length > 0) {
+    const { data: customers } = await supabase
+      .from("customers")
+      .select("id, name")
+      .in("id", customerIds);
+
+    if (customers) {
+      customersMap = Object.fromEntries(customers.map(c => [c.id, { name: c.name }]));
+    }
+  }
+
+  // Attach customers to appointments
+  const appointments = rawAppointments.map(apt => ({
+    ...apt,
+    customers: apt.customer_id ? customersMap[apt.customer_id] || null : null,
+  }));
 
   const statusStyles = {
     scheduled: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",

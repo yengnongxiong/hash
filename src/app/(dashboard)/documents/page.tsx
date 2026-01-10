@@ -8,10 +8,12 @@ export default async function DocumentsPage() {
   const supabase = await createClient();
 
   // Fetch documents and flags in parallel
+  // Filter out soft-deleted documents (deleted_at is NULL)
   const [documentsResult, flagsResult] = await Promise.all([
     supabase
       .from("documents")
-      .select("*, customers(name, company)")
+      .select("*")
+      .is("deleted_at", null)
       .order("created_at", { ascending: false }),
     supabase
       .from("document_flags")
@@ -24,6 +26,27 @@ export default async function DocumentsPage() {
         <p className="text-destructive">Error loading documents: {documentsResult.error.message}</p>
       </div>
     );
+  }
+
+  // Fetch customers for documents that have customer_id
+  const customerIds = [...new Set(
+    (documentsResult.data || [])
+      .filter(doc => doc.customer_id)
+      .map(doc => doc.customer_id as string)
+  )];
+
+  let customersMap: Record<string, { name: string; company: string | null }> = {};
+  if (customerIds.length > 0) {
+    const { data: customers } = await supabase
+      .from("customers")
+      .select("id, name, company")
+      .in("id", customerIds);
+
+    if (customers) {
+      customersMap = Object.fromEntries(
+        customers.map(c => [c.id, { name: c.name, company: c.company }])
+      );
+    }
   }
 
   // Calculate flag counts per document
@@ -39,9 +62,10 @@ export default async function DocumentsPage() {
     }
   }
 
-  // Merge flag counts into documents
+  // Merge flag counts and customers into documents
   const documents = (documentsResult.data || []).map(doc => ({
     ...doc,
+    customers: doc.customer_id ? customersMap[doc.customer_id] || null : null,
     flag_count: flagCountsByDocument.get(doc.id)?.total || 0,
     unresolved_flag_count: flagCountsByDocument.get(doc.id)?.unresolved || 0,
   }));

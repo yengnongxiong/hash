@@ -18,12 +18,30 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  // Get user profile with organization
-  const { data: profile } = await supabase
+  // Get user profile (without organization join to avoid TypeScript issues)
+  const { data: userProfile } = await supabase
     .from("users")
-    .select("*, organizations(name)")
+    .select("*")
     .eq("id", user.id)
     .single();
+
+  // Fetch organization separately if user has one
+  let organization: { name: string } | null = null;
+  if (userProfile?.organization_id) {
+    const { data: org } = await supabase
+      .from("organizations")
+      .select("name")
+      .eq("id", userProfile.organization_id)
+      .single();
+    organization = org;
+  }
+
+  // Construct profile with organization
+  const profile = userProfile ? {
+    email: userProfile.email,
+    name: userProfile.name,
+    organizations: organization,
+  } : null;
 
   // Fetch active system alerts
   const { data: alertsData } = await supabase

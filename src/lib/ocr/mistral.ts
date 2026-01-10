@@ -233,9 +233,12 @@ export class MistralOCRProvider implements OCRProvider {
       const content = data.choices?.[0]?.message?.content || "";
 
       let extractedData: ExtractedDocumentData;
+      let rawText = "";
       try {
         const parsed = JSON.parse(content);
         extractedData = this.normalizeExtractedData(parsed);
+        // Generate human-readable text from extracted data for images
+        rawText = this.generateRawTextFromExtraction(extractedData);
       } catch {
         extractedData = {
           documentType: "other",
@@ -243,15 +246,16 @@ export class MistralOCRProvider implements OCRProvider {
           hasImages: true,
           hasTables: false,
         };
+        rawText = "Image processed but text extraction failed.";
       }
 
       return {
         success: true,
-        rawText: content,
+        rawText,
         pages: [
           {
             pageNumber: 1,
-            markdown: content,
+            markdown: rawText,
             images: [imageUrl],
           },
         ],
@@ -272,6 +276,56 @@ export class MistralOCRProvider implements OCRProvider {
         error: error instanceof Error ? error.message : "Unknown error",
       };
     }
+  }
+
+  private generateRawTextFromExtraction(data: ExtractedDocumentData): string {
+    const lines: string[] = [];
+
+    // Document type
+    if (data.documentType && data.documentType !== "other") {
+      lines.push(`Document Type: ${data.documentType.charAt(0).toUpperCase() + data.documentType.slice(1)}`);
+    }
+
+    // Invoice fields
+    if (data.invoiceNumber) lines.push(`Invoice Number: ${data.invoiceNumber}`);
+    if (data.vendorName) lines.push(`Vendor: ${data.vendorName}`);
+    if (data.invoiceDate) lines.push(`Invoice Date: ${data.invoiceDate}`);
+    if (data.dueDate) lines.push(`Due Date: ${data.dueDate}`);
+    if (data.totalAmount !== undefined) {
+      lines.push(`Total Amount: ${data.currency || "USD"} ${data.totalAmount}`);
+    }
+
+    // Receipt fields
+    if (data.merchantName) lines.push(`Merchant: ${data.merchantName}`);
+    if (data.transactionDate) lines.push(`Transaction Date: ${data.transactionDate}`);
+    if (data.subtotal !== undefined) lines.push(`Subtotal: ${data.subtotal}`);
+    if (data.tax !== undefined) lines.push(`Tax: ${data.tax}`);
+    if (data.total !== undefined) lines.push(`Total: ${data.total}`);
+    if (data.paymentMethod) lines.push(`Payment Method: ${data.paymentMethod}`);
+
+    // Contract fields
+    if (data.partyA) lines.push(`Party A: ${data.partyA}`);
+    if (data.partyB) lines.push(`Party B: ${data.partyB}`);
+    if (data.effectiveDate) lines.push(`Effective Date: ${data.effectiveDate}`);
+    if (data.expirationDate) lines.push(`Expiration Date: ${data.expirationDate}`);
+    if (data.contractValue !== undefined) lines.push(`Contract Value: ${data.contractValue}`);
+
+    // Line items
+    if (data.lineItems && data.lineItems.length > 0) {
+      lines.push("");
+      lines.push("Line Items:");
+      for (const item of data.lineItems) {
+        const itemLine = [
+          item.description,
+          item.quantity ? `Qty: ${item.quantity}` : null,
+          item.unitPrice ? `@ ${item.unitPrice}` : null,
+          item.amount ? `= ${item.amount}` : null,
+        ].filter(Boolean).join(" | ");
+        lines.push(`  - ${itemLine}`);
+      }
+    }
+
+    return lines.length > 0 ? lines.join("\n") : "No text content extracted from image.";
   }
 
   private normalizeExtractedData(parsed: Record<string, unknown>): ExtractedDocumentData {

@@ -14,11 +14,37 @@ export default async function DatesPage() {
 
   const organizationId = currentUserData?.organization_id;
 
-  // Fetch appointments with customer data and type
+  // Fetch appointments without relationship joins
   const { data: appointments, error: appointmentsError } = await supabase
     .from("appointments")
-    .select("*, customers(name, company), appointment_types(id, name, color)")
+    .select("*")
     .order("start_time", { ascending: true });
+
+  // Fetch customers for appointments
+  const customerIds = [...new Set((appointments || []).filter(a => a.customer_id).map(a => a.customer_id as string))];
+  let customersMap: Record<string, { name: string; company: string | null }> = {};
+  if (customerIds.length > 0) {
+    const { data: appointmentCustomers } = await supabase
+      .from("customers")
+      .select("id, name, company")
+      .in("id", customerIds);
+    if (appointmentCustomers) {
+      customersMap = Object.fromEntries(appointmentCustomers.map(c => [c.id, { name: c.name, company: c.company }]));
+    }
+  }
+
+  // Fetch appointment types for appointments
+  const typeIds = [...new Set((appointments || []).filter(a => a.appointment_type_id).map(a => a.appointment_type_id as string))];
+  let typesMap: Record<string, { id: string; name: string; color: string }> = {};
+  if (typeIds.length > 0) {
+    const { data: types } = await supabase
+      .from("appointment_types")
+      .select("id, name, color")
+      .in("id", typeIds);
+    if (types) {
+      typesMap = Object.fromEntries(types.map(t => [t.id, { id: t.id, name: t.name, color: t.color }]));
+    }
+  }
 
   // Fetch all organization members (team) for assignee selection
   const { data: organizationMembers } = organizationId
@@ -58,13 +84,15 @@ export default async function DatesPage() {
     }
   }
 
-  // Add notes_user, assignees, created_by_user, updated_by_user to appointments
+  // Add notes_user, assignees, created_by_user, updated_by_user, customers, and appointment_types to appointments
   const appointmentsWithUsers = appointments?.map(apt => ({
     ...apt,
     notes_user: apt.notes_updated_by ? allUsersMap[apt.notes_updated_by] || null : null,
     assignees: apt.assignee_ids?.map((id: string) => allUsersMap[id]).filter(Boolean) || null,
     created_by_user: apt.created_by ? allUsersMap[apt.created_by] || null : null,
     updated_by_user: apt.updated_by ? allUsersMap[apt.updated_by] || null : null,
+    customers: apt.customer_id ? customersMap[apt.customer_id] || null : null,
+    appointment_types: apt.appointment_type_id ? typesMap[apt.appointment_type_id] || null : null,
   })) || [];
 
   // Fetch customers for creating new appointments

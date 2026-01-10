@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { saveSketchAsAttachment } from "@/app/(dashboard)/whiteboard/actions";
+import { saveSketchAsAttachment } from "@/app/(dashboard)/tasks/actions";
 
 interface SketchCanvasDialogProps {
   taskId: string;

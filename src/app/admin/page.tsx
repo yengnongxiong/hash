@@ -28,18 +28,52 @@ export default async function AdminPage() {
     supabase.from("system_alerts").select("*", { count: "exact", head: true }).eq("active", true),
   ]);
 
-  // Fetch recent activity
-  const { data: recentUsers } = await supabase
+  // Fetch recent activity - users without organization join
+  const { data: rawUsers } = await supabase
     .from("users")
-    .select("id, email, name, role, created_at, organizations(name)")
+    .select("id, email, name, role, created_at, organization_id")
     .order("created_at", { ascending: false })
     .limit(5);
 
-  const { data: recentDocuments } = await supabase
+  // Fetch organizations for users
+  const orgIds = [...new Set((rawUsers || []).filter(u => u.organization_id).map(u => u.organization_id as string))];
+  let orgsMap: Record<string, { name: string }> = {};
+
+  if (orgIds.length > 0) {
+    const { data: orgs } = await supabase
+      .from("organizations")
+      .select("id, name")
+      .in("id", orgIds);
+
+    if (orgs) {
+      orgsMap = Object.fromEntries(orgs.map(o => [o.id, { name: o.name }]));
+    }
+  }
+
+  // Attach organizations to users
+  const recentUsers = (rawUsers || []).map(user => ({
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role || "member",
+    created_at: user.created_at,
+    organizations: user.organization_id ? orgsMap[user.organization_id] || null : null,
+  }));
+
+  const { data: rawDocuments } = await supabase
     .from("documents")
     .select("id, file_name, status, document_type, created_at")
     .order("created_at", { ascending: false })
     .limit(5);
+
+  // Transform documents to ensure status is not null
+  const recentDocuments = (rawDocuments || []).map(doc => ({
+    id: doc.id,
+    file_name: doc.file_name,
+    status: doc.status || "pending",
+    document_type: doc.document_type,
+    created_at: doc.created_at,
+  }));
 
   return (
     <AdminDashboard
@@ -50,8 +84,8 @@ export default async function AdminPage() {
         documents: documentCount || 0,
         activeAlerts: alertCount || 0,
       }}
-      recentUsers={recentUsers || []}
-      recentDocuments={recentDocuments || []}
+      recentUsers={recentUsers}
+      recentDocuments={recentDocuments}
     />
   );
 }

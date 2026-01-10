@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { Whiteboard } from "@/components/dashboard/whiteboard";
 
-export default async function WhiteboardPage() {
+export default async function TasksPage() {
   const supabase = await createClient();
 
   const {
@@ -41,9 +41,9 @@ export default async function WhiteboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Team Whiteboard</h1>
+        <h1 className="text-2xl font-bold">Tasks</h1>
         <p className="text-muted-foreground">
-          Collaborate in real-time with your team. Drag tasks between columns.
+          Manage your team and organization&apos;s tasks. Drag tasks between kanban columns to update status.
         </p>
       </div>
 

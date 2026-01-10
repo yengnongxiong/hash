@@ -9,13 +9,31 @@ export default async function SettingsPage() {
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  const { data: profile } = user
+  // Fetch user profile without organization join
+  const { data: userProfile } = user
     ? await supabase
         .from("users")
-        .select("*, organizations(name, settings)")
+        .select("*")
         .eq("id", user.id)
         .single()
     : { data: null };
+
+  // Fetch organization separately if user has one
+  let organization: { name: string; settings: unknown } | null = null;
+  if (userProfile?.organization_id) {
+    const { data: org } = await supabase
+      .from("organizations")
+      .select("name, settings")
+      .eq("id", userProfile.organization_id)
+      .single();
+    organization = org;
+  }
+
+  // Construct profile with organizations
+  const profile = userProfile ? {
+    ...userProfile,
+    organizations: organization,
+  } : null;
 
   // Fetch active system alerts for all users (read-only)
   const { data: alertsData } = await supabase

@@ -12,6 +12,8 @@ import { toast } from "sonner";
 import { formatDistanceToNow, formatFileSize } from "@/lib/utils/format";
 import type { Document } from "@/types/database";
 
+type DocumentStatus = "pending" | "processing" | "pending_review" | "completed" | "failed" | "rejected";
+
 interface DocumentWithCustomer extends Document {
   customers?: { name: string; company: string | null } | null;
 }
@@ -166,10 +168,10 @@ export function DocumentList({ documents }: DocumentListProps) {
                   {doc.document_type || "-"}
                 </td>
                 <td className="p-3">
-                  <ProcessingStatus status={doc.status} />
+                  <ProcessingStatus status={(doc.status || "pending") as DocumentStatus} />
                 </td>
                 <td className="p-3 text-sm text-muted-foreground">
-                  {formatDistanceToNow(new Date(doc.created_at))}
+                  {formatDistanceToNow(new Date(doc.created_at || new Date()))}
                 </td>
                 <td className="p-3">
                   <div className="flex items-center gap-1">

@@ -109,7 +109,7 @@ function StickyNote({
           )}
           style={{
             ...provided.draggableProps.style,
-            backgroundColor: task.color !== "#ffffff" ? task.color : undefined,
+            backgroundColor: task.color && task.color !== "#ffffff" ? task.color : undefined,
           }}
         >
           {/* Priority indicator */}
@@ -170,7 +170,7 @@ function StickyNote({
                 </div>
               )}
               <p className="text-[9px] text-muted-foreground ml-auto">
-                {formatDistanceToNow(new Date(task.created_at))}
+                {formatDistanceToNow(new Date(task.created_at || new Date()))}
               </p>
             </div>
           </div>

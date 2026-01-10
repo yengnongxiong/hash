@@ -18,10 +18,31 @@ export default async function AdminUsersPage() {
 
   const supabase = await createClient();
 
-  const { data: users } = await supabase
+  const { data: rawUsers } = await supabase
     .from("users")
-    .select("*, organizations(name)")
+    .select("*")
     .order("created_at", { ascending: false });
+
+  // Fetch organizations separately
+  const orgIds = [...new Set((rawUsers || []).filter(u => u.organization_id).map(u => u.organization_id as string))];
+  let orgsMap: Record<string, { name: string }> = {};
+
+  if (orgIds.length > 0) {
+    const { data: orgs } = await supabase
+      .from("organizations")
+      .select("id, name")
+      .in("id", orgIds);
+
+    if (orgs) {
+      orgsMap = Object.fromEntries(orgs.map(o => [o.id, { name: o.name }]));
+    }
+  }
+
+  // Attach organizations to users
+  const users = (rawUsers || []).map(user => ({
+    ...user,
+    organizations: user.organization_id ? orgsMap[user.organization_id] || null : null,
+  }));
 
   return (
     <AdminPageWrapper

@@ -67,9 +67,10 @@ export function ActivityFeed({ initialActivities = [] }: ActivityFeedProps) {
   const fetchActivities = useCallback(async () => {
     const supabase = createClient();
 
+    // Fetch audit logs without relationship joins
     const { data: auditLogs, error } = await supabase
       .from("document_audit_log")
-      .select("*, documents(file_name), users(name, email)")
+      .select("*")
       .order("created_at", { ascending: false })
       .limit(10);
 
@@ -78,16 +79,46 @@ export function ActivityFeed({ initialActivities = [] }: ActivityFeedProps) {
       return;
     }
 
-    if (auditLogs) {
-      const activities: ActivityItem[] = auditLogs.map((log) => ({
-        id: log.id,
-        type: "document" as const,
-        action: log.action,
-        entity_name: log.documents?.file_name || "Unknown",
-        entity_id: log.document_id,
-        user_name: log.users?.name || log.users?.email,
-        created_at: log.created_at,
-      }));
+    if (auditLogs && auditLogs.length > 0) {
+      // Fetch related documents
+      const docIds = [...new Set(auditLogs.filter(l => l.document_id).map(l => l.document_id))];
+      let docsMap: Record<string, { file_name: string }> = {};
+      if (docIds.length > 0) {
+        const { data: docs } = await supabase
+          .from("documents")
+          .select("id, file_name")
+          .in("id", docIds);
+        if (docs) {
+          docsMap = Object.fromEntries(docs.map(d => [d.id, { file_name: d.file_name }]));
+        }
+      }
+
+      // Fetch related users
+      const userIds = [...new Set(auditLogs.filter(l => l.user_id).map(l => l.user_id as string))];
+      let usersMap: Record<string, { name: string | null; email: string }> = {};
+      if (userIds.length > 0) {
+        const { data: users } = await supabase
+          .from("users")
+          .select("id, name, email")
+          .in("id", userIds);
+        if (users) {
+          usersMap = Object.fromEntries(users.map(u => [u.id, { name: u.name, email: u.email }]));
+        }
+      }
+
+      const activities: ActivityItem[] = auditLogs.map((log) => {
+        const doc = log.document_id ? docsMap[log.document_id] : null;
+        const user = log.user_id ? usersMap[log.user_id] : null;
+        return {
+          id: log.id,
+          type: "document" as const,
+          action: log.action || "unknown",
+          entity_name: doc?.file_name || "Unknown",
+          entity_id: log.document_id,
+          user_name: user?.name || user?.email,
+          created_at: log.created_at || new Date().toISOString(),
+        };
+      });
       setActivities(activities);
     }
 
@@ -117,9 +148,9 @@ export function ActivityFeed({ initialActivities = [] }: ActivityFeedProps) {
           table: "document_audit_log",
         },
         async (payload) => {
-          const { data, error } = await supabase
+          const { data: logData, error } = await supabase
             .from("document_audit_log")
-            .select("*, documents(file_name), users(name, email)")
+            .select("*")
             .eq("id", payload.new.id)
             .single();
 
@@ -128,15 +159,37 @@ export function ActivityFeed({ initialActivities = [] }: ActivityFeedProps) {
             return;
           }
 
-          if (data) {
+          if (logData) {
+            // Fetch document name
+            let docName = "Unknown";
+            if (logData.document_id) {
+              const { data: doc } = await supabase
+                .from("documents")
+                .select("file_name")
+                .eq("id", logData.document_id)
+                .single();
+              if (doc) docName = doc.file_name;
+            }
+
+            // Fetch user info
+            let userName: string | undefined;
+            if (logData.user_id) {
+              const { data: user } = await supabase
+                .from("users")
+                .select("name, email")
+                .eq("id", logData.user_id)
+                .single();
+              if (user) userName = user.name || user.email;
+            }
+
             const newActivity: ActivityItem = {
-              id: data.id,
+              id: logData.id,
               type: "document",
-              action: data.action,
-              entity_name: data.documents?.file_name || "Unknown",
-              entity_id: data.document_id,
-              user_name: data.users?.name || data.users?.email,
-              created_at: data.created_at,
+              action: logData.action || "unknown",
+              entity_name: docName,
+              entity_id: logData.document_id,
+              user_name: userName,
+              created_at: logData.created_at || new Date().toISOString(),
             };
             setActivities((prev) => [newActivity, ...prev.slice(0, 9)]);
           }

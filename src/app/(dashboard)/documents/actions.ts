@@ -285,39 +285,98 @@ export async function getDocuments() {
   return data;
 }
 
-export async function deleteDocuments(documentIds: string[]) {
+export async function deleteDocuments(documentIds: string[], permanent = false) {
   const supabase = await createClient();
 
   if (documentIds.length === 0) {
     return { error: "No documents selected" };
   }
 
-  // Get file paths before deleting
-  const { data: documents } = await supabase
-    .from("documents")
-    .select("id, file_url")
-    .in("id", documentIds);
+  if (permanent) {
+    // Permanent delete - remove from storage and database
+    const { data: documents } = await supabase
+      .from("documents")
+      .select("id, file_url")
+      .in("id", documentIds);
 
-  // Delete from storage
-  if (documents) {
-    for (const doc of documents) {
-      // Extract path from URL
-      const url = new URL(doc.file_url);
-      const pathMatch = url.pathname.match(/\/documents\/(.+)/);
-      if (pathMatch) {
-        await supabase.storage.from("documents").remove([pathMatch[1]]);
+    // Delete from storage
+    if (documents) {
+      for (const doc of documents) {
+        // Extract path from URL
+        const url = new URL(doc.file_url);
+        const pathMatch = url.pathname.match(/\/documents\/(.+)/);
+        if (pathMatch) {
+          await supabase.storage.from("documents").remove([pathMatch[1]]);
+        }
+      }
+    }
+
+    // Delete from database
+    const { error } = await supabase
+      .from("documents")
+      .delete()
+      .in("id", documentIds);
+
+    if (error) {
+      return { error: error.message };
+    }
+  } else {
+    // Soft delete - set deleted_at timestamp
+    const { error } = await supabase
+      .from("documents")
+      .update({ deleted_at: new Date().toISOString() })
+      .in("id", documentIds);
+
+    if (error) {
+      return { error: error.message };
+    }
+
+    // Log the soft delete action
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      for (const docId of documentIds) {
+        await supabase.from("document_audit_log").insert({
+          document_id: docId,
+          user_id: user.id,
+          action: "deleted",
+          details: { soft_delete: true },
+        });
       }
     }
   }
 
-  // Delete from database
+  revalidatePath("/documents");
+  return { success: true, count: documentIds.length };
+}
+
+export async function restoreDocuments(documentIds: string[]) {
+  const supabase = await createClient();
+
+  if (documentIds.length === 0) {
+    return { error: "No documents selected" };
+  }
+
+  // Restore by clearing deleted_at
   const { error } = await supabase
     .from("documents")
-    .delete()
+    .update({ deleted_at: null })
     .in("id", documentIds);
 
   if (error) {
     return { error: error.message };
+  }
+
+  // Log the restore action
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    for (const docId of documentIds) {
+      await supabase.from("document_audit_log").insert({
+        document_id: docId,
+        user_id: user.id,
+        action: "restored",
+        details: {},
+      });
+    }
   }
 
   revalidatePath("/documents");
@@ -537,61 +596,103 @@ export async function bulkApproveDocuments(documentIds: string[]) {
 }
 
 export async function logDocumentView(documentId: string) {
-  const supabase = await createClient();
+  try {
+    const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  if (!user) return;
+    if (!user) return;
 
-  // Only log view once per session (check if viewed in last 5 minutes)
-  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    // Only log view once per session (check if viewed in last 5 minutes)
+    // Using a shorter window (1 minute) to reduce race condition window
+    const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString();
 
-  const { data: recentView } = await supabase
-    .from("document_audit_log")
-    .select("id")
-    .eq("document_id", documentId)
-    .eq("user_id", user.id)
-    .eq("action", "viewed")
-    .gte("created_at", fiveMinutesAgo)
-    .limit(1);
+    // Get the most recent view to check timing more accurately
+    const { data: recentView } = await supabase
+      .from("document_audit_log")
+      .select("id, created_at")
+      .eq("document_id", documentId)
+      .eq("user_id", user.id)
+      .eq("action", "viewed")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
 
-  if (recentView && recentView.length > 0) {
-    return; // Already logged recently
+    // If there's a recent view within the last minute, skip logging
+    if (recentView && new Date(recentView.created_at) >= new Date(oneMinuteAgo)) {
+      return; // Already logged recently
+    }
+
+    // Insert the view log - errors are caught and silently ignored
+    // since view logging is informational and non-critical
+    await supabase.from("document_audit_log").insert({
+      document_id: documentId,
+      user_id: user.id,
+      action: "viewed",
+      details: {},
+    });
+  } catch (error) {
+    // Silently ignore view logging errors - they're non-critical
+    // and shouldn't break the page load
+    console.error("View logging error (non-critical):", error);
   }
-
-  await supabase.from("document_audit_log").insert({
-    document_id: documentId,
-    user_id: user.id,
-    action: "viewed",
-    details: {},
-  });
 }
 
 export async function getDocumentAuditLog(documentId: string) {
   const supabase = await createClient();
+  const PAGE_SIZE = 20;
 
-  const { data, error } = await supabase
+  // Get total count
+  const { count } = await supabase
     .from("document_audit_log")
-    .select("*, users(name, email)")
+    .select("*", { count: "exact", head: true })
+    .eq("document_id", documentId);
+
+  // Get initial batch of logs (without relationship join to avoid TypeScript issues)
+  const { data: logs, error } = await supabase
+    .from("document_audit_log")
+    .select("*")
     .eq("document_id", documentId)
     .order("created_at", { ascending: false })
-    .limit(50);
+    .limit(PAGE_SIZE);
 
-  if (error) {
-    return [];
+  if (error || !logs) {
+    return { logs: [], total: 0 };
   }
 
-  return data || [];
+  // Fetch users separately for logs that have user_id
+  const userIds = [...new Set(logs.filter(l => l.user_id).map(l => l.user_id as string))];
+  let usersMap: Record<string, { name: string | null; email: string }> = {};
+
+  if (userIds.length > 0) {
+    const { data: users } = await supabase
+      .from("users")
+      .select("id, name, email")
+      .in("id", userIds);
+
+    if (users) {
+      usersMap = Object.fromEntries(users.map(u => [u.id, { name: u.name, email: u.email }]));
+    }
+  }
+
+  // Attach users to logs
+  const logsWithUsers = logs.map(log => ({
+    ...log,
+    users: log.user_id ? usersMap[log.user_id] || null : null,
+  }));
+
+  return { logs: logsWithUsers, total: count || 0 };
 }
 
 export async function getDocumentFlags(documentId: string) {
   const supabase = await createClient();
 
-  const { data, error } = await supabase
+  // Fetch flags first
+  const { data: flags, error } = await supabase
     .from("document_flags")
-    .select("*, resolved_by_user:users!document_flags_resolved_by_fkey(name, email)")
+    .select("*")
     .eq("document_id", documentId)
     .order("created_at", { ascending: false });
 
@@ -600,7 +701,29 @@ export async function getDocumentFlags(documentId: string) {
     return [];
   }
 
-  return data || [];
+  if (!flags || flags.length === 0) {
+    return [];
+  }
+
+  // Get unique resolved_by user IDs
+  const resolvedByIds = [...new Set(flags.map(f => f.resolved_by).filter(Boolean))] as string[];
+
+  // Fetch users who resolved flags
+  const { data: users } = resolvedByIds.length > 0
+    ? await supabase
+        .from("users")
+        .select("id, name, email")
+        .in("id", resolvedByIds)
+    : { data: [] };
+
+  // Map users by ID for quick lookup
+  const usersMap = new Map(users?.map(u => [u.id, u]) || []);
+
+  // Attach resolved_by_user to each flag
+  return flags.map(flag => ({
+    ...flag,
+    resolved_by_user: flag.resolved_by ? usersMap.get(flag.resolved_by) || null : null,
+  }));
 }
 
 // Helper function to extract and save document dates from OCR results

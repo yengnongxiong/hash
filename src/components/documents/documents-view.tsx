@@ -45,6 +45,17 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { ProcessingStatus } from "./processing-status";
 import { UploadDialog } from "./upload-dialog";
@@ -59,6 +70,8 @@ import { useDebounce } from "@/lib/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 import type { Document } from "@/types/database";
 import { useTransition } from "react";
+
+type DocumentStatus = "pending" | "processing" | "pending_review" | "completed" | "failed" | "rejected";
 
 interface DocumentWithCustomer extends Document {
   customers?: { name: string; company: string | null } | null;
@@ -550,7 +563,7 @@ export function DocumentsView({ documents }: DocumentsViewProps) {
                     </Badge>
                   </td>
                   <td className="p-3">
-                    <ProcessingStatus status={doc.status} />
+                    <ProcessingStatus status={(doc.status || "pending") as DocumentStatus} />
                   </td>
                   <td className="p-3">
                     <TooltipProvider>
@@ -593,14 +606,41 @@ export function DocumentsView({ documents }: DocumentsViewProps) {
                   <td className="p-3">
                     <div className="flex items-center gap-1">
                       {doc.status === "failed" && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleRetry(doc.id)}
-                          title="Retry processing"
-                        >
-                          <RotateCw className="h-4 w-4" />
-                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Retry processing"
+                            >
+                              <RotateCw className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle className="flex items-center gap-2">
+                                <RotateCw className="h-5 w-5" />
+                                Retry OCR Processing?
+                              </AlertDialogTitle>
+                              <AlertDialogDescription asChild>
+                                <div className="space-y-2">
+                                  <p>
+                                    This will reprocess the document with OCR and extract new data.
+                                  </p>
+                                  <p className="text-amber-600 dark:text-amber-400 font-medium">
+                                    Any manually edited data will be replaced with new extracted data.
+                                  </p>
+                                </div>
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleRetry(doc.id)}>
+                                Retry Processing
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       )}
                       <Link href={`/documents/${doc.id}`}>
                         <Button variant="ghost" size="icon" title="View details">

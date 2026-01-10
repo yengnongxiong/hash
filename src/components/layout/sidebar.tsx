@@ -36,7 +36,7 @@ const navigation = [
   { name: "People", href: "/people", icon: Users },
   { name: "Dates", href: "/dates", icon: Calendar },
   { name: "Documents", href: "/documents", icon: FileText },
-  { name: "Whiteboard", href: "/whiteboard", icon: Kanban },
+  { name: "Tasks", href: "/tasks", icon: Kanban },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
