@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+type CustomerInfo = { name: string; company: string | null };
 type AppointmentWithCustomer = Appointment & {
-  customers?: { name: string; company: string | null } | null;
+  customers?: CustomerInfo | CustomerInfo[] | null;
 };
 
 interface AppointmentsCalendarProps {

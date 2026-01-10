@@ -23,8 +23,9 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
+type CustomerInfo = { name: string; company: string | null };
 type AppointmentWithCustomer = Appointment & {
-  customers?: { name: string; company: string | null } | null;
+  customers?: CustomerInfo | CustomerInfo[] | null;
 };
 
 interface AppointmentsTableProps {
@@ -111,11 +112,24 @@ export function AppointmentsTable({ data }: AppointmentsTableProps) {
               <TableCell>
                 {appointment.customers ? (
                   <div>
-                    <div>{appointment.customers.name}</div>
-                    {appointment.customers.company && (
-                      <div className="text-xs text-muted-foreground">
-                        {appointment.customers.company}
-                      </div>
+                    {Array.isArray(appointment.customers) ? (
+                      appointment.customers.map((c, i) => (
+                        <div key={i}>
+                          <div>{c.name}</div>
+                          {c.company && (
+                            <div className="text-xs text-muted-foreground">{c.company}</div>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <>
+                        <div>{appointment.customers.name}</div>
+                        {appointment.customers.company && (
+                          <div className="text-xs text-muted-foreground">
+                            {appointment.customers.company}
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 ) : (

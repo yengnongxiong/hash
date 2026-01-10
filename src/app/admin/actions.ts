@@ -190,3 +190,59 @@ export async function deleteSystemAlertAdmin(alertId: string) {
   revalidatePath("/settings");
   return { success: true };
 }
+
+// Update organization AI settings (admin only)
+export async function updateOrganizationAISettingsAdmin(
+  organizationId: string,
+  settings: {
+    highConfidenceThreshold: number;
+    mediumConfidenceThreshold: number;
+    lowConfidenceThreshold: number;
+    autoApprovalEnabled: boolean;
+    autoApprovalMinConfidence: number;
+    autoApprovalRequireNoFlags: boolean;
+    amountAnomalyThreshold: number;
+    enableDuplicateDetection: boolean;
+    duplicateSimilarityThreshold: number;
+    autoRetrainEnabled: boolean;
+    retrainCorrectionThreshold: number;
+    retrainAccuracyThreshold: number;
+  }
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient();
+
+  // Verify admin session
+  const isValid = await isAdminSessionValid();
+  if (!isValid) {
+    return { success: false, error: "Admin session expired" };
+  }
+
+  const updateData = {
+    organization_id: organizationId,
+    high_confidence_threshold: settings.highConfidenceThreshold,
+    medium_confidence_threshold: settings.mediumConfidenceThreshold,
+    low_confidence_threshold: settings.lowConfidenceThreshold,
+    auto_approval_enabled: settings.autoApprovalEnabled,
+    auto_approval_min_confidence: settings.autoApprovalMinConfidence,
+    auto_approval_require_no_flags: settings.autoApprovalRequireNoFlags,
+    amount_anomaly_threshold: settings.amountAnomalyThreshold,
+    enable_duplicate_detection: settings.enableDuplicateDetection,
+    duplicate_similarity_threshold: settings.duplicateSimilarityThreshold,
+    auto_retrain_enabled: settings.autoRetrainEnabled,
+    retrain_correction_threshold: settings.retrainCorrectionThreshold,
+    retrain_accuracy_threshold: settings.retrainAccuracyThreshold,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { error } = await supabase
+    .from("organization_ai_settings")
+    .upsert(updateData, { onConflict: "organization_id" });
+
+  if (error) {
+    console.error("Error updating AI settings:", error);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath("/admin/ai-settings");
+  return { success: true };
+}

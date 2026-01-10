@@ -212,8 +212,18 @@ export function ExtractedDataView({
     invoice: "Invoice",
     receipt: "Receipt",
     contract: "Contract",
+    purchase_order: "Purchase Order",
+    bank_statement: "Bank Statement",
+    credit_card_statement: "Credit Card Statement",
+    check: "Check",
+    amendment: "Amendment",
+    nda: "NDA",
+    terms_of_service: "Terms of Service",
+    w2: "W-2",
+    "1099": "1099",
+    pay_stub: "Pay Stub",
     other: "Other",
-  }[documentType || "other"];
+  }[documentType || "other"] || "Other";
 
   // Count confidence levels
   const confidenceCounts = Object.values(fieldConfidence).reduce(
@@ -419,11 +429,617 @@ export function ExtractedDataView({
                   confidence={getConfidence("contractValue")}
                   onSave={handleSave}
                 />
+                <EditableField
+                  label="Contract Type"
+                  value={data.contractType as string}
+                  field="contractType"
+                  confidence={getConfidence("contractType")}
+                  onSave={handleSave}
+                />
               </CardContent>
             </Card>
           )}
 
-          {/* Line Items (for invoices) */}
+          {/* Purchase Order Fields */}
+          {documentType === "purchase_order" && (
+            <Card>
+              <CardHeader className="py-3">
+                <CardTitle className="text-sm">Purchase Order Details</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-4 md:grid-cols-2">
+                <EditableField
+                  label="PO Number"
+                  value={data.poNumber as string}
+                  field="poNumber"
+                  confidence={getConfidence("poNumber")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Vendor Name"
+                  value={data.vendorName as string}
+                  field="vendorName"
+                  confidence={getConfidence("vendorName")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="PO Date"
+                  value={data.poDate as string}
+                  field="poDate"
+                  type="date"
+                  confidence={getConfidence("poDate")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Delivery Date"
+                  value={data.deliveryDate as string}
+                  field="deliveryDate"
+                  type="date"
+                  confidence={getConfidence("deliveryDate")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Total Amount"
+                  value={data.totalAmount as number}
+                  field="totalAmount"
+                  type="number"
+                  confidence={getConfidence("totalAmount")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Currency"
+                  value={data.currency as string}
+                  field="currency"
+                  confidence={getConfidence("currency")}
+                  onSave={handleSave}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Bank Statement Fields */}
+          {documentType === "bank_statement" && (
+            <Card>
+              <CardHeader className="py-3">
+                <CardTitle className="text-sm">Bank Statement Details</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-4 md:grid-cols-2">
+                <EditableField
+                  label="Account Number"
+                  value={data.accountNumber as string}
+                  field="accountNumber"
+                  confidence={getConfidence("accountNumber")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Bank Name"
+                  value={data.bankName as string}
+                  field="bankName"
+                  confidence={getConfidence("bankName")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Statement Period Start"
+                  value={data.statementPeriodStart as string}
+                  field="statementPeriodStart"
+                  type="date"
+                  confidence={getConfidence("statementPeriodStart")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Statement Period End"
+                  value={data.statementPeriodEnd as string}
+                  field="statementPeriodEnd"
+                  type="date"
+                  confidence={getConfidence("statementPeriodEnd")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Opening Balance"
+                  value={data.openingBalance as number}
+                  field="openingBalance"
+                  type="number"
+                  confidence={getConfidence("openingBalance")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Closing Balance"
+                  value={data.closingBalance as number}
+                  field="closingBalance"
+                  type="number"
+                  confidence={getConfidence("closingBalance")}
+                  onSave={handleSave}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Credit Card Statement Fields */}
+          {documentType === "credit_card_statement" && (
+            <Card>
+              <CardHeader className="py-3">
+                <CardTitle className="text-sm">Credit Card Statement Details</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-4 md:grid-cols-2">
+                <EditableField
+                  label="Account Number"
+                  value={data.accountNumber as string}
+                  field="accountNumber"
+                  confidence={getConfidence("accountNumber")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Cardholder Name"
+                  value={data.cardholderName as string}
+                  field="cardholderName"
+                  confidence={getConfidence("cardholderName")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Statement Date"
+                  value={data.statementDate as string}
+                  field="statementDate"
+                  type="date"
+                  confidence={getConfidence("statementDate")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Due Date"
+                  value={data.dueDate as string}
+                  field="dueDate"
+                  type="date"
+                  confidence={getConfidence("dueDate")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Credit Limit"
+                  value={data.creditLimit as number}
+                  field="creditLimit"
+                  type="number"
+                  confidence={getConfidence("creditLimit")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Current Balance"
+                  value={data.currentBalance as number}
+                  field="currentBalance"
+                  type="number"
+                  confidence={getConfidence("currentBalance")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Minimum Payment"
+                  value={data.minimumPayment as number}
+                  field="minimumPayment"
+                  type="number"
+                  confidence={getConfidence("minimumPayment")}
+                  onSave={handleSave}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Check Fields */}
+          {documentType === "check" && (
+            <Card>
+              <CardHeader className="py-3">
+                <CardTitle className="text-sm">Check Details</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-4 md:grid-cols-2">
+                <EditableField
+                  label="Check Number"
+                  value={data.checkNumber as string}
+                  field="checkNumber"
+                  confidence={getConfidence("checkNumber")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Check Date"
+                  value={data.checkDate as string}
+                  field="checkDate"
+                  type="date"
+                  confidence={getConfidence("checkDate")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Amount"
+                  value={data.amount as number}
+                  field="amount"
+                  type="number"
+                  confidence={getConfidence("amount")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Payee"
+                  value={data.payee as string}
+                  field="payee"
+                  confidence={getConfidence("payee")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Payer"
+                  value={data.payer as string}
+                  field="payer"
+                  confidence={getConfidence("payer")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Memo"
+                  value={data.memo as string}
+                  field="memo"
+                  confidence={getConfidence("memo")}
+                  onSave={handleSave}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Amendment Fields */}
+          {documentType === "amendment" && (
+            <Card>
+              <CardHeader className="py-3">
+                <CardTitle className="text-sm">Amendment Details</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-4 md:grid-cols-2">
+                <EditableField
+                  label="Original Contract Ref"
+                  value={data.originalContractRef as string}
+                  field="originalContractRef"
+                  confidence={getConfidence("originalContractRef")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Amendment Date"
+                  value={data.amendmentDate as string}
+                  field="amendmentDate"
+                  type="date"
+                  confidence={getConfidence("amendmentDate")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Party A"
+                  value={data.partyA as string}
+                  field="partyA"
+                  confidence={getConfidence("partyA")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Party B"
+                  value={data.partyB as string}
+                  field="partyB"
+                  confidence={getConfidence("partyB")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Changes"
+                  value={data.changes as string}
+                  field="changes"
+                  confidence={getConfidence("changes")}
+                  onSave={handleSave}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* NDA Fields */}
+          {documentType === "nda" && (
+            <Card>
+              <CardHeader className="py-3">
+                <CardTitle className="text-sm">NDA Details</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-4 md:grid-cols-2">
+                <EditableField
+                  label="Party A"
+                  value={data.partyA as string}
+                  field="partyA"
+                  confidence={getConfidence("partyA")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Party B"
+                  value={data.partyB as string}
+                  field="partyB"
+                  confidence={getConfidence("partyB")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Effective Date"
+                  value={data.effectiveDate as string}
+                  field="effectiveDate"
+                  type="date"
+                  confidence={getConfidence("effectiveDate")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Expiration Date"
+                  value={data.expirationDate as string}
+                  field="expirationDate"
+                  type="date"
+                  confidence={getConfidence("expirationDate")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Term"
+                  value={data.term as string}
+                  field="term"
+                  confidence={getConfidence("term")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Scope"
+                  value={data.scope as string}
+                  field="scope"
+                  confidence={getConfidence("scope")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Jurisdiction"
+                  value={data.jurisdiction as string}
+                  field="jurisdiction"
+                  confidence={getConfidence("jurisdiction")}
+                  onSave={handleSave}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Terms of Service Fields */}
+          {documentType === "terms_of_service" && (
+            <Card>
+              <CardHeader className="py-3">
+                <CardTitle className="text-sm">Terms of Service Details</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-4 md:grid-cols-2">
+                <EditableField
+                  label="Effective Date"
+                  value={data.effectiveDate as string}
+                  field="effectiveDate"
+                  type="date"
+                  confidence={getConfidence("effectiveDate")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Version"
+                  value={data.version as string}
+                  field="version"
+                  confidence={getConfidence("version")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Company Name"
+                  value={data.companyName as string}
+                  field="companyName"
+                  confidence={getConfidence("companyName")}
+                  onSave={handleSave}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* W-2 Fields */}
+          {documentType === "w2" && (
+            <Card>
+              <CardHeader className="py-3">
+                <CardTitle className="text-sm">W-2 Details</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-4 md:grid-cols-2">
+                <EditableField
+                  label="Employee Name"
+                  value={data.employeeName as string}
+                  field="employeeName"
+                  confidence={getConfidence("employeeName")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="SSN (Last 4)"
+                  value={data.employeeSsnLast4 as string}
+                  field="employeeSsnLast4"
+                  confidence={getConfidence("employeeSsnLast4")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Employer Name"
+                  value={data.employerName as string}
+                  field="employerName"
+                  confidence={getConfidence("employerName")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Employer EIN"
+                  value={data.employerEin as string}
+                  field="employerEin"
+                  confidence={getConfidence("employerEin")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Tax Year"
+                  value={data.taxYear as number}
+                  field="taxYear"
+                  type="number"
+                  confidence={getConfidence("taxYear")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Wages, Tips, Compensation"
+                  value={data.wagesTipsCompensation as number}
+                  field="wagesTipsCompensation"
+                  type="number"
+                  confidence={getConfidence("wagesTipsCompensation")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Federal Income Tax Withheld"
+                  value={data.federalIncomeTaxWithheld as number}
+                  field="federalIncomeTaxWithheld"
+                  type="number"
+                  confidence={getConfidence("federalIncomeTaxWithheld")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Social Security Wages"
+                  value={data.socialSecurityWages as number}
+                  field="socialSecurityWages"
+                  type="number"
+                  confidence={getConfidence("socialSecurityWages")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Social Security Tax Withheld"
+                  value={data.socialSecurityTaxWithheld as number}
+                  field="socialSecurityTaxWithheld"
+                  type="number"
+                  confidence={getConfidence("socialSecurityTaxWithheld")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Medicare Wages"
+                  value={data.medicareWages as number}
+                  field="medicareWages"
+                  type="number"
+                  confidence={getConfidence("medicareWages")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Medicare Tax Withheld"
+                  value={data.medicareTaxWithheld as number}
+                  field="medicareTaxWithheld"
+                  type="number"
+                  confidence={getConfidence("medicareTaxWithheld")}
+                  onSave={handleSave}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* 1099 Fields */}
+          {documentType === "1099" && (
+            <Card>
+              <CardHeader className="py-3">
+                <CardTitle className="text-sm">1099 Details</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-4 md:grid-cols-2">
+                <EditableField
+                  label="Recipient Name"
+                  value={data.recipientName as string}
+                  field="recipientName"
+                  confidence={getConfidence("recipientName")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Payer Name"
+                  value={data.payerName as string}
+                  field="payerName"
+                  confidence={getConfidence("payerName")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Tax Year"
+                  value={data.taxYear as number}
+                  field="taxYear"
+                  type="number"
+                  confidence={getConfidence("taxYear")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Amount"
+                  value={data.amount as number}
+                  field="amount"
+                  type="number"
+                  confidence={getConfidence("amount")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="1099 Type"
+                  value={data.form1099Type as string}
+                  field="form1099Type"
+                  confidence={getConfidence("form1099Type")}
+                  onSave={handleSave}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Pay Stub Fields */}
+          {documentType === "pay_stub" && (
+            <Card>
+              <CardHeader className="py-3">
+                <CardTitle className="text-sm">Pay Stub Details</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-4 md:grid-cols-2">
+                <EditableField
+                  label="Employee Name"
+                  value={data.employeeName as string}
+                  field="employeeName"
+                  confidence={getConfidence("employeeName")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Employer Name"
+                  value={data.employerName as string}
+                  field="employerName"
+                  confidence={getConfidence("employerName")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Pay Period Start"
+                  value={data.payPeriodStart as string}
+                  field="payPeriodStart"
+                  type="date"
+                  confidence={getConfidence("payPeriodStart")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Pay Period End"
+                  value={data.payPeriodEnd as string}
+                  field="payPeriodEnd"
+                  type="date"
+                  confidence={getConfidence("payPeriodEnd")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Pay Date"
+                  value={data.payDate as string}
+                  field="payDate"
+                  type="date"
+                  confidence={getConfidence("payDate")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Gross Pay"
+                  value={data.grossPay as number}
+                  field="grossPay"
+                  type="number"
+                  confidence={getConfidence("grossPay")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="Net Pay"
+                  value={data.netPay as number}
+                  field="netPay"
+                  type="number"
+                  confidence={getConfidence("netPay")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="YTD Gross"
+                  value={data.ytdGross as number}
+                  field="ytdGross"
+                  type="number"
+                  confidence={getConfidence("ytdGross")}
+                  onSave={handleSave}
+                />
+                <EditableField
+                  label="YTD Net"
+                  value={data.ytdNet as number}
+                  field="ytdNet"
+                  type="number"
+                  confidence={getConfidence("ytdNet")}
+                  onSave={handleSave}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Line Items (for invoices, receipts, purchase orders) */}
           {Array.isArray(data.lineItems) && data.lineItems.length > 0 && (
             <Card>
               <CardHeader className="py-3">

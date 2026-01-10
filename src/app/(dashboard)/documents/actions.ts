@@ -6,6 +6,11 @@ import { getOCRProvider } from "@/lib/ocr/provider";
 import { revalidatePath } from "next/cache";
 import { detectDocumentFlags, saveDocumentFlags } from "@/lib/ocr/detect-flags";
 import { ExtractedDocumentData } from "@/lib/ocr/types";
+import { confidenceLevelToNumber, getReviewPriority, CONFIDENCE_THRESHOLDS } from "@/lib/ocr/confidence";
+import { generateDocumentEmbedding } from "@/lib/embeddings/document-embeddings";
+import { learnEntitiesFromDocument, validateDocumentEntities } from "@/lib/embeddings/entity-service";
+import { recordBatchCorrections, recordExperimentCorrection } from "@/lib/ml";
+import { categorizeError, logProcessingError, withTimeout, withRetry } from "@/lib/errors";
 
 /**
  * Generates a 6-character random alphanumeric document ID
@@ -148,8 +153,12 @@ export async function uploadDocument(formData: FormData) {
   }
 }
 
-async function processDocumentOCR(documentId: string) {
+// OCR processing timeout: 60 seconds for single page, 120 seconds for multi-page
+const OCR_TIMEOUT_MS = 120000;
+
+export async function processDocumentOCR(documentId: string) {
   const adminClient = createAdminClient();
+  const startTime = Date.now();
 
   // Update status to processing
   await adminClient
@@ -169,30 +178,83 @@ async function processDocumentOCR(documentId: string) {
       throw new Error("Document not found");
     }
 
-    // Process with OCR
+    // Process with OCR using retry logic and timeout
     const ocrProvider = getOCRProvider();
     const isImage = document.file_type?.startsWith("image/");
 
-    const result = isImage
-      ? await ocrProvider.processImage(document.file_url)
-      : await ocrProvider.processDocument(
-          document.file_url,
-          document.file_type || "application/pdf"
-        );
+    // Use retry with timeout for resilient OCR processing
+    const ocrResult = await withRetry(
+      () => withTimeout(
+        async () => {
+          return isImage
+            ? await ocrProvider.processImage(document.file_url)
+            : await ocrProvider.processDocument(
+                document.file_url,
+                document.file_type || "application/pdf"
+              );
+        },
+        OCR_TIMEOUT_MS,
+        "OCR processing"
+      ),
+      { maxRetries: 2, baseDelayMs: 2000 }
+    );
+
+    if (!ocrResult.success) {
+      const error = ocrResult.error;
+      logProcessingError(error, {
+        documentId,
+        organizationId: document.organization_id,
+        operation: "ocr_processing",
+      });
+      throw new Error(error.userMessage || "OCR processing failed");
+    }
+
+    const result = ocrResult.data;
 
     if (!result.success) {
       throw new Error(result.error || "OCR processing failed");
     }
 
-    // Update document with results - set to pending_review for human approval
+    // Log processing time for performance monitoring
+    const processingTimeMs = Date.now() - startTime;
+    console.log(`[Performance] Document ${documentId} processed in ${processingTimeMs}ms`);
+
+    // Calculate confidence scores for routing
+    const extractedData = result.extractedData;
+    const classificationConfidence = confidenceLevelToNumber(
+      extractedData.documentTypeConfidence || "medium"
+    );
+    const extractionConfidence = confidenceLevelToNumber(
+      extractedData.overallConfidence || "medium"
+    );
+    const overallConfidence = (classificationConfidence + extractionConfidence) / 2;
+
+    // Determine review priority based on confidence
+    const reviewPriority = getReviewPriority(overallConfidence);
+
+    // Determine initial status based on confidence threshold
+    let initialStatus: "pending_review" | "completed" = "pending_review";
+    if (overallConfidence >= CONFIDENCE_THRESHOLDS.AUTO_APPROVE) {
+      // Auto-approve high confidence documents
+      initialStatus = "completed";
+    }
+
+    // Update document with results and confidence-based routing
     await adminClient
       .from("documents")
       .update({
-        status: "pending_review",
+        status: initialStatus,
         raw_text: result.rawText,
-        document_type: result.extractedData.documentType || "other",
-        extracted_data: JSON.parse(JSON.stringify(result.extractedData)),
+        document_type: extractedData.documentType || "other",
+        extracted_data: JSON.parse(JSON.stringify(extractedData)),
+        classification_confidence: classificationConfidence,
+        extraction_confidence: extractionConfidence,
+        review_priority: reviewPriority,
         updated_at: new Date().toISOString(),
+        ...(initialStatus === "completed" ? {
+          approved_at: new Date().toISOString(),
+          // No approved_by since it's auto-approved
+        } : {}),
       })
       .eq("id", documentId);
 
@@ -210,7 +272,11 @@ async function processDocumentOCR(documentId: string) {
       action: "ocr_completed",
       details: {
         pageCount: result.pages.length,
-        documentType: result.extractedData.documentType,
+        documentType: extractedData.documentType,
+        classificationConfidence,
+        extractionConfidence,
+        reviewPriority,
+        autoApproved: initialStatus === "completed",
       },
     });
 
@@ -218,7 +284,7 @@ async function processDocumentOCR(documentId: string) {
     try {
       const flags = await detectDocumentFlags(
         documentId,
-        result.extractedData as ExtractedDocumentData
+        extractedData as ExtractedDocumentData
       );
       if (flags.length > 0) {
         await saveDocumentFlags(documentId, flags);
@@ -239,32 +305,46 @@ async function processDocumentOCR(documentId: string) {
 
     // Extract and save document dates
     try {
-      await saveDocumentDates(documentId, result.extractedData as ExtractedDocumentData, adminClient);
+      await saveDocumentDates(documentId, extractedData as ExtractedDocumentData, adminClient);
     } catch (dateError) {
       console.error("Date extraction error:", dateError);
       // Don't fail the whole process if date extraction fails
     }
   } catch (error) {
-    console.error("OCR processing error:", error);
+    // Categorize the error for better user feedback
+    const categorizedError = categorizeError(error);
 
-    // Update status to failed
+    // Log with context for debugging
+    logProcessingError(categorizedError, {
+      documentId,
+      operation: "ocr_processing",
+    });
+
+    // Update status to failed with user-friendly error message
     await adminClient
       .from("documents")
       .update({
         status: "failed",
         extracted_data: {
-          error: error instanceof Error ? error.message : "Processing failed",
+          error: categorizedError.userMessage,
+          errorCode: categorizedError.code,
+          errorCategory: categorizedError.category,
+          isRetryable: categorizedError.isRetryable,
         },
         updated_at: new Date().toISOString(),
       })
       .eq("id", documentId);
 
-    // Create audit log entry
+    // Create audit log entry with detailed error info
     await adminClient.from("document_audit_log").insert({
       document_id: documentId,
       action: "ocr_failed",
       details: {
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: categorizedError.message,
+        errorCode: categorizedError.code,
+        errorCategory: categorizedError.category,
+        isRetryable: categorizedError.isRetryable,
+        userMessage: categorizedError.userMessage,
       },
     });
   }
@@ -473,6 +553,30 @@ export async function approveDocument(documentId: string) {
     action: "approved",
     details: {},
   });
+
+  // Generate document embedding for semantic search (async, don't block)
+  generateDocumentEmbedding(documentId).catch(err => {
+    console.error("Error generating document embedding:", err);
+  });
+
+  // Get extracted data for entity learning
+  const { data: docData } = await supabase
+    .from("documents")
+    .select("extracted_data")
+    .eq("id", documentId)
+    .single();
+
+  if (docData?.extracted_data) {
+    // Learn entities from approved document (async, don't block)
+    learnEntitiesFromDocument(documentId, docData.extracted_data as Record<string, unknown>).catch(err => {
+      console.error("Error learning entities:", err);
+    });
+
+    // Validate entities for this document (async, don't block)
+    validateDocumentEntities(documentId, docData.extracted_data as Record<string, unknown>).catch(err => {
+      console.error("Error validating entities:", err);
+    });
+  }
 
   revalidatePath("/documents");
   revalidatePath(`/documents/${documentId}`);
@@ -747,11 +851,44 @@ async function saveDocumentDates(
     type: string;
     label: string;
   }> = [
+    // Common dates
     { field: "dueDate", type: "due_date", label: "Due Date" },
     { field: "invoiceDate", type: "invoice_date", label: "Invoice Date" },
     { field: "expirationDate", type: "expiration", label: "Expiration Date" },
     { field: "effectiveDate", type: "effective", label: "Effective Date" },
     { field: "transactionDate", type: "transaction", label: "Transaction Date" },
+    // Purchase order dates
+    { field: "poDate", type: "invoice_date", label: "PO Date" },
+    { field: "deliveryDate", type: "due_date", label: "Delivery Date" },
+    // Bank statement dates
+    { field: "statementPeriodStart", type: "effective", label: "Statement Start" },
+    { field: "statementPeriodEnd", type: "expiration", label: "Statement End" },
+    { field: "statementDate", type: "invoice_date", label: "Statement Date" },
+    // Check dates
+    { field: "checkDate", type: "transaction", label: "Check Date" },
+    // Amendment dates
+    { field: "amendmentDate", type: "effective", label: "Amendment Date" },
+    // Pay stub dates
+    { field: "payPeriodStart", type: "effective", label: "Pay Period Start" },
+    { field: "payPeriodEnd", type: "expiration", label: "Pay Period End" },
+    { field: "payDate", type: "transaction", label: "Pay Date" },
+    // HR - Offer letter dates
+    { field: "startDate", type: "effective", label: "Start Date" },
+    // Insurance dates
+    { field: "policyPeriodStart", type: "effective", label: "Policy Start" },
+    { field: "policyPeriodEnd", type: "expiration", label: "Policy End" },
+    { field: "dateOfLoss", type: "transaction", label: "Date of Loss" },
+    // Healthcare dates
+    { field: "serviceDate", type: "transaction", label: "Service Date" },
+    { field: "admissionDate", type: "effective", label: "Admission Date" },
+    { field: "dischargeDate", type: "expiration", label: "Discharge Date" },
+    { field: "dispensedDate", type: "transaction", label: "Dispensed Date" },
+    // Real Estate dates
+    { field: "leaseTermStart", type: "effective", label: "Lease Start" },
+    { field: "leaseTermEnd", type: "expiration", label: "Lease End" },
+    { field: "nextPaymentDue", type: "due_date", label: "Next Payment Due" },
+    // Shipping dates
+    { field: "shipDate", type: "transaction", label: "Ship Date" },
   ];
 
   for (const mapping of dateFieldMappings) {
@@ -910,6 +1047,138 @@ export async function deleteDocumentDate(documentId: string, dateId: string) {
   if (error) {
     return { error: error.message };
   }
+
+  revalidatePath(`/documents/${documentId}`);
+  return { success: true };
+}
+
+/**
+ * Update document extracted data with correction tracking for training
+ */
+export async function updateDocumentExtractedData(
+  documentId: string,
+  updatedData: Record<string, unknown>
+): Promise<{ success: boolean; correctionsRecorded?: number; error?: string }> {
+  const supabase = await createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { success: false, error: "Not authenticated" };
+  }
+
+  // Get current extracted data
+  const { data: document, error: fetchError } = await supabase
+    .from("documents")
+    .select("extracted_data")
+    .eq("id", documentId)
+    .single();
+
+  if (fetchError || !document) {
+    return { success: false, error: "Document not found" };
+  }
+
+  const originalData = (document.extracted_data || {}) as Record<string, unknown>;
+
+  // Record corrections for training data collection
+  const correctionResult = await recordBatchCorrections(
+    documentId,
+    originalData,
+    updatedData
+  );
+
+  // If there were corrections, also update the experiment tracking
+  if (correctionResult.correctionsRecorded > 0) {
+    await recordExperimentCorrection(documentId, correctionResult.correctionsRecorded);
+  }
+
+  // Update the document with new extracted data
+  const { error: updateError } = await supabase
+    .from("documents")
+    .update({
+      extracted_data: JSON.parse(JSON.stringify(updatedData)),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", documentId);
+
+  if (updateError) {
+    return { success: false, error: updateError.message };
+  }
+
+  // Create audit log entry
+  await supabase.from("document_audit_log").insert({
+    document_id: documentId,
+    user_id: user.id,
+    action: "data_corrected",
+    details: {
+      fieldsModified: correctionResult.correctionsRecorded,
+    },
+  });
+
+  revalidatePath(`/documents/${documentId}`);
+  return { success: true, correctionsRecorded: correctionResult.correctionsRecorded };
+}
+
+/**
+ * Update document type with correction tracking
+ */
+export async function updateDocumentType(
+  documentId: string,
+  newDocumentType: string
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { success: false, error: "Not authenticated" };
+  }
+
+  // Get current document type
+  const { data: document, error: fetchError } = await supabase
+    .from("documents")
+    .select("document_type")
+    .eq("id", documentId)
+    .single();
+
+  if (fetchError || !document) {
+    return { success: false, error: "Document not found" };
+  }
+
+  const originalType = document.document_type;
+
+  // Record the type correction if different
+  if (originalType !== newDocumentType) {
+    await recordBatchCorrections(
+      documentId,
+      { documentType: originalType },
+      { documentType: newDocumentType }
+    );
+  }
+
+  // Update the document type
+  const { error: updateError } = await supabase
+    .from("documents")
+    .update({
+      document_type: newDocumentType,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", documentId);
+
+  if (updateError) {
+    return { success: false, error: updateError.message };
+  }
+
+  // Create audit log entry
+  await supabase.from("document_audit_log").insert({
+    document_id: documentId,
+    user_id: user.id,
+    action: "type_corrected",
+    details: {
+      originalType,
+      newType: newDocumentType,
+    },
+  });
 
   revalidatePath(`/documents/${documentId}`);
   return { success: true };

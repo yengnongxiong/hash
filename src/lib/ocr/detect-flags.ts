@@ -2,12 +2,15 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { ExtractedDocumentData } from "./types";
+import { FLAG_THRESHOLDS, type DetectionMethod } from "./flag-config";
 
 export interface DetectedFlag {
-  flag_type: "past_due" | "duplicate_invoice" | "suspicious_amount" | "missing_data" | "other";
+  flag_type: "past_due" | "duplicate_invoice" | "suspicious_amount" | "missing_data" | "expiring_soon" | "other";
   severity: "info" | "warning" | "critical";
   message: string;
   details: Record<string, unknown>;
+  detection_method?: DetectionMethod;
+  model_confidence?: number; // 0-1 confidence score from ML model
 }
 
 export async function detectDocumentFlags(
@@ -25,14 +28,21 @@ export async function detectDocumentFlags(
 
     if (dueDate < today) {
       const daysOverdue = Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
+      const severity = daysOverdue > FLAG_THRESHOLDS.PAST_DUE_CRITICAL
+        ? "critical"
+        : daysOverdue > FLAG_THRESHOLDS.PAST_DUE_WARNING
+        ? "warning"
+        : "info";
       flags.push({
         flag_type: "past_due",
-        severity: daysOverdue > 30 ? "critical" : daysOverdue > 7 ? "warning" : "info",
+        severity,
         message: `Invoice is ${daysOverdue} days past due`,
         details: {
           dueDate: extractedData.dueDate,
           daysOverdue,
+          threshold: FLAG_THRESHOLDS.PAST_DUE_WARNING,
         },
+        detection_method: "rule_based",
       });
     }
   }
@@ -61,6 +71,7 @@ export async function detectDocumentFlags(
               duplicateDocumentId: doc.id,
               duplicateFileName: doc.file_name,
             },
+            detection_method: "pattern_match",
           });
           break;
         }
@@ -71,7 +82,20 @@ export async function detectDocumentFlags(
   // Check for suspicious amounts
   if (extractedData.totalAmount !== undefined && extractedData.totalAmount !== null) {
     // Flag unusually high amounts
-    if (extractedData.totalAmount > 100000) {
+    if (extractedData.totalAmount > FLAG_THRESHOLDS.HIGH_AMOUNT_CRITICAL) {
+      flags.push({
+        flag_type: "suspicious_amount",
+        severity: "critical",
+        message: `Very high amount: ${extractedData.currency || "USD"} ${extractedData.totalAmount.toLocaleString()}`,
+        details: {
+          amount: extractedData.totalAmount,
+          currency: extractedData.currency || "USD",
+          reason: `Amount exceeds $${FLAG_THRESHOLDS.HIGH_AMOUNT_CRITICAL.toLocaleString()}`,
+          threshold: FLAG_THRESHOLDS.HIGH_AMOUNT_CRITICAL,
+        },
+        detection_method: "rule_based",
+      });
+    } else if (extractedData.totalAmount > FLAG_THRESHOLDS.HIGH_AMOUNT_WARNING) {
       flags.push({
         flag_type: "suspicious_amount",
         severity: "warning",
@@ -79,13 +103,15 @@ export async function detectDocumentFlags(
         details: {
           amount: extractedData.totalAmount,
           currency: extractedData.currency || "USD",
-          reason: "Amount exceeds $100,000",
+          reason: `Amount exceeds $${FLAG_THRESHOLDS.HIGH_AMOUNT_WARNING.toLocaleString()}`,
+          threshold: FLAG_THRESHOLDS.HIGH_AMOUNT_WARNING,
         },
+        detection_method: "rule_based",
       });
     }
 
     // Flag round numbers that might indicate estimates
-    if (extractedData.totalAmount >= 1000 && extractedData.totalAmount % 1000 === 0) {
+    if (extractedData.totalAmount >= FLAG_THRESHOLDS.ROUND_NUMBER_MIN && extractedData.totalAmount % 1000 === 0) {
       flags.push({
         flag_type: "suspicious_amount",
         severity: "info",
@@ -95,6 +121,7 @@ export async function detectDocumentFlags(
           currency: extractedData.currency || "USD",
           reason: "Perfectly round number",
         },
+        detection_method: "rule_based",
       });
     }
   }
@@ -102,29 +129,84 @@ export async function detectDocumentFlags(
   // Check for missing critical data
   const missingFields: string[] = [];
 
-  if (extractedData.documentType === "invoice") {
-    if (!extractedData.invoiceNumber) missingFields.push("Invoice Number");
-    if (!extractedData.vendorName) missingFields.push("Vendor Name");
-    if (!extractedData.totalAmount) missingFields.push("Total Amount");
-    if (!extractedData.dueDate) missingFields.push("Due Date");
-  } else if (extractedData.documentType === "contract") {
-    if (!extractedData.partyA) missingFields.push("Party A");
-    if (!extractedData.partyB) missingFields.push("Party B");
-    if (!extractedData.effectiveDate) missingFields.push("Effective Date");
-  } else if (extractedData.documentType === "receipt") {
-    if (!extractedData.merchantName) missingFields.push("Merchant Name");
-    if (!extractedData.total && !extractedData.totalAmount) missingFields.push("Total Amount");
+  switch (extractedData.documentType) {
+    case "invoice":
+      if (!extractedData.invoiceNumber) missingFields.push("Invoice Number");
+      if (!extractedData.vendorName) missingFields.push("Vendor Name");
+      if (!extractedData.totalAmount) missingFields.push("Total Amount");
+      if (!extractedData.dueDate) missingFields.push("Due Date");
+      break;
+    case "receipt":
+      if (!extractedData.merchantName) missingFields.push("Merchant Name");
+      if (!extractedData.total && !extractedData.totalAmount) missingFields.push("Total Amount");
+      break;
+    case "contract":
+      if (!extractedData.partyA) missingFields.push("Party A");
+      if (!extractedData.partyB) missingFields.push("Party B");
+      if (!extractedData.effectiveDate) missingFields.push("Effective Date");
+      break;
+    case "purchase_order":
+      if (!extractedData.poNumber) missingFields.push("PO Number");
+      if (!extractedData.vendorName) missingFields.push("Vendor Name");
+      break;
+    case "bank_statement":
+      if (!extractedData.accountNumber) missingFields.push("Account Number");
+      if (!extractedData.statementPeriodStart) missingFields.push("Statement Period Start");
+      if (!extractedData.statementPeriodEnd) missingFields.push("Statement Period End");
+      break;
+    case "credit_card_statement":
+      if (!extractedData.accountNumber) missingFields.push("Account Number");
+      if (!extractedData.statementDate) missingFields.push("Statement Date");
+      break;
+    case "check":
+      if (!extractedData.checkNumber) missingFields.push("Check Number");
+      if (!extractedData.amount) missingFields.push("Amount");
+      if (!extractedData.payee) missingFields.push("Payee");
+      break;
+    case "amendment":
+      if (!extractedData.originalContractRef) missingFields.push("Original Contract Reference");
+      if (!extractedData.amendmentDate) missingFields.push("Amendment Date");
+      break;
+    case "nda":
+      if (!extractedData.partyA) missingFields.push("Party A");
+      if (!extractedData.partyB) missingFields.push("Party B");
+      if (!extractedData.effectiveDate) missingFields.push("Effective Date");
+      break;
+    case "terms_of_service":
+      if (!extractedData.effectiveDate) missingFields.push("Effective Date");
+      break;
+    case "w2":
+      if (!extractedData.employeeName) missingFields.push("Employee Name");
+      if (!extractedData.employerName) missingFields.push("Employer Name");
+      if (!extractedData.taxYear) missingFields.push("Tax Year");
+      if (!extractedData.wagesTipsCompensation) missingFields.push("Wages/Tips/Compensation");
+      break;
+    case "1099":
+      if (!extractedData.recipientName) missingFields.push("Recipient Name");
+      if (!extractedData.payerName) missingFields.push("Payer Name");
+      if (!extractedData.taxYear) missingFields.push("Tax Year");
+      if (!extractedData.amount) missingFields.push("Amount");
+      break;
+    case "pay_stub":
+      if (!extractedData.employeeName) missingFields.push("Employee Name");
+      if (!extractedData.payPeriodStart) missingFields.push("Pay Period Start");
+      if (!extractedData.payPeriodEnd) missingFields.push("Pay Period End");
+      if (!extractedData.grossPay) missingFields.push("Gross Pay");
+      if (!extractedData.netPay) missingFields.push("Net Pay");
+      break;
   }
 
   if (missingFields.length > 0) {
     flags.push({
       flag_type: "missing_data",
-      severity: missingFields.length > 2 ? "warning" : "info",
+      severity: missingFields.length > FLAG_THRESHOLDS.MISSING_FIELDS_WARNING ? "warning" : "info",
       message: `Missing ${missingFields.length} required field(s): ${missingFields.join(", ")}`,
       details: {
         missingFields,
         documentType: extractedData.documentType,
+        threshold: FLAG_THRESHOLDS.MISSING_FIELDS_WARNING,
       },
+      detection_method: "rule_based",
     });
   }
 
@@ -132,7 +214,7 @@ export async function detectDocumentFlags(
   if (extractedData.expirationDate) {
     const expirationDate = new Date(extractedData.expirationDate);
     const today = new Date();
-    const thirtyDaysFromNow = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const warningThreshold = new Date(today.getTime() + FLAG_THRESHOLDS.CONTRACT_EXPIRATION_WARNING * 24 * 60 * 60 * 1000);
 
     if (expirationDate < today) {
       flags.push({
@@ -142,17 +224,20 @@ export async function detectDocumentFlags(
         details: {
           expirationDate: extractedData.expirationDate,
         },
+        detection_method: "rule_based",
       });
-    } else if (expirationDate < thirtyDaysFromNow) {
+    } else if (expirationDate < warningThreshold) {
       const daysUntilExpiration = Math.ceil((expirationDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
       flags.push({
-        flag_type: "other",
+        flag_type: "expiring_soon",
         severity: "warning",
         message: `Contract expires in ${daysUntilExpiration} days`,
         details: {
           expirationDate: extractedData.expirationDate,
           daysUntilExpiration,
+          threshold: FLAG_THRESHOLDS.CONTRACT_EXPIRATION_WARNING,
         },
+        detection_method: "rule_based",
       });
     }
   }
@@ -170,7 +255,7 @@ export async function saveDocumentFlags(
 
   const supabase = await createClient();
 
-  // Insert all flags
+  // Insert all flags with detection metadata
   const { error } = await supabase.from("document_flags").insert(
     flags.map((flag) => ({
       document_id: documentId,
@@ -178,6 +263,8 @@ export async function saveDocumentFlags(
       severity: flag.severity,
       message: flag.message,
       details: JSON.parse(JSON.stringify(flag.details)),
+      detection_method: flag.detection_method || "rule_based",
+      model_confidence: flag.model_confidence || null,
     }))
   );
 

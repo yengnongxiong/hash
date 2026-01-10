@@ -84,8 +84,37 @@ interface DocumentsViewProps {
 }
 
 type StatusFilter = "all" | "pending" | "processing" | "pending_review" | "completed" | "failed" | "rejected";
-type TypeFilter = "all" | "invoice" | "receipt" | "contract" | "other";
+type TypeFilter = "all" | "invoice" | "receipt" | "contract" | "purchase_order" | "bank_statement" | "credit_card_statement" | "check" | "amendment" | "nda" | "terms_of_service" | "w2" | "1099" | "pay_stub" | "other";
 type FlagFilter = "all" | "has_flags" | "no_flags";
+
+// Document type display configuration
+const DOCUMENT_TYPE_OPTIONS: { value: TypeFilter; label: string; category: string }[] = [
+  { value: "all", label: "All Types", category: "" },
+  // Financial
+  { value: "invoice", label: "Invoice", category: "Financial" },
+  { value: "receipt", label: "Receipt", category: "Financial" },
+  { value: "purchase_order", label: "Purchase Order", category: "Financial" },
+  { value: "bank_statement", label: "Bank Statement", category: "Financial" },
+  { value: "credit_card_statement", label: "Credit Card Statement", category: "Financial" },
+  { value: "check", label: "Check", category: "Financial" },
+  // Legal
+  { value: "contract", label: "Contract", category: "Legal" },
+  { value: "amendment", label: "Amendment", category: "Legal" },
+  { value: "nda", label: "NDA", category: "Legal" },
+  { value: "terms_of_service", label: "Terms of Service", category: "Legal" },
+  // HR
+  { value: "w2", label: "W-2", category: "HR" },
+  { value: "1099", label: "1099", category: "HR" },
+  { value: "pay_stub", label: "Pay Stub", category: "HR" },
+  // Other
+  { value: "other", label: "Other", category: "" },
+];
+
+// Helper to get document type label
+function getDocumentTypeLabel(type: string | null): string {
+  const option = DOCUMENT_TYPE_OPTIONS.find(o => o.value === type);
+  return option?.label || type || "Other";
+}
 
 // Helper to get file icon based on type
 function getFileIcon(fileType: string | null) {
@@ -311,14 +340,34 @@ export function DocumentsView({ documents }: DocumentsViewProps) {
           value={typeFilter}
           onValueChange={(v) => setTypeFilter(v as TypeFilter)}
         >
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Type" />
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="Type">
+              {getDocumentTypeLabel(typeFilter === "all" ? null : typeFilter)}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Types</SelectItem>
+            {/* Financial */}
+            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Financial</div>
             <SelectItem value="invoice">Invoice</SelectItem>
             <SelectItem value="receipt">Receipt</SelectItem>
+            <SelectItem value="purchase_order">Purchase Order</SelectItem>
+            <SelectItem value="bank_statement">Bank Statement</SelectItem>
+            <SelectItem value="credit_card_statement">Credit Card Statement</SelectItem>
+            <SelectItem value="check">Check</SelectItem>
+            {/* Legal */}
+            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Legal</div>
             <SelectItem value="contract">Contract</SelectItem>
+            <SelectItem value="amendment">Amendment</SelectItem>
+            <SelectItem value="nda">NDA</SelectItem>
+            <SelectItem value="terms_of_service">Terms of Service</SelectItem>
+            {/* HR */}
+            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">HR</div>
+            <SelectItem value="w2">W-2</SelectItem>
+            <SelectItem value="1099">1099</SelectItem>
+            <SelectItem value="pay_stub">Pay Stub</SelectItem>
+            {/* Other */}
+            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Other</div>
             <SelectItem value="other">Other</SelectItem>
           </SelectContent>
         </Select>
@@ -558,8 +607,8 @@ export function DocumentsView({ documents }: DocumentsViewProps) {
                     )}
                   </td>
                   <td className="p-3">
-                    <Badge variant="outline" className="capitalize text-xs">
-                      {doc.document_type || "other"}
+                    <Badge variant="outline" className="text-xs">
+                      {getDocumentTypeLabel(doc.document_type)}
                     </Badge>
                   </td>
                   <td className="p-3">

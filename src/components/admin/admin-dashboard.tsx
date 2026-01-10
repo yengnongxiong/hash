@@ -16,6 +16,7 @@ import {
   LogOut,
   Shield,
   Clock,
+  Brain,
 } from "lucide-react";
 import { format } from "date-fns";
 import { logoutAdmin } from "@/app/admin/actions";
@@ -96,7 +97,7 @@ export function AdminDashboard({ stats, recentUsers, recentDocuments }: AdminDas
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Navigation */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
           <Link href="/admin/alerts">
             <Card className="bg-slate-800/50 border-slate-700 hover:bg-slate-700/50 transition-colors cursor-pointer">
               <CardContent className="p-4 flex items-center gap-3">
@@ -132,6 +133,19 @@ export function AdminDashboard({ stats, recentUsers, recentDocuments }: AdminDas
                 <div>
                   <p className="text-sm font-medium text-white">Organizations</p>
                   <p className="text-xs text-slate-400">View all orgs</p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/admin/ai-settings">
+            <Card className="bg-slate-800/50 border-slate-700 hover:bg-slate-700/50 transition-colors cursor-pointer">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-cyan-500/10 flex items-center justify-center">
+                  <Brain className="h-5 w-5 text-cyan-500" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-white">AI Settings</p>
+                  <p className="text-xs text-slate-400">Configure AI features</p>
                 </div>
               </CardContent>
             </Card>
