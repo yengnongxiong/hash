@@ -54,6 +54,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { formatFileSize } from "@/lib/utils/format";
 import { useDropzone } from "react-dropzone";
 import {
   createWhiteboardTask,
@@ -111,14 +112,6 @@ function getFileIcon(fileType: string) {
   if (fileType.startsWith("image/")) return Image;
   if (fileType === "application/pdf") return FileText;
   return File;
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes === 0) return "0 Bytes";
-  const k = 1024;
-  const sizes = ["Bytes", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 }
 
 export function CreateTaskDialog({

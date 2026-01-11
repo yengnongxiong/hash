@@ -1,9 +1,11 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isAdminSessionValid } from "@/lib/admin/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Cpu, Clock, CheckCircle, XCircle, Loader2, FileText, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Cpu, Clock, CheckCircle, XCircle, Loader2, FileText, AlertCircle, ExternalLink } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { AdminPageWrapper } from "@/components/admin/admin-page-wrapper";
 
@@ -184,13 +186,25 @@ export default async function AdminProcessingPage() {
         {/* Failed Documents */}
         <Card className="bg-slate-800/50 border-slate-700">
           <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-red-400" />
-              Failed Documents
-            </CardTitle>
-            <CardDescription className="text-slate-400">
-              Documents that failed processing
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <AlertCircle className="h-5 w-5 text-red-400" />
+                  Failed Documents
+                </CardTitle>
+                <CardDescription className="text-slate-400">
+                  Documents that failed processing
+                </CardDescription>
+              </div>
+              {(failedCount || 0) > 0 && (
+                <Link href="/admin/processing/failed">
+                  <Button variant="outline" size="sm" className="border-slate-600 text-slate-300 hover:bg-slate-700">
+                    Manage All
+                    <ExternalLink className="h-3 w-3 ml-1" />
+                  </Button>
+                </Link>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">

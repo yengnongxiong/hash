@@ -6,7 +6,8 @@ import { getOCRProvider } from "@/lib/ocr/provider";
 import { revalidatePath } from "next/cache";
 import { detectDocumentFlags, saveDocumentFlags } from "@/lib/ocr/detect-flags";
 import { ExtractedDocumentData } from "@/lib/ocr/types";
-import { confidenceLevelToNumber, getReviewPriority, CONFIDENCE_THRESHOLDS } from "@/lib/ocr/confidence";
+import { confidenceLevelToNumber, getReviewPriority } from "@/lib/ocr/confidence";
+import { processAutoApproval, runAnomalyDetection } from "@/lib/smart-automation";
 import { generateDocumentEmbedding } from "@/lib/embeddings/document-embeddings";
 import { learnEntitiesFromDocument, validateDocumentEntities } from "@/lib/embeddings/entity-service";
 import { recordBatchCorrections, recordExperimentCorrection } from "@/lib/ml";
@@ -186,14 +187,16 @@ export async function processDocumentOCR(documentId: string) {
     const isImage = document.file_type?.startsWith("image/");
 
     // Use retry with timeout for resilient OCR processing
+    // Pass documentId to enable A/B testing for model experiments
     const ocrResult = await withRetry(
       () => withTimeout(
         async () => {
           return isImage
-            ? await ocrProvider.processImage(document.file_url)
+            ? await ocrProvider.processImage(document.file_url, { documentId })
             : await ocrProvider.processDocument(
                 document.file_url,
-                document.file_type || "application/pdf"
+                document.file_type || "application/pdf",
+                { documentId }
               );
         },
         OCR_TIMEOUT_MS,
@@ -235,18 +238,12 @@ export async function processDocumentOCR(documentId: string) {
     // Determine review priority based on confidence
     const reviewPriority = getReviewPriority(overallConfidence);
 
-    // Determine initial status based on confidence threshold
-    let initialStatus: "pending_review" | "completed" = "pending_review";
-    if (overallConfidence >= CONFIDENCE_THRESHOLDS.AUTO_APPROVE) {
-      // Auto-approve high confidence documents
-      initialStatus = "completed";
-    }
-
-    // Update document with results and confidence-based routing
+    // Update document with OCR results (initial status = pending_review)
+    // Auto-approval decision will be made after flag and anomaly detection
     await adminClient
       .from("documents")
       .update({
-        status: initialStatus,
+        status: "pending_review",
         raw_text: result.rawText,
         document_type: extractedData.documentType || "other",
         extracted_data: JSON.parse(JSON.stringify(extractedData)),
@@ -254,43 +251,27 @@ export async function processDocumentOCR(documentId: string) {
         extraction_confidence: extractionConfidence,
         review_priority: reviewPriority,
         updated_at: new Date().toISOString(),
-        ...(initialStatus === "completed" ? {
-          approved_at: new Date().toISOString(),
-          // No approved_by since it's auto-approved
-        } : {}),
       })
       .eq("id", documentId);
 
     // Remove any previous ocr_failed entries since OCR now succeeded
-    // This prevents confusing double-logging in the activity feed
     await adminClient
       .from("document_audit_log")
       .delete()
       .eq("document_id", documentId)
       .eq("action", "ocr_failed");
 
-    // Create audit log entry
-    await adminClient.from("document_audit_log").insert({
-      document_id: documentId,
-      action: "ocr_completed",
-      details: {
-        pageCount: result.pages.length,
-        documentType: extractedData.documentType,
-        classificationConfidence,
-        extractionConfidence,
-        reviewPriority,
-        autoApproved: initialStatus === "completed",
-      },
-    });
-
-    // Detect and save document flags
+    // Detect and save document flags FIRST (before auto-approval check)
+    let flagCount = 0;
     try {
       const flags = await detectDocumentFlags(
         documentId,
-        extractedData as ExtractedDocumentData
+        extractedData as ExtractedDocumentData,
+        document.organization_id
       );
       if (flags.length > 0) {
         await saveDocumentFlags(documentId, flags);
+        flagCount = flags.length;
         // Log flag detection
         await adminClient.from("document_audit_log").insert({
           document_id: documentId,
@@ -303,8 +284,76 @@ export async function processDocumentOCR(documentId: string) {
       }
     } catch (flagError) {
       console.error("Flag detection error:", flagError);
-      // Don't fail the whole process if flag detection fails
     }
+
+    // Run statistical anomaly detection
+    let anomalyCount = 0;
+    try {
+      const anomalyResult = await runAnomalyDetection(
+        documentId,
+        extractedData as unknown as Record<string, unknown>,
+        extractedData.documentType
+      );
+
+      if (anomalyResult.success && anomalyResult.anomalies.length > 0) {
+        anomalyCount = anomalyResult.anomalies.length;
+        // Log anomaly detection
+        await adminClient.from("document_audit_log").insert({
+          document_id: documentId,
+          action: "anomalies_detected",
+          details: {
+            anomalyCount: anomalyResult.anomalies.length,
+            anomalies: anomalyResult.anomalies.map((a) => ({
+              type: a.type,
+              severity: a.severity,
+              fieldName: a.fieldName,
+            })),
+          },
+        });
+      }
+    } catch (anomalyError) {
+      console.error("Anomaly detection error:", anomalyError);
+    }
+
+    // Use smart auto-approval system instead of hardcoded threshold
+    // This checks: org settings, confidence thresholds, flags, validation rules
+    let autoApproved = false;
+    let autoApprovalReason = "";
+    try {
+      const autoApprovalResult = await processAutoApproval(
+        documentId,
+        extractedData as unknown as Record<string, unknown>,
+        extractedData.documentType || null,
+        classificationConfidence,
+        extractionConfidence
+      );
+
+      if (autoApprovalResult.success && autoApprovalResult.autoApproved) {
+        autoApproved = true;
+        autoApprovalReason = autoApprovalResult.result?.reason || "All criteria met";
+      } else if (autoApprovalResult.result) {
+        autoApprovalReason = autoApprovalResult.result.reason;
+      }
+    } catch (approvalError) {
+      console.error("Auto-approval check error:", approvalError);
+    }
+
+    // Create audit log entry for OCR completion
+    await adminClient.from("document_audit_log").insert({
+      document_id: documentId,
+      action: "ocr_completed",
+      details: {
+        pageCount: result.pages.length,
+        documentType: extractedData.documentType,
+        classificationConfidence,
+        extractionConfidence,
+        reviewPriority,
+        autoApproved,
+        autoApprovalReason,
+        flagCount,
+        anomalyCount,
+      },
+    });
 
     // Extract and save document dates
     try {

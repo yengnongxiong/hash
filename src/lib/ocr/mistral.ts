@@ -2,12 +2,14 @@ import {
   OCRProvider,
   OCRResult,
   OCRPage,
+  OCRProcessOptions,
   ExtractedDocumentData,
   DocumentType,
   ConfidenceLevel,
 } from "./types";
 import {
   extractWithFineTunedModel,
+  extractWithExperiment,
   isTogetherConfigured,
 } from "./together-extraction";
 
@@ -168,13 +170,13 @@ export class MistralOCRProvider implements OCRProvider {
     this.useTogetherExtraction = useTogetherExtraction ?? isTogetherConfigured();
   }
 
-  async processDocument(fileUrl: string, fileType: string): Promise<OCRResult> {
+  async processDocument(fileUrl: string, fileType: string, options?: OCRProcessOptions): Promise<OCRResult> {
     try {
       // For images, use the vision chat endpoint
       const isImage = fileType?.startsWith("image/");
 
       if (isImage) {
-        return this.processImage(fileUrl);
+        return this.processImage(fileUrl, options);
       }
 
       // For PDFs, use Mistral's dedicated OCR endpoint
@@ -215,7 +217,13 @@ export class MistralOCRProvider implements OCRProvider {
       if (this.useTogetherExtraction) {
         // Use Together.ai fine-tuned Llama 3.1 8B model for extraction
         try {
-          extractedData = await extractWithFineTunedModel(rawText);
+          // Use A/B testing extraction if documentId is provided
+          if (options?.documentId) {
+            const result = await extractWithExperiment(rawText, options.documentId);
+            extractedData = result.data;
+          } else {
+            extractedData = await extractWithFineTunedModel(rawText);
+          }
           extractedData.pageCount = pages.length;
         } catch (togetherError) {
           console.error("Together.ai extraction failed, falling back to Mistral:", togetherError);
@@ -250,7 +258,7 @@ export class MistralOCRProvider implements OCRProvider {
     }
   }
 
-  async processImage(imageUrl: string): Promise<OCRResult> {
+  async processImage(imageUrl: string, options?: OCRProcessOptions): Promise<OCRResult> {
     try {
       // Step 1: Use Mistral OCR to extract raw text from the image
       const ocrResponse = await fetch("https://api.mistral.ai/v1/ocr", {
@@ -291,7 +299,13 @@ export class MistralOCRProvider implements OCRProvider {
       if (this.useTogetherExtraction) {
         // Use Together.ai fine-tuned Llama 3.1 8B model for extraction
         try {
-          extractedData = await extractWithFineTunedModel(rawText);
+          // Use A/B testing extraction if documentId is provided
+          if (options?.documentId) {
+            const result = await extractWithExperiment(rawText, options.documentId);
+            extractedData = result.data;
+          } else {
+            extractedData = await extractWithFineTunedModel(rawText);
+          }
           extractedData.pageCount = pages.length || 1;
           extractedData.hasImages = true;
         } catch (togetherError) {

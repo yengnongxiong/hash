@@ -15,7 +15,8 @@ export interface DetectedFlag {
 
 export async function detectDocumentFlags(
   documentId: string,
-  extractedData: ExtractedDocumentData
+  extractedData: ExtractedDocumentData,
+  organizationId: string
 ): Promise<DetectedFlag[]> {
   const flags: DetectedFlag[] = [];
   const supabase = await createClient();
@@ -49,10 +50,12 @@ export async function detectDocumentFlags(
 
   // Check for duplicate invoice numbers using indexed query
   if (extractedData.invoiceNumber) {
-    // Use a targeted query filtering by document_type for better performance
+    // Use a targeted query filtering by organization_id and document_type for better performance
+    // IMPORTANT: organization_id filter prevents cross-tenant data exposure
     const { data: existingDocs } = await supabase
       .from("documents")
       .select("id, file_name, extracted_data")
+      .eq("organization_id", organizationId)
       .neq("id", documentId)
       .eq("status", "completed")
       .eq("document_type", "invoice")

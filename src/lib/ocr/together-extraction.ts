@@ -3,9 +3,15 @@
  *
  * Uses our fine-tuned Llama 3.1 8B model for document extraction.
  * Falls back to base Llama 3.1 8B if fine-tuned model is unavailable.
+ * Supports A/B testing via experiment-service integration.
  */
 
 import { ExtractedDocumentData, DocumentType, ConfidenceLevel } from "./types";
+import {
+  selectModelForDocument,
+  recordExperimentResult,
+  type ModelType,
+} from "../ml";
 
 // Together.ai API configuration
 const TOGETHER_API_URL = "https://api.together.xyz/v1/chat/completions";
@@ -479,4 +485,119 @@ export function getCurrentModel(): string {
  */
 export function isUsingFineTunedModel(): boolean {
   return !!FINE_TUNED_MODEL;
+}
+
+/**
+ * Extract with A/B testing support
+ *
+ * This function:
+ * 1. Checks for running experiments
+ * 2. Selects control or treatment model based on traffic allocation
+ * 3. Performs extraction with the selected model
+ * 4. Records the result for experiment tracking
+ *
+ * @param ocrText - The raw text from OCR
+ * @param documentId - The document ID (for result tracking)
+ * @param options - Extraction options
+ * @returns Extracted data with experiment metadata
+ */
+export async function extractWithExperiment(
+  ocrText: string,
+  documentId: string,
+  options?: {
+    maxTokens?: number;
+    temperature?: number;
+  }
+): Promise<{
+  data: ExtractedDocumentData;
+  experimentId?: string;
+  modelVersionId?: string;
+  isControl?: boolean;
+}> {
+  const startTime = Date.now();
+
+  // Select model for this document (handles A/B testing)
+  const modelSelection = await selectModelForDocument("document_extraction" as ModelType);
+
+  let model = FINE_TUNED_MODEL || FALLBACK_MODEL;
+  let experimentId: string | undefined;
+  let modelVersionId: string | undefined;
+  let isControl: boolean | undefined;
+
+  if (modelSelection.success && modelSelection.modelVersion) {
+    // Use the model from A/B testing selection
+    model = modelSelection.modelVersion.modelId || model;
+    experimentId = modelSelection.experimentId;
+    modelVersionId = modelSelection.modelVersion.id;
+    isControl = modelSelection.isControl;
+  }
+
+  const apiKey = process.env.TOGETHER_API_KEY;
+
+  if (!apiKey) {
+    throw new Error("TOGETHER_API_KEY environment variable not set");
+  }
+
+  const userPrompt = `${EXTRACTION_PROMPT}\n\nDocument text:\n${ocrText}`;
+
+  try {
+    const response = await fetch(TOGETHER_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: "user", content: userPrompt }],
+        max_tokens: options?.maxTokens ?? 4096,
+        temperature: options?.temperature ?? 0.1,
+        response_format: { type: "json_object" },
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Together API error: ${response.status} - ${error}`);
+    }
+
+    const data: TogetherResponse = await response.json();
+    const content = data.choices[0]?.message?.content;
+
+    if (!content) {
+      throw new Error("No response content from Together API");
+    }
+
+    const parsed = JSON.parse(content);
+    validateExtraction(parsed, ocrText);
+    const extractedData = normalizeToExtractedDocumentData(parsed);
+
+    const processingTimeMs = Date.now() - startTime;
+
+    // Record experiment result if in an experiment
+    if (experimentId && modelVersionId && isControl !== undefined) {
+      // Calculate overall confidence as a number
+      const confidenceScore = extractedData.overallConfidence === "high" ? 0.9 :
+        extractedData.overallConfidence === "medium" ? 0.7 : 0.5;
+
+      await recordExperimentResult(
+        experimentId,
+        documentId,
+        modelVersionId,
+        isControl,
+        confidenceScore,
+        processingTimeMs
+      );
+    }
+
+    return {
+      data: extractedData,
+      experimentId,
+      modelVersionId,
+      isControl,
+    };
+  } catch (error) {
+    console.error("Together extraction error:", error);
+    throw error;
+  }
 }

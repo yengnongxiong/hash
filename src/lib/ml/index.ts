@@ -60,7 +60,26 @@ export {
   getTrainingBatch,
   updateTrainingBatchStatus,
   getRecentTrainingBatches,
+  startFineTuningJob,
+  checkFineTuningJobStatus,
   type TrainingExample,
   type TrainingBatch,
   type TrainingDataExport,
 } from "./training-export";
+
+// Together.ai fine-tuning API
+export {
+  uploadTrainingFile,
+  createFineTuningJob,
+  getJobStatus,
+  listJobEvents,
+  cancelJob,
+  listJobs,
+  deleteFile,
+  isTogetherConfigured,
+  type JobStatus,
+  type TogetherFile,
+  type TogetherFineTuneJob,
+  type TogetherFineTuneEvent,
+  type FineTuneCreateParams,
+} from "./together-finetune";

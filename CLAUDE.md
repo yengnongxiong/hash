@@ -215,7 +215,6 @@ src/
 │   ├── documents/             # Document components
 │   │   ├── documents-view.tsx
 │   │   ├── document-calendar.tsx
-│   │   ├── document-list.tsx
 │   │   ├── document-upload.tsx
 │   │   ├── document-flags.tsx
 │   │   ├── document-audit-log.tsx
@@ -238,7 +237,6 @@ src/
 │   │   ├── whiteboard.tsx
 │   │   ├── whiteboard-column.tsx
 │   │   ├── whiteboard-task.tsx
-│   │   ├── whiteboard-gallery.tsx
 │   │   ├── whiteboard-table.tsx
 │   │   ├── task-detail-dialog.tsx
 │   │   ├── task-subtasks.tsx
@@ -265,7 +263,7 @@ src/
 │   │   └── organization-code-actions.tsx
 │   ├── settings/              # Settings components
 │   ├── data-table/            # Reusable table components
-│   ├── shared/                # Shared components (empty-state, error-boundary)
+│   ├── shared/                # Shared components (error-boundary)
 │   └── ui/                    # shadcn/ui components
 ├── contexts/
 │   ├── theme-context.tsx      # Dark/light mode
@@ -311,8 +309,7 @@ src/
 │   │   └── document-processing.ts
 │   ├── hooks/                 # Custom hooks
 │   │   ├── use-debounce.ts
-│   │   ├── use-keyboard-shortcuts.ts
-│   │   └── use-document-shortcuts.ts
+│   │   └── use-keyboard-shortcuts.ts
 │   ├── utils/                 # Utilities
 │   │   └── format.ts          # Formatting helpers
 │   ├── export.ts              # CSV export utility

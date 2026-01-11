@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { AuthGuard } from "@/components/layout/auth-guard";
+import { ErrorBoundary } from "@/components/shared/error-boundary";
 import { SystemAlert } from "@/types/database";
 import { isAdminSessionValid } from "@/lib/admin/auth";
 
@@ -64,7 +65,9 @@ export default async function DashboardLayout({
     <>
       <AuthGuard />
       <DashboardShell user={profile} alerts={alerts} userId={user.id}>
-        {children}
+        <ErrorBoundary>
+          {children}
+        </ErrorBoundary>
       </DashboardShell>
     </>
   );

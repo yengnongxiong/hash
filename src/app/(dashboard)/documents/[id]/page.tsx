@@ -13,6 +13,7 @@ import { DocumentApproval } from "@/components/documents/document-approval";
 import { RetryButton } from "@/components/documents/retry-button";
 import { DuplicateWarning } from "@/components/documents/duplicate-warning";
 import { DocumentVersionHistory } from "@/components/documents/document-version-history";
+import { SimilarDocuments } from "@/components/documents/similar-documents";
 import { formatDistanceToNow, formatFileSize } from "@/lib/utils/format";
 import { logDocumentView, getDocumentAuditLog, getDocumentFlags } from "../actions";
 import { getDocumentVersions } from "./actions";
@@ -243,6 +244,9 @@ export default async function DocumentDetailPage({
               versions={versions}
               currentExtractedData={(document.extracted_data || {}) as Record<string, unknown>}
             />
+            {(isCompleted || isPendingReview) && (
+              <SimilarDocuments documentId={document.id} />
+            )}
             <DocumentAuditLog documentId={document.id} initialLogs={auditLogs} initialTotal={auditLogTotal} />
           </div>
         </div>

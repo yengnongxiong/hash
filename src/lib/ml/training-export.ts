@@ -2,8 +2,14 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { getUnusedCorrections, markCorrectionsUsed } from "./correction-service";
-import { ModelType } from "./model-versioning";
+import { ModelType, registerModelVersion } from "./model-versioning";
 import { Json } from "@/types/database";
+import {
+  uploadTrainingFile,
+  createFineTuningJob,
+  getJobStatus,
+  type TogetherFineTuneJob,
+} from "./together-finetune";
 
 export interface TrainingExample {
   documentId: string;
@@ -374,4 +380,286 @@ export async function getRecentTrainingBatches(
       completedAt: b.completed_at,
     })),
   };
+}
+
+/**
+ * Start a fine-tuning job on Together.ai for a training batch
+ *
+ * This function:
+ * 1. Rebuilds training examples from corrections
+ * 2. Exports in OpenAI chat format (required for Together.ai)
+ * 3. Uploads training file to Together.ai
+ * 4. Creates a fine-tuning job
+ * 5. Updates the batch with job IDs for tracking
+ */
+export async function startFineTuningJob(
+  batchId: string,
+  options?: {
+    baseModel?: string;
+    nEpochs?: number;
+    learningRate?: number;
+    batchSize?: number;
+  }
+): Promise<{
+  success: boolean;
+  jobId?: string;
+  job?: TogetherFineTuneJob;
+  error?: string;
+}> {
+  const supabase = await createClient();
+
+  // Get the batch
+  const { data: batch, error: batchError } = await supabase
+    .from("training_batches")
+    .select("*")
+    .eq("id", batchId)
+    .single();
+
+  if (batchError || !batch) {
+    return { success: false, error: batchError?.message || "Batch not found" };
+  }
+
+  if (batch.status !== "pending") {
+    return { success: false, error: `Batch is already ${batch.status}` };
+  }
+
+  // Get corrections associated with this batch
+  const { data: corrections, error: correctionsError } = await supabase
+    .from("field_corrections")
+    .select("document_id, field_name, original_value, corrected_value")
+    .eq("training_batch_id", batchId);
+
+  if (correctionsError || !corrections || corrections.length === 0) {
+    return { success: false, error: "No corrections found for this batch" };
+  }
+
+  // Group corrections by document
+  const correctionsByDoc = new Map<string, typeof corrections>();
+  for (const correction of corrections) {
+    const existing = correctionsByDoc.get(correction.document_id) || [];
+    existing.push(correction);
+    correctionsByDoc.set(correction.document_id, existing);
+  }
+
+  // Fetch document data
+  const documentIds = Array.from(correctionsByDoc.keys());
+  const { data: documents, error: docsError } = await supabase
+    .from("documents")
+    .select("id, document_type, raw_text, extracted_data")
+    .in("id", documentIds);
+
+  if (docsError || !documents || documents.length === 0) {
+    return { success: false, error: "Failed to fetch documents for training" };
+  }
+
+  // Build training data in OpenAI chat format
+  const trainingLines: string[] = [];
+
+  for (const doc of documents) {
+    const docCorrections = correctionsByDoc.get(doc.id) || [];
+    if (docCorrections.length === 0) continue;
+
+    const originalExtraction = (doc.extracted_data || {}) as Record<string, unknown>;
+    const correctedExtraction = { ...originalExtraction };
+
+    for (const correction of docCorrections) {
+      correctedExtraction[correction.field_name] = correction.corrected_value;
+    }
+
+    const example = {
+      messages: [
+        {
+          role: "system",
+          content: `You are a document extraction AI. Extract structured data from ${doc.document_type || "document"} documents. Return the extracted data as a valid JSON object.`,
+        },
+        {
+          role: "user",
+          content: `Extract structured data from this document:\n\n${doc.raw_text || ""}`,
+        },
+        {
+          role: "assistant",
+          content: JSON.stringify(correctedExtraction),
+        },
+      ],
+    };
+
+    trainingLines.push(JSON.stringify(example));
+  }
+
+  if (trainingLines.length === 0) {
+    return { success: false, error: "No valid training examples" };
+  }
+
+  const trainingData = trainingLines.join("\n");
+
+  // Update batch status to processing
+  await supabase
+    .from("training_batches")
+    .update({
+      status: "processing",
+      started_at: new Date().toISOString(),
+    })
+    .eq("id", batchId);
+
+  // Upload training file to Together.ai
+  const uploadResult = await uploadTrainingFile(
+    trainingData,
+    `training_batch_${batchId}.jsonl`
+  );
+
+  if (!uploadResult.success || !uploadResult.fileId) {
+    await supabase
+      .from("training_batches")
+      .update({
+        status: "failed",
+        error_message: uploadResult.error || "File upload failed",
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", batchId);
+    return { success: false, error: uploadResult.error || "File upload failed" };
+  }
+
+  // Store the file ID (column added via migration, not in generated types)
+  await supabase
+    .from("training_batches")
+    .update({ together_file_id: uploadResult.fileId } as never)
+    .eq("id", batchId);
+
+  // Create fine-tuning job
+  const outputName = `hash-extraction-${batch.model_type}-${Date.now()}`;
+  const jobResult = await createFineTuningJob({
+    trainingFile: uploadResult.fileId,
+    outputName,
+    nEpochs: options?.nEpochs,
+    learningRate: options?.learningRate,
+    batchSize: options?.batchSize,
+    baseModel: options?.baseModel,
+  });
+
+  if (!jobResult.success || !jobResult.jobId) {
+    await supabase
+      .from("training_batches")
+      .update({
+        status: "failed",
+        error_message: jobResult.error || "Job creation failed",
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", batchId);
+    return { success: false, error: jobResult.error || "Job creation failed" };
+  }
+
+  // Store the job ID (columns added via migration, not in generated types)
+  await supabase
+    .from("training_batches")
+    .update({
+      together_job_id: jobResult.jobId,
+      together_output_model: outputName,
+    } as never)
+    .eq("id", batchId);
+
+  return {
+    success: true,
+    jobId: jobResult.jobId,
+    job: jobResult.job,
+  };
+}
+
+/**
+ * Check and update status of a Together.ai fine-tuning job
+ */
+export async function checkFineTuningJobStatus(
+  batchId: string
+): Promise<{
+  success: boolean;
+  status?: string;
+  modelId?: string;
+  error?: string;
+}> {
+  const supabase = await createClient();
+
+  // Get the batch with Together job ID (columns added via migration)
+  const { data: batch, error: batchError } = await supabase
+    .from("training_batches")
+    .select("*")
+    .eq("id", batchId)
+    .single() as {
+      data: {
+        together_job_id: string | null;
+        together_output_model: string | null;
+        model_type: string;
+        status: string | null;
+      } | null;
+      error: Error | null;
+    };
+
+  if (batchError || !batch) {
+    return { success: false, error: "Batch not found" };
+  }
+
+  if (!batch.together_job_id) {
+    return { success: false, error: "No Together.ai job associated with this batch" };
+  }
+
+  // Already completed or failed
+  if (batch.status === "completed" || batch.status === "failed") {
+    return { success: true, status: batch.status };
+  }
+
+  // Get job status from Together.ai
+  const jobResult = await getJobStatus(batch.together_job_id);
+
+  if (!jobResult.success || !jobResult.job) {
+    return { success: false, error: jobResult.error || "Failed to get job status" };
+  }
+
+  const job = jobResult.job;
+
+  // Update batch based on job status
+  if (job.status === "completed") {
+    // Register the new model version
+    const modelVersion = await registerModelVersion({
+      modelType: batch.model_type as ModelType,
+      version: `v${Date.now()}`,
+      provider: "together",
+      modelId: batch.together_output_model || job.output_name,
+      metadata: {
+        trainedTokens: job.trained_tokens,
+        trainingSteps: job.training_steps,
+        togetherJobId: job.id,
+      },
+    });
+
+    await supabase
+      .from("training_batches")
+      .update({
+        status: "completed",
+        completed_at: new Date().toISOString(),
+        result_model_id: modelVersion.success ? modelVersion.modelVersionId : null,
+        metrics: {
+          trained_tokens: job.trained_tokens,
+          training_steps: job.training_steps,
+        } as Json,
+      })
+      .eq("id", batchId);
+
+    return {
+      success: true,
+      status: "completed",
+      modelId: modelVersion.modelVersionId,
+    };
+  } else if (job.status === "failed" || job.status === "cancelled") {
+    await supabase
+      .from("training_batches")
+      .update({
+        status: "failed",
+        completed_at: new Date().toISOString(),
+        error_message: `Together.ai job ${job.status}`,
+      })
+      .eq("id", batchId);
+
+    return { success: true, status: job.status };
+  }
+
+  // Still running
+  return { success: true, status: job.status };
 }

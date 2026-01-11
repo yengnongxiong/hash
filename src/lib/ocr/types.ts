@@ -705,10 +705,14 @@ export function getFieldsByCategory(documentType: DocumentType): Record<FieldCat
   return result;
 }
 
+export interface OCRProcessOptions {
+  documentId?: string; // For A/B testing experiment tracking
+}
+
 export interface OCRProvider {
   name: string;
-  processDocument(fileUrl: string, fileType: string): Promise<OCRResult>;
-  processImage(imageUrl: string): Promise<OCRResult>;
+  processDocument(fileUrl: string, fileType: string, options?: OCRProcessOptions): Promise<OCRResult>;
+  processImage(imageUrl: string, options?: OCRProcessOptions): Promise<OCRResult>;
 }
 
 export interface OCRProviderConfig {

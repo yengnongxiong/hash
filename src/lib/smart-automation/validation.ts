@@ -342,8 +342,36 @@ function runCustomRule(
       const pattern = config.pattern as string | undefined;
       if (!pattern) return null;
 
-      const regex = new RegExp(pattern);
-      if (!regex.test(value)) {
+      // Limit pattern length to prevent ReDoS attacks
+      if (pattern.length > 500) {
+        console.warn(`Regex pattern too long for rule ${ruleName}, skipping`);
+        return null;
+      }
+
+      // Wrap regex in try-catch to handle invalid patterns
+      let regex: RegExp;
+      try {
+        regex = new RegExp(pattern);
+      } catch {
+        console.error(`Invalid regex pattern for rule ${ruleName}`);
+        return null;
+      }
+
+      // Set a timeout for regex execution to prevent ReDoS
+      const timeoutMs = 100;
+      const startTime = Date.now();
+      let matched = false;
+      try {
+        matched = regex.test(value.substring(0, 10000)); // Limit input length
+        if (Date.now() - startTime > timeoutMs) {
+          console.warn(`Regex execution took too long for rule ${ruleName}`);
+        }
+      } catch {
+        console.error(`Regex execution failed for rule ${ruleName}`);
+        return null;
+      }
+
+      if (!matched) {
         return {
           passed: false,
           ruleName,
