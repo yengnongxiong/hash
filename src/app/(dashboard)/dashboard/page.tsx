@@ -96,7 +96,7 @@ export default async function DashboardPage() {
 
   // Get upcoming appointments
   const { data: appointments } = await supabase
-    .from("appointments")
+    .from("dates")
     .select("id, title, start_time, status, customer_id")
     .gte("start_time", todayStart.toISOString())
     .lte("start_time", nextWeek.toISOString())

@@ -204,7 +204,7 @@ export function AppointmentDetailDialog({
         location: location || null,
         description: description || null,
         status,
-        appointment_type_id: appointmentTypeId,
+        date_type_id: appointmentTypeId,
       });
 
       if (result.error) {

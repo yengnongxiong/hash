@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { login, resendConfirmation } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,7 @@ import { toast } from "sonner";
 import { Mail, RefreshCw } from "lucide-react";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [unconfirmedEmail, setUnconfirmedEmail] = useState<string | null>(null);
@@ -22,7 +24,12 @@ export default function LoginPage() {
 
     const result = await login(formData);
 
-    if (result?.error === "EMAIL_NOT_CONFIRMED") {
+    if (result?.redirectTo) {
+      // Admin users need to use admin login portal
+      toast.info(result.error);
+      router.push(result.redirectTo);
+      return;
+    } else if (result?.error === "EMAIL_NOT_CONFIRMED") {
       setUnconfirmedEmail(result.email || null);
       setError(result.message || "Please confirm your email before logging in.");
       setLoading(false);

@@ -1,12 +1,15 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import {
+  isDeviceTrusted,
+  startDeviceVerification,
+  updateDeviceLastUsed,
+} from "@/lib/auth/device";
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "yengnongxiong@gmail.com";
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -26,67 +29,16 @@ export async function login(formData: FormData) {
 
   const supabase = await createClient();
 
-  // Check if this is admin login
+  // Admin users should use /admin/login with OTP
   if (result.data.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
-    // Admin uses ADMIN_PASSWORD instead of Supabase password
-    if (!ADMIN_PASSWORD) {
-      return { error: "Admin password not configured" };
-    }
-
-    if (result.data.password !== ADMIN_PASSWORD) {
-      return { error: "Invalid credentials" };
-    }
-
-    // Sign in admin using Supabase with the admin password as the actual password
-    const adminClient = createAdminClient();
-
-    // Try to sign in - if it fails, we may need to create or update the user
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: ADMIN_EMAIL,
-      password: ADMIN_PASSWORD,
-    });
-
-    if (signInError) {
-      // Check if admin user exists
-      const { data: users } = await adminClient.auth.admin.listUsers();
-      const adminUser = users?.users?.find(u => u.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase());
-
-      if (adminUser) {
-        // User exists but password is wrong - update it
-        await adminClient.auth.admin.updateUserById(adminUser.id, {
-          password: ADMIN_PASSWORD,
-        });
-      } else {
-        // Create admin user
-        const { error: createError } = await adminClient.auth.admin.createUser({
-          email: ADMIN_EMAIL,
-          password: ADMIN_PASSWORD,
-          email_confirm: true,
-        });
-
-        if (createError) {
-          console.error("Failed to create admin user:", createError);
-          return { error: "Failed to create admin user" };
-        }
-      }
-
-      // Try signing in again
-      const { error: retryError } = await supabase.auth.signInWithPassword({
-        email: ADMIN_EMAIL,
-        password: ADMIN_PASSWORD,
-      });
-
-      if (retryError) {
-        console.error("Failed to sign in admin after setup:", retryError);
-        return { error: "Failed to sign in admin" };
-      }
-    }
-
-    redirect("/admin");
+    return {
+      error: "Admin users must use the admin login portal",
+      redirectTo: "/admin/login"
+    };
   }
 
   // Regular user login via Supabase
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data: authData, error } = await supabase.auth.signInWithPassword({
     email: result.data.email,
     password: result.data.password,
   });
@@ -101,6 +53,29 @@ export async function login(formData: FormData) {
       };
     }
     return { error: error.message };
+  }
+
+  // Check if device is trusted
+  const trusted = await isDeviceTrusted(authData.user.id);
+
+  if (!trusted) {
+    // Start device verification
+    const verifyResult = await startDeviceVerification(
+      authData.user.id,
+      authData.user.email || result.data.email
+    );
+
+    if (!verifyResult.success) {
+      // If we can't send OTP, allow login but log the issue
+      console.warn("Could not start device verification:", verifyResult.error);
+      // Fall through to redirect to dashboard
+    } else {
+      // Redirect to device verification page
+      redirect("/verify-device");
+    }
+  } else {
+    // Update last used timestamp for trusted device
+    await updateDeviceLastUsed(authData.user.id);
   }
 
   redirect("/dashboard");

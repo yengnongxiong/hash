@@ -6,12 +6,12 @@ export default async function AdminProtectedLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Check if admin has valid 2FA session
+  // Check if admin has valid session (created after OTP verification)
   const hasValidSession = await isAdminSessionValid();
 
   if (!hasValidSession) {
-    // Need 2FA verification
-    redirect("/admin/verify");
+    // Need to log in with OTP
+    redirect("/admin/login");
   }
 
   return <>{children}</>;

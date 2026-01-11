@@ -266,7 +266,7 @@ export function Whiteboard({ initialTasks, organizationId, teamMembers = [] }: W
 
     exportToCSV(
       tasksWithAssignees,
-      `whiteboard_tasks_${new Date().toISOString().split("T")[0]}`,
+      `tasks_${new Date().toISOString().split("T")[0]}`,
       [
         { key: "title", label: "Title" },
         { key: "description", label: "Description", format: (v) => String(v ?? "") },
@@ -287,13 +287,13 @@ export function Whiteboard({ initialTasks, organizationId, teamMembers = [] }: W
     const supabase = createClient();
 
     const channel = supabase
-      .channel("whiteboard_changes")
+      .channel("tasks_changes")
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
-          table: "whiteboard_tasks",
+          table: "tasks",
         },
         (payload) => {
           if (payload.eventType === "INSERT") {

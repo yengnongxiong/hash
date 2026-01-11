@@ -33,10 +33,10 @@ export function subscribeToTable<T extends Record<string, unknown>>(
   };
 }
 
-export function subscribeToWhiteboard<T extends Record<string, unknown>>(
+export function subscribeToTasks<T extends Record<string, unknown>>(
   callback: ChangeCallback<T>
 ) {
-  return subscribeToTable<T>("whiteboard_tasks", callback);
+  return subscribeToTable<T>("tasks", callback);
 }
 
 export function subscribeToActivityLog<T extends Record<string, unknown>>(

@@ -44,7 +44,9 @@ next-env.d.ts
 .playwright-mcp/
 
 # training data (large files - regenerate with scripts)
+training-data/exports/
+training-data/processed/
 training-data/public-datasets/
 training-data/synthetic/
+training-data/templates/
 training-data/together-ai/
-training-data/processed/

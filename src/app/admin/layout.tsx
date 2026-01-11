@@ -10,8 +10,8 @@ export default async function AdminLayout({
   const isAdmin = await isAdminEmail();
 
   if (!isAdmin) {
-    // Not the admin user - redirect to login
-    redirect("/login");
+    // Not the admin user - redirect to admin login
+    redirect("/admin/login");
   }
 
   return <>{children}</>;

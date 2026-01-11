@@ -16,7 +16,7 @@ export default async function DatesPage() {
 
   // Fetch appointments without relationship joins
   const { data: appointments, error: appointmentsError } = await supabase
-    .from("appointments")
+    .from("dates")
     .select("*")
     .order("start_time", { ascending: true });
 
@@ -34,11 +34,11 @@ export default async function DatesPage() {
   }
 
   // Fetch appointment types for appointments
-  const typeIds = [...new Set((appointments || []).filter(a => a.appointment_type_id).map(a => a.appointment_type_id as string))];
+  const typeIds = [...new Set((appointments || []).filter(a => a.date_type_id).map(a => a.date_type_id as string))];
   let typesMap: Record<string, { id: string; name: string; color: string }> = {};
   if (typeIds.length > 0) {
     const { data: types } = await supabase
-      .from("appointment_types")
+      .from("date_types")
       .select("id, name, color")
       .in("id", typeIds);
     if (types) {
@@ -92,7 +92,7 @@ export default async function DatesPage() {
     created_by_user: apt.created_by ? allUsersMap[apt.created_by] || null : null,
     updated_by_user: apt.updated_by ? allUsersMap[apt.updated_by] || null : null,
     customers: apt.customer_id ? customersMap[apt.customer_id] || null : null,
-    appointment_types: apt.appointment_type_id ? typesMap[apt.appointment_type_id] || null : null,
+    appointment_types: apt.date_type_id ? typesMap[apt.date_type_id] || null : null,
   })) || [];
 
   // Fetch customers for creating new appointments
@@ -103,7 +103,7 @@ export default async function DatesPage() {
 
   // Fetch appointment types for the organization
   const { data: appointmentTypes } = await supabase
-    .from("appointment_types")
+    .from("date_types")
     .select("*")
     .order("name");
 

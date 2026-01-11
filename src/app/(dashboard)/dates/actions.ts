@@ -33,7 +33,7 @@ export async function createAppointment(formData: FormData) {
   const endTimeRaw = formData.get("end_time") as string;
   const location = formData.get("location") as string;
   const description = formData.get("description") as string;
-  const appointmentTypeId = formData.get("appointment_type_id") as string;
+  const appointmentTypeId = formData.get("date_type_id") as string;
 
   if (!title || !startTimeRaw) {
     return { error: "Title and start time are required" };
@@ -49,7 +49,7 @@ export async function createAppointment(formData: FormData) {
   const primaryCustomerId = customerIds.length > 0 ? customerIds[0] : (customerId || null);
   const allCustomerIds = customerIds.length > 0 ? customerIds : (customerId ? [customerId] : []);
 
-  const { error } = await supabase.from("appointments").insert({
+  const { error } = await supabase.from("dates").insert({
     organization_id: userData.organization_id,
     customer_id: primaryCustomerId,
     customer_ids: allCustomerIds.length > 0 ? allCustomerIds : null,
@@ -59,7 +59,7 @@ export async function createAppointment(formData: FormData) {
     end_time: endTime,
     location: location || null,
     description: description || null,
-    appointment_type_id: appointmentTypeId || null,
+    date_type_id: appointmentTypeId || null,
     created_by: user.id,
   });
 
@@ -84,7 +84,7 @@ export async function updateAppointment(
     location?: string | null;
     description?: string | null;
     status?: "scheduled" | "completed" | "cancelled";
-    appointment_type_id?: string | null;
+    date_type_id?: string | null;
   }
 ) {
   const supabase = await createClient();
@@ -103,7 +103,7 @@ export async function updateAppointment(
   }
 
   const { error } = await supabase
-    .from("appointments")
+    .from("dates")
     .update({
       ...updateData,
       updated_at: new Date().toISOString(),
@@ -123,7 +123,7 @@ export async function updateAppointment(
 export async function deleteAppointment(id: string) {
   const supabase = await createClient();
 
-  const { error } = await supabase.from("appointments").delete().eq("id", id);
+  const { error } = await supabase.from("dates").delete().eq("id", id);
 
   if (error) {
     return { error: error.message };
@@ -141,7 +141,7 @@ export async function bulkUpdateAppointmentStatus(
   const supabase = await createClient();
 
   const { error } = await supabase
-    .from("appointments")
+    .from("dates")
     .update({
       status,
       updated_at: new Date().toISOString(),
@@ -161,7 +161,7 @@ export async function bulkDeleteAppointments(ids: string[]) {
   const supabase = await createClient();
 
   const { error } = await supabase
-    .from("appointments")
+    .from("dates")
     .delete()
     .in("id", ids);
 
@@ -186,7 +186,7 @@ export async function updateAppointmentNotes(id: string, notes: string | null) {
   }
 
   const { error } = await supabase
-    .from("appointments")
+    .from("dates")
     .update({
       notes: notes || null,
       notes_updated_by: user.id,
@@ -227,7 +227,7 @@ export async function createAppointmentType(name: string, color: string) {
   }
 
   const { data, error } = await supabase
-    .from("appointment_types")
+    .from("date_types")
     .insert({
       organization_id: userData.organization_id,
       name: name.trim(),
@@ -254,7 +254,7 @@ export async function updateAppointmentType(
   const supabase = await createClient();
 
   const { error } = await supabase
-    .from("appointment_types")
+    .from("date_types")
     .update(data)
     .eq("id", id);
 
@@ -270,7 +270,7 @@ export async function deleteAppointmentType(id: string) {
   const supabase = await createClient();
 
   const { error } = await supabase
-    .from("appointment_types")
+    .from("date_types")
     .delete()
     .eq("id", id);
 
@@ -330,7 +330,7 @@ export async function importDatesFromCSV(
     location: string | null;
     description: string | null;
     status: "scheduled" | "completed" | "cancelled";
-    appointment_type_id: string | null;
+    date_type_id: string | null;
     created_by: string;
   }[] = [];
 
@@ -464,7 +464,7 @@ export async function importDatesFromCSV(
       location: row.location?.trim() || null,
       description: row.description?.trim() || null,
       status,
-      appointment_type_id: appointmentTypeId,
+      date_type_id: appointmentTypeId,
       created_by: user.id,
     });
   }
@@ -473,7 +473,7 @@ export async function importDatesFromCSV(
     return { imported: 0, errors };
   }
 
-  const { error } = await supabase.from("appointments").insert(toInsert);
+  const { error } = await supabase.from("dates").insert(toInsert);
 
   if (error) {
     return { error: error.message, errors };

@@ -47,7 +47,7 @@ export default async function AdminPage() {
         supabase.from("users").select("*", { count: "exact", head: true }).eq("organization_id", org.id),
         supabase.from("customers").select("*", { count: "exact", head: true }).eq("organization_id", org.id),
         supabase.from("documents").select("*", { count: "exact", head: true }).eq("organization_id", org.id),
-        supabase.from("whiteboard_tasks").select("*", { count: "exact", head: true }).eq("organization_id", org.id),
+        supabase.from("tasks").select("*", { count: "exact", head: true }).eq("organization_id", org.id),
       ]);
 
       return {

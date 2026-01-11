@@ -311,143 +311,6 @@ export type Database = {
           },
         ]
       }
-      appointment_types: {
-        Row: {
-          color: string
-          created_at: string
-          id: string
-          name: string
-          organization_id: string
-          updated_at: string
-        }
-        Insert: {
-          color?: string
-          created_at?: string
-          id?: string
-          name: string
-          organization_id: string
-          updated_at?: string
-        }
-        Update: {
-          color?: string
-          created_at?: string
-          id?: string
-          name?: string
-          organization_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "appointment_types_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      appointments: {
-        Row: {
-          appointment_type_id: string | null
-          assignee_ids: string[] | null
-          created_at: string | null
-          created_by: string | null
-          customer_id: string | null
-          customer_ids: string[] | null
-          description: string | null
-          end_time: string | null
-          id: string
-          location: string | null
-          notes: string | null
-          notes_updated_at: string | null
-          notes_updated_by: string | null
-          organization_id: string
-          start_time: string
-          status: string | null
-          title: string
-          updated_at: string | null
-          updated_by: string | null
-        }
-        Insert: {
-          appointment_type_id?: string | null
-          assignee_ids?: string[] | null
-          created_at?: string | null
-          created_by?: string | null
-          customer_id?: string | null
-          customer_ids?: string[] | null
-          description?: string | null
-          end_time?: string | null
-          id?: string
-          location?: string | null
-          notes?: string | null
-          notes_updated_at?: string | null
-          notes_updated_by?: string | null
-          organization_id: string
-          start_time: string
-          status?: string | null
-          title: string
-          updated_at?: string | null
-          updated_by?: string | null
-        }
-        Update: {
-          appointment_type_id?: string | null
-          assignee_ids?: string[] | null
-          created_at?: string | null
-          created_by?: string | null
-          customer_id?: string | null
-          customer_ids?: string[] | null
-          description?: string | null
-          end_time?: string | null
-          id?: string
-          location?: string | null
-          notes?: string | null
-          notes_updated_at?: string | null
-          notes_updated_by?: string | null
-          organization_id?: string
-          start_time?: string
-          status?: string | null
-          title?: string
-          updated_at?: string | null
-          updated_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "appointments_appointment_type_id_fkey"
-            columns: ["appointment_type_id"]
-            isOneToOne: false
-            referencedRelation: "appointment_types"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "appointments_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "appointments_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "customers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "appointments_notes_updated_by_fkey"
-            columns: ["notes_updated_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "appointments_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       customer_tag_assignments: {
         Row: {
           created_at: string | null
@@ -553,6 +416,143 @@ export type Database = {
             columns: ["updated_by"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      date_types: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          name: string
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          id?: string
+          name: string
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          name?: string
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointment_types_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dates: {
+        Row: {
+          assignee_ids: string[] | null
+          created_at: string | null
+          created_by: string | null
+          customer_id: string | null
+          customer_ids: string[] | null
+          date_type_id: string | null
+          description: string | null
+          end_time: string | null
+          id: string
+          location: string | null
+          notes: string | null
+          notes_updated_at: string | null
+          notes_updated_by: string | null
+          organization_id: string
+          start_time: string
+          status: string | null
+          title: string
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          assignee_ids?: string[] | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_id?: string | null
+          customer_ids?: string[] | null
+          date_type_id?: string | null
+          description?: string | null
+          end_time?: string | null
+          id?: string
+          location?: string | null
+          notes?: string | null
+          notes_updated_at?: string | null
+          notes_updated_by?: string | null
+          organization_id: string
+          start_time: string
+          status?: string | null
+          title: string
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          assignee_ids?: string[] | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_id?: string | null
+          customer_ids?: string[] | null
+          date_type_id?: string | null
+          description?: string | null
+          end_time?: string | null
+          id?: string
+          location?: string | null
+          notes?: string | null
+          notes_updated_at?: string | null
+          notes_updated_by?: string | null
+          organization_id?: string
+          start_time?: string
+          status?: string | null
+          title?: string
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_notes_updated_by_fkey"
+            columns: ["notes_updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dates_date_type_id_fkey"
+            columns: ["date_type_id"]
+            isOneToOne: false
+            referencedRelation: "date_types"
             referencedColumns: ["id"]
           },
         ]
@@ -1695,7 +1695,7 @@ export type Database = {
             foreignKeyName: "task_attachments_task_id_fkey"
             columns: ["task_id"]
             isOneToOne: false
-            referencedRelation: "whiteboard_tasks"
+            referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
         ]
@@ -1783,7 +1783,99 @@ export type Database = {
             foreignKeyName: "task_subtasks_task_id_fkey"
             columns: ["task_id"]
             isOneToOne: false
-            referencedRelation: "whiteboard_tasks"
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tasks: {
+        Row: {
+          assigned_to: string | null
+          assigned_to_ids: string[] | null
+          color: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          due_date: string | null
+          id: string
+          labels: string[] | null
+          organization_id: string
+          position: number | null
+          position_x: number | null
+          position_y: number | null
+          priority: string | null
+          status: string | null
+          title: string
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          assigned_to_ids?: string[] | null
+          color?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          labels?: string[] | null
+          organization_id: string
+          position?: number | null
+          position_x?: number | null
+          position_y?: number | null
+          priority?: string | null
+          status?: string | null
+          title: string
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          assigned_to_ids?: string[] | null
+          color?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          labels?: string[] | null
+          organization_id?: string
+          position?: number | null
+          position_x?: number | null
+          position_y?: number | null
+          priority?: string | null
+          status?: string | null
+          title?: string
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whiteboard_tasks_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whiteboard_tasks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whiteboard_tasks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whiteboard_tasks_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -1800,6 +1892,9 @@ export type Database = {
           source_model_id: string | null
           started_at: string | null
           status: string | null
+          together_file_id: string | null
+          together_job_id: string | null
+          together_output_model: string | null
           training_config: Json | null
           training_examples_count: number | null
           validation_examples_count: number | null
@@ -1815,6 +1910,9 @@ export type Database = {
           source_model_id?: string | null
           started_at?: string | null
           status?: string | null
+          together_file_id?: string | null
+          together_job_id?: string | null
+          together_output_model?: string | null
           training_config?: Json | null
           training_examples_count?: number | null
           validation_examples_count?: number | null
@@ -1830,6 +1928,9 @@ export type Database = {
           source_model_id?: string | null
           started_at?: string | null
           status?: string | null
+          together_file_id?: string | null
+          together_job_id?: string | null
+          together_output_model?: string | null
           training_config?: Json | null
           training_examples_count?: number | null
           validation_examples_count?: number | null
@@ -1850,6 +1951,75 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      trusted_devices: {
+        Row: {
+          created_at: string | null
+          device_id: string
+          device_name: string | null
+          id: string
+          ip_address: unknown
+          is_active: boolean | null
+          last_used_at: string | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          device_id: string
+          device_name?: string | null
+          id?: string
+          ip_address?: unknown
+          is_active?: boolean | null
+          last_used_at?: string | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          device_id?: string
+          device_name?: string | null
+          id?: string
+          ip_address?: unknown
+          is_active?: boolean | null
+          last_used_at?: string | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_verification_codes: {
+        Row: {
+          code: string
+          created_at: string | null
+          device_id: string
+          email: string
+          expires_at: string
+          id: string
+          used: boolean | null
+          user_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          device_id: string
+          email: string
+          expires_at: string
+          id?: string
+          used?: boolean | null
+          user_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          device_id?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          used?: boolean | null
+          user_id?: string
+        }
+        Relationships: []
       }
       users: {
         Row: {
@@ -1938,98 +2108,6 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      whiteboard_tasks: {
-        Row: {
-          assigned_to: string | null
-          assigned_to_ids: string[] | null
-          color: string | null
-          created_at: string | null
-          created_by: string | null
-          description: string | null
-          due_date: string | null
-          id: string
-          labels: string[] | null
-          organization_id: string
-          position: number | null
-          position_x: number | null
-          position_y: number | null
-          priority: string | null
-          status: string | null
-          title: string
-          updated_at: string | null
-          updated_by: string | null
-        }
-        Insert: {
-          assigned_to?: string | null
-          assigned_to_ids?: string[] | null
-          color?: string | null
-          created_at?: string | null
-          created_by?: string | null
-          description?: string | null
-          due_date?: string | null
-          id?: string
-          labels?: string[] | null
-          organization_id: string
-          position?: number | null
-          position_x?: number | null
-          position_y?: number | null
-          priority?: string | null
-          status?: string | null
-          title: string
-          updated_at?: string | null
-          updated_by?: string | null
-        }
-        Update: {
-          assigned_to?: string | null
-          assigned_to_ids?: string[] | null
-          color?: string | null
-          created_at?: string | null
-          created_by?: string | null
-          description?: string | null
-          due_date?: string | null
-          id?: string
-          labels?: string[] | null
-          organization_id?: string
-          position?: number | null
-          position_x?: number | null
-          position_y?: number | null
-          priority?: string | null
-          status?: string | null
-          title?: string
-          updated_at?: string | null
-          updated_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "whiteboard_tasks_assigned_to_fkey"
-            columns: ["assigned_to"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "whiteboard_tasks_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "whiteboard_tasks_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "whiteboard_tasks_updated_by_fkey"
-            columns: ["updated_by"]
-            isOneToOne: false
-            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -2229,31 +2307,42 @@ export const Constants = {
 } as const
 
 // Custom type aliases for convenience
-export type SystemAlert = Tables<"system_alerts">
-export type Organization = Tables<"organizations">
-export type User = Tables<"users">
-export type Customer = Tables<"customers">
-export type PersonTag = Tables<"person_tags">
-export type Document = Tables<"documents">
-export type DocumentAuditLog = Tables<"document_audit_log">
-export type Appointment = Tables<"appointments">
-export type AppointmentType = Tables<"appointment_types">
-export type WhiteboardTask = Tables<"whiteboard_tasks">
-export type TaskAttachment = Tables<"task_attachments">
-export type TaskSubtask = Tables<"task_subtasks">
+export type SystemAlert = Database["public"]["Tables"]["system_alerts"]["Row"]
+export type Organization = Database["public"]["Tables"]["organizations"]["Row"]
+export type User = Database["public"]["Tables"]["users"]["Row"]
+export type Customer = Database["public"]["Tables"]["customers"]["Row"]
+export type PersonTag = Database["public"]["Tables"]["person_tags"]["Row"]
+export type Document = Database["public"]["Tables"]["documents"]["Row"]
+export type DocumentAuditLog = Database["public"]["Tables"]["document_audit_log"]["Row"]
 
-// Extended types with relations
-export interface CustomerWithUserInfo extends Customer {
-  created_by_user?: { id: string; name: string | null; email: string | null } | null;
-  updated_by_user?: { id: string; name: string | null; email: string | null } | null;
-  tag_list?: PersonTag[];
+// Task types (renamed from whiteboard_tasks to tasks)
+export type Task = Database["public"]["Tables"]["tasks"]["Row"]
+export type WhiteboardTask = Task // Backwards compatibility alias
+export type TaskSubtask = Database["public"]["Tables"]["task_subtasks"]["Row"]
+export type TaskAttachment = Database["public"]["Tables"]["task_attachments"]["Row"]
+
+// Appointment/Date types (renamed from appointments to dates)
+export type DateType = Database["public"]["Tables"]["date_types"]["Row"]
+export type AppointmentType = DateType // Backwards compatibility alias
+export type DateEntry = Database["public"]["Tables"]["dates"]["Row"]
+
+// Device/Auth types
+export type TrustedDevice = Database["public"]["Tables"]["trusted_devices"]["Row"]
+export type UserVerificationCode = Database["public"]["Tables"]["user_verification_codes"]["Row"]
+
+// Extended types with joins
+export type CustomerWithUserInfo = Customer & {
+  created_by_user?: { id: string; name: string | null; email: string | null } | null
+  updated_by_user?: { id: string; name: string | null; email: string | null } | null
 }
 
-export interface AppointmentWithDetails extends Appointment {
-  appointment_types?: Partial<AppointmentType> | null;
-  customers?: Partial<Customer> | null;
-  created_by_user?: { id: string; name: string | null; email: string } | null;
-  updated_by_user?: { id: string; name: string | null; email: string } | null;
-  notes_user?: { id: string; name: string | null; email: string } | null;
-  assignees?: { id: string; name: string | null; email: string }[] | null;
+export type AppointmentWithDetails = DateEntry & {
+  customer?: Customer | null
+  customers?: { name: string; company: string | null } | null
+  date_type?: DateType | null
+  appointment_types?: { id: string; name: string; color: string } | null
+  created_by_user?: { id: string; name: string | null; email: string } | null
+  updated_by_user?: { id: string; name: string | null; email: string } | null
+  notes_user?: { id: string; name: string | null; email: string } | null
+  assignees?: { id: string; name: string | null; email: string }[] | null
 }

@@ -210,7 +210,7 @@ export async function getAppointments() {
   const supabase = await createClient();
 
   const { data, error } = await supabase
-    .from("appointments")
+    .from("dates")
     .select("*, customers(name, company)")
     .order("start_time", { ascending: true });
 
@@ -256,7 +256,7 @@ export async function createAppointment(formData: FormData) {
     return { error: result.error.issues[0].message };
   }
 
-  const { error } = await supabase.from("appointments").insert({
+  const { error } = await supabase.from("dates").insert({
     ...result.data,
     organization_id: userData.organization_id,
     created_by: user.id,
@@ -277,7 +277,7 @@ export async function updateAppointmentStatus(
   const supabase = await createClient();
 
   const { error } = await supabase
-    .from("appointments")
+    .from("dates")
     .update({ status, updated_at: new Date().toISOString() })
     .eq("id", appointmentId);
 
@@ -293,7 +293,7 @@ export async function deleteAppointment(appointmentId: string) {
   const supabase = await createClient();
 
   const { error } = await supabase
-    .from("appointments")
+    .from("dates")
     .delete()
     .eq("id", appointmentId);
 

@@ -39,7 +39,7 @@ export async function signup(formData: FormData) {
     return { error: "Invalid organization code. Please check with your administrator." };
   }
 
-  // 2. Check if email is already registered
+  // 2. Check if email is already registered in users table
   const { data: existingUser } = await adminClient
     .from("users")
     .select("id")
@@ -51,6 +51,7 @@ export async function signup(formData: FormData) {
   }
 
   // 3. Sign up the user with Supabase Auth
+  // Store org info in metadata - profile will be created after email confirmation
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email: result.data.email,
     password: result.data.password,
@@ -59,6 +60,7 @@ export async function signup(formData: FormData) {
         name: result.data.name,
         organization_id: org.id,
       },
+      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/auth/callback`,
     },
   });
 
@@ -70,26 +72,11 @@ export async function signup(formData: FormData) {
     return { error: "Failed to create user" };
   }
 
-  // 4. Create the user profile record (as member, not owner)
-  const { error: userError } = await adminClient.from("users").insert({
-    id: authData.user.id,
-    organization_id: org.id,
-    email: result.data.email,
-    name: result.data.name,
-    role: "member",
-  });
+  // NOTE: User profile is NOT created here anymore.
+  // It will be created in /auth/callback after email confirmation.
+  // This prevents fake emails from getting into the users table.
 
-  if (userError) {
-    console.error("Failed to create user profile:", userError);
-    return { error: "Account created but profile setup failed. Please contact support." };
-  }
-
-  // User created - redirect to email confirmation page
-  // If no session, email confirmation is required
-  if (authData.user && !authData.session) {
-    redirect(`/signup/confirm-email?email=${encodeURIComponent(result.data.email)}`);
-  }
-
-  // If session exists (email auto-confirmed), go to dashboard
-  redirect("/dashboard");
+  // Always redirect to email confirmation page
+  // Users must verify their email before accessing the app
+  redirect(`/signup/confirm-email?email=${encodeURIComponent(result.data.email)}`);
 }

@@ -298,7 +298,7 @@ async function UpcomingAppointments() {
   const nextWeek = addDays(new Date(), 7).toISOString();
 
   const { data: rawAppointments } = await supabase
-    .from("appointments")
+    .from("dates")
     .select("id, title, start_time, status, customer_id")
     .gte("start_time", today)
     .lte("start_time", nextWeek)

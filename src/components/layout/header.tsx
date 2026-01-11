@@ -14,6 +14,7 @@ import {
 import { User, LogOut, Settings, Sun, Moon, Search } from "lucide-react";
 import { useTheme } from "@/contexts/theme-context";
 import { MobileSidebar } from "./sidebar";
+import { revokeCurrentDevice } from "@/lib/auth/device";
 
 interface HeaderProps {
   user: {
@@ -32,6 +33,8 @@ export function Header({ user, onOpenCommandPalette }: HeaderProps) {
   const { theme, toggleTheme } = useTheme();
 
   async function handleSignOut() {
+    // Revoke device trust so user must verify on next login
+    await revokeCurrentDevice();
     await supabase.auth.signOut();
     router.push("/login");
     router.refresh();

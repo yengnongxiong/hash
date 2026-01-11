@@ -30,7 +30,7 @@ export async function createWhiteboardTask(
   }
 
   const { data, error } = await supabase
-    .from("whiteboard_tasks")
+    .from("tasks")
     .insert({
       organization_id: organizationId,
       title,
@@ -86,7 +86,7 @@ export async function updateWhiteboardTaskStatus(
   }
 
   const { error } = await supabase
-    .from("whiteboard_tasks")
+    .from("tasks")
     .update(updateData)
     .eq("id", taskId);
 
@@ -106,7 +106,7 @@ export async function reorderWhiteboardTasks(
   // Update each task's position
   const promises = updates.map(({ id, status, position }) =>
     supabase
-      .from("whiteboard_tasks")
+      .from("tasks")
       .update({
         status,
         position,
@@ -148,7 +148,7 @@ export async function updateWhiteboardTask(
   } = await supabase.auth.getUser();
 
   const { error } = await supabase
-    .from("whiteboard_tasks")
+    .from("tasks")
     .update({
       ...updates,
       updated_at: new Date().toISOString(),
@@ -168,7 +168,7 @@ export async function deleteWhiteboardTask(taskId: string) {
   const supabase = await createClient();
 
   const { error } = await supabase
-    .from("whiteboard_tasks")
+    .from("tasks")
     .delete()
     .eq("id", taskId);
 
@@ -293,7 +293,7 @@ export async function uploadTaskAttachment(taskId: string, formData: FormData) {
 
   // Get the organization ID from the task
   const { data: task } = await supabase
-    .from("whiteboard_tasks")
+    .from("tasks")
     .select("organization_id")
     .eq("id", taskId)
     .single();
@@ -414,7 +414,7 @@ export async function saveSketchAsAttachment(
 
   // Get the organization ID from the task
   const { data: task } = await supabase
-    .from("whiteboard_tasks")
+    .from("tasks")
     .select("organization_id")
     .eq("id", taskId)
     .single();
@@ -611,7 +611,7 @@ export async function importTasksFromCSV(
   }
 
   const { data, error } = await supabase
-    .from("whiteboard_tasks")
+    .from("tasks")
     .insert(validTasks)
     .select();
 

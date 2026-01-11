@@ -19,7 +19,7 @@ export default async function TasksPage() {
   // Fetch tasks and team members in parallel
   const [tasksResult, membersResult] = await Promise.all([
     supabase
-      .from("whiteboard_tasks")
+      .from("tasks")
       .select("*")
       .eq("organization_id", organizationId)
       .order("created_at", { ascending: true }),

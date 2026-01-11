@@ -39,7 +39,6 @@
 | OCR/AI | Mistral AI (pixtral-12b-latest), Together AI, OpenAI embeddings |
 | Drag & Drop | @hello-pangea/dnd |
 | Command Palette | cmdk |
-| Email | Resend |
 | Drawing | react-sketch-canvas |
 | Markdown | react-markdown |
 
@@ -271,7 +270,7 @@ src/
 ├── lib/
 │   ├── supabase/              # Supabase clients (client.ts, server.ts, admin.ts)
 │   ├── admin/                 # Admin 2FA auth utilities
-│   ├── email/                 # Resend email service
+│   ├── auth/                  # User device verification (Supabase OTP)
 │   ├── ocr/                   # OCR extraction
 │   │   ├── provider.ts        # OCR provider abstraction
 │   │   ├── mistral.ts         # Mistral pixtral integration
@@ -335,9 +334,6 @@ TOGETHER_API_KEY=<together-key>        # For structured extraction
 
 # Admin
 ADMIN_EMAIL=yengnongxiong@gmail.com
-
-# Email
-RESEND_API_KEY=<resend-key>
 ```
 
 ---

@@ -392,11 +392,11 @@ export async function deleteUserAdmin(
   // Set foreign keys to NULL (uploaded_by, created_by, etc.)
   await adminClient.from("documents").update({ uploaded_by: null }).eq("uploaded_by", userId);
   await adminClient.from("documents").update({ approved_by: null }).eq("approved_by", userId);
-  await adminClient.from("whiteboard_tasks").update({ assigned_to: null }).eq("assigned_to", userId);
-  await adminClient.from("whiteboard_tasks").update({ created_by: null }).eq("created_by", userId);
-  await adminClient.from("whiteboard_tasks").update({ updated_by: null }).eq("updated_by", userId);
-  await adminClient.from("appointments").update({ created_by: null }).eq("created_by", userId);
-  await adminClient.from("appointments").update({ updated_by: null }).eq("updated_by", userId);
+  await adminClient.from("tasks").update({ assigned_to: null }).eq("assigned_to", userId);
+  await adminClient.from("tasks").update({ created_by: null }).eq("created_by", userId);
+  await adminClient.from("tasks").update({ updated_by: null }).eq("updated_by", userId);
+  await adminClient.from("dates").update({ created_by: null }).eq("created_by", userId);
+  await adminClient.from("dates").update({ updated_by: null }).eq("updated_by", userId);
   await adminClient.from("customers").update({ created_by: null }).eq("created_by", userId);
   await adminClient.from("customers").update({ updated_by: null }).eq("updated_by", userId);
 
@@ -471,15 +471,15 @@ export async function resetDatabaseAdmin(
     // 2. Task-related data
     await adminClient.from("task_subtasks").delete().neq("id", "00000000-0000-0000-0000-000000000000");
     await adminClient.from("task_attachments").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-    await adminClient.from("whiteboard_tasks").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+    await adminClient.from("tasks").delete().neq("id", "00000000-0000-0000-0000-000000000000");
     await adminClient.from("task_recommendations").delete().neq("id", "00000000-0000-0000-0000-000000000000");
 
     // 3. People/customer data
     await adminClient.from("customer_tag_assignments").delete().neq("customer_id", "00000000-0000-0000-0000-000000000000");
-    await adminClient.from("appointments").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+    await adminClient.from("dates").delete().neq("id", "00000000-0000-0000-0000-000000000000");
     await adminClient.from("customers").delete().neq("id", "00000000-0000-0000-0000-000000000000");
     await adminClient.from("person_tags").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-    await adminClient.from("appointment_types").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+    await adminClient.from("date_types").delete().neq("id", "00000000-0000-0000-0000-000000000000");
 
     // 4. Activity and alerts
     await adminClient.from("activity_log").delete().neq("id", "00000000-0000-0000-0000-000000000000");
@@ -601,15 +601,15 @@ export async function deleteOrganizationAdmin(
     // 2. Delete task-related data for this org
     await adminClient.from("task_subtasks").delete().eq("organization_id", organizationId);
     await adminClient.from("task_attachments").delete().eq("organization_id", organizationId);
-    await adminClient.from("whiteboard_tasks").delete().eq("organization_id", organizationId);
+    await adminClient.from("tasks").delete().eq("organization_id", organizationId);
     await adminClient.from("task_recommendations").delete().eq("organization_id", organizationId);
 
     // 3. Delete people/customer data for this org
     await adminClient.from("customer_tag_assignments").delete().eq("organization_id", organizationId);
-    await adminClient.from("appointments").delete().eq("organization_id", organizationId);
+    await adminClient.from("dates").delete().eq("organization_id", organizationId);
     await adminClient.from("customers").delete().eq("organization_id", organizationId);
     await adminClient.from("person_tags").delete().eq("organization_id", organizationId);
-    await adminClient.from("appointment_types").delete().eq("organization_id", organizationId);
+    await adminClient.from("date_types").delete().eq("organization_id", organizationId);
 
     // 4. Delete activity and org-specific data
     await adminClient.from("activity_log").delete().eq("organization_id", organizationId);

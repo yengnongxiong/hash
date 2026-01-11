@@ -94,9 +94,9 @@ export function CreateAppointmentDialog({
     });
 
     // Add selected type ID to form data
-    formData.delete("appointment_type_id"); // Remove any existing
+    formData.delete("date_type_id"); // Remove any existing
     if (selectedTypeId) {
-      formData.set("appointment_type_id", selectedTypeId);
+      formData.set("date_type_id", selectedTypeId);
     }
 
     startTransition(async () => {
