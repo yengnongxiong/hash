@@ -131,6 +131,56 @@ export async function regenerateOrganizationCodeAdmin(
   return { newCode: orgCode };
 }
 
+// Rename organization (admin only)
+export async function renameOrganizationAdmin(
+  organizationId: string,
+  newName: string
+): Promise<{ success: boolean; error?: string }> {
+  const isValid = await isAdminSessionValid();
+  if (!isValid) {
+    return { success: false, error: "Admin session expired" };
+  }
+
+  if (!newName || newName.trim().length < 2) {
+    return { success: false, error: "Organization name must be at least 2 characters" };
+  }
+
+  const adminClient = createAdminClient();
+
+  // Get old name for logging
+  const { data: org } = await adminClient
+    .from("organizations")
+    .select("name")
+    .eq("id", organizationId)
+    .single();
+
+  if (!org) {
+    return { success: false, error: "Organization not found" };
+  }
+
+  const oldName = org.name;
+
+  // Update the organization name
+  const { error } = await adminClient
+    .from("organizations")
+    .update({ name: newName.trim() })
+    .eq("id", organizationId);
+
+  if (error) {
+    console.error("Error renaming organization:", error);
+    return { success: false, error: error.message };
+  }
+
+  // Log the action
+  await logAdminActivity("org_renamed", "organization", organizationId, newName.trim(), {
+    old_name: oldName,
+    new_name: newName.trim(),
+  });
+
+  revalidatePath("/admin/organizations");
+  return { success: true };
+}
+
 // Logout from admin
 export async function logoutAdmin(): Promise<void> {
   await logoutAdminSession();

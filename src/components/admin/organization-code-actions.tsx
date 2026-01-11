@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Tooltip,
   TooltipContent,
@@ -20,9 +21,18 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Copy, Check, RefreshCw, Trash2 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Copy, Check, RefreshCw, Trash2, Pencil } from "lucide-react";
 import { toast } from "sonner";
-import { regenerateOrganizationCodeAdmin, deleteOrganizationAdmin } from "@/app/admin/actions";
+import { regenerateOrganizationCodeAdmin, deleteOrganizationAdmin, renameOrganizationAdmin } from "@/app/admin/actions";
 
 interface OrganizationCodeActionsProps {
   orgId: string;
@@ -44,6 +54,9 @@ export function OrganizationCodeActions({
   const [copied, setCopied] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [newName, setNewName] = useState(orgName);
   const router = useRouter();
 
   const handleCopy = async () => {
@@ -85,6 +98,28 @@ export function OrganizationCodeActions({
     }
   };
 
+  const handleRename = async () => {
+    if (newName.trim() === orgName) {
+      setEditDialogOpen(false);
+      return;
+    }
+
+    setIsRenaming(true);
+    try {
+      const result = await renameOrganizationAdmin(orgId, newName);
+
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success(`Organization renamed to "${newName.trim()}"`);
+        setEditDialogOpen(false);
+        router.refresh();
+      }
+    } finally {
+      setIsRenaming(false);
+    }
+  };
+
   const totalDataCount = userCount + customerCount + documentCount;
 
   return (
@@ -110,6 +145,62 @@ export function OrganizationCodeActions({
             <p>{copied ? "Copied!" : "Copy code"}</p>
           </TooltipContent>
         </Tooltip>
+
+        <Dialog open={editDialogOpen} onOpenChange={(open) => {
+          setEditDialogOpen(open);
+          if (open) setNewName(orgName);
+        }}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-slate-400 hover:text-white"
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              </DialogTrigger>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Edit name</p>
+            </TooltipContent>
+          </Tooltip>
+          <DialogContent className="bg-slate-800 border-slate-700">
+            <DialogHeader>
+              <DialogTitle className="text-white">Rename Organization</DialogTitle>
+              <DialogDescription className="text-slate-400">
+                Enter a new name for this organization.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <Input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Organization name"
+                className="bg-slate-700/50 border-slate-600 text-white"
+                disabled={isRenaming}
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setEditDialogOpen(false)}
+                className="border-slate-600"
+                disabled={isRenaming}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleRename}
+                disabled={isRenaming || newName.trim().length < 2}
+                className="bg-purple-600 hover:bg-purple-700"
+              >
+                {isRenaming ? "Saving..." : "Save"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <AlertDialog>
           <Tooltip>
