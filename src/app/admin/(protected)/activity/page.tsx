@@ -1,6 +1,4 @@
-import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isAdminSessionValid } from "@/lib/admin/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { History, User, Building2, Bell, Trash2, RefreshCw, Database } from "lucide-react";
@@ -33,11 +31,7 @@ interface ActivityLog {
 }
 
 export default async function AdminActivityPage() {
-  const isVerified = await isAdminSessionValid();
-  if (!isVerified) {
-    redirect("/login");
-  }
-
+  // Note: Admin session validation is handled by the (protected) layout
   const adminClient = createAdminClient();
 
   const { data: activities } = await adminClient

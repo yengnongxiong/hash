@@ -1,14 +1,8 @@
-import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isAdminSessionValid } from "@/lib/admin/auth";
 import { AISettingsManager } from "@/components/admin/ai-settings-manager";
 
 export default async function AdminAISettingsPage() {
-  const isVerified = await isAdminSessionValid();
-  if (!isVerified) {
-    redirect("/login");
-  }
-
+  // Note: Admin session validation is handled by the (protected) layout
   const supabase = createAdminClient();
 
   // Fetch organizations

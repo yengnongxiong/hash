@@ -1,29 +1,18 @@
 "use server";
 
 import {
-  verifyDeviceCode,
-  resendDeviceVerificationCode,
+  resendDeviceVerificationLink,
+  hasPendingVerification,
 } from "@/lib/auth/device";
 
-export async function verifyDevice(
-  code: string
-): Promise<{ success?: boolean; error?: string }> {
-  if (!code || code.length !== 6) {
-    return { error: "Please enter a valid 6-digit code" };
-  }
-
-  const result = await verifyDeviceCode(code);
-
-  if (!result.success) {
-    return { error: result.error || "Invalid code" };
-  }
-
-  return { success: true };
-}
-
-export async function resendCode(): Promise<{
+export async function resendVerificationLink(): Promise<{
   success: boolean;
   error?: string;
 }> {
-  return resendDeviceVerificationCode();
+  return resendDeviceVerificationLink();
+}
+
+export async function getPendingVerificationEmail(): Promise<string | null> {
+  const pending = await hasPendingVerification();
+  return pending.email || null;
 }

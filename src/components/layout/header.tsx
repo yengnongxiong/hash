@@ -1,7 +1,6 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -14,7 +13,7 @@ import {
 import { User, LogOut, Settings, Sun, Moon, Search } from "lucide-react";
 import { useTheme } from "@/contexts/theme-context";
 import { MobileSidebar } from "./sidebar";
-import { revokeCurrentDevice } from "@/lib/auth/device";
+import { logout } from "@/app/(auth)/logout/actions";
 
 interface HeaderProps {
   user: {
@@ -29,16 +28,7 @@ interface HeaderProps {
 
 export function Header({ user, onOpenCommandPalette }: HeaderProps) {
   const router = useRouter();
-  const supabase = createClient();
   const { theme, toggleTheme } = useTheme();
-
-  async function handleSignOut() {
-    // Revoke device trust so user must verify on next login
-    await revokeCurrentDevice();
-    await supabase.auth.signOut();
-    router.push("/login");
-    router.refresh();
-  }
 
   return (
     <header className="h-14 border-b px-4 md:px-6 flex items-center justify-between bg-background">
@@ -106,10 +96,14 @@ export function Header({ user, onOpenCommandPalette }: HeaderProps) {
               Settings
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleSignOut}>
-              <LogOut className="mr-2 h-4 w-4" />
-              Sign out
-            </DropdownMenuItem>
+            <form action={logout}>
+              <DropdownMenuItem asChild>
+                <button type="submit" className="w-full cursor-pointer">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Sign out
+                </button>
+              </DropdownMenuItem>
+            </form>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

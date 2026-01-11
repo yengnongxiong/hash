@@ -1,20 +1,14 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isAdminSessionValid } from "@/lib/admin/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Cpu, Clock, CheckCircle, XCircle, Loader2, FileText, AlertCircle, ExternalLink } from "lucide-react";
-import { format, formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
 import { AdminPageWrapper } from "@/components/admin/admin-page-wrapper";
 
 export default async function AdminProcessingPage() {
-  const isVerified = await isAdminSessionValid();
-  if (!isVerified) {
-    redirect("/login");
-  }
-
+  // Note: Admin session validation is handled by the (protected) layout
   const supabase = createAdminClient();
 
   // Get document processing stats

@@ -8,8 +8,7 @@ import {
   startDeviceVerification,
   updateDeviceLastUsed,
 } from "@/lib/auth/device";
-
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "yengnongxiong@gmail.com";
+import { ADMIN_EMAIL } from "@/lib/constants";
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),

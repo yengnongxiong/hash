@@ -1,17 +1,9 @@
-import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isAdminSessionValid } from "@/lib/admin/auth";
 import { AdminDashboard } from "@/components/admin/admin-dashboard";
 
 export default async function AdminPage() {
-  // Check if admin session is valid
-  const isVerified = await isAdminSessionValid();
-
-  if (!isVerified) {
-    redirect("/login");
-  }
-
   // Use admin client to bypass RLS and see all data
+  // Note: Admin session validation is handled by the (protected) layout
   const supabase = createAdminClient();
 
   // Fetch stats

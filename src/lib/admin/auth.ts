@@ -3,10 +3,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { cookies } from "next/headers";
-
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "yengnongxiong@gmail.com";
-const ADMIN_SESSION_COOKIE = "admin_session_id";
-const SESSION_DURATION_HOURS = 1; // 60 minutes
+import {
+  ADMIN_EMAIL,
+  ADMIN_SESSION_COOKIE,
+  ADMIN_SESSION_DURATION_HOURS,
+} from "@/lib/constants";
 
 // Check if user is logged in as the admin email
 export async function isAdminEmail(): Promise<boolean> {
@@ -104,12 +105,6 @@ export async function cleanupExpiredAdminData(): Promise<void> {
   // Delete expired sessions
   await adminClient
     .from("admin_sessions")
-    .delete()
-    .lt("expires_at", now);
-
-  // Delete expired verification codes
-  await adminClient
-    .from("admin_verification_codes")
     .delete()
     .lt("expires_at", now);
 }

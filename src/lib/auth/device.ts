@@ -4,18 +4,25 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { cookies, headers } from "next/headers";
 import crypto from "crypto";
-
-const DEVICE_VERIFICATION_COOKIE = "device_verification_pending";
-const TRUSTED_DEVICE_DAYS = 30;
+import {
+  DEVICE_VERIFICATION_COOKIE,
+  TRUSTED_DEVICE_DAYS,
+  APP_URL,
+} from "@/lib/constants";
 
 // Generate device fingerprint from request headers
+// Uses multiple headers for more robust identification
 export async function generateDeviceId(): Promise<string> {
   const headersList = await headers();
   const userAgent = headersList.get("user-agent") || "";
-  // Create a hash from user agent - this is a simple fingerprint
+  const acceptLanguage = headersList.get("accept-language") || "";
+  const acceptEncoding = headersList.get("accept-encoding") || "";
+
+  // Combine multiple headers for more unique fingerprint
+  const fingerprintData = `${userAgent}|${acceptLanguage}|${acceptEncoding}`;
   const hash = crypto
     .createHash("sha256")
-    .update(userAgent)
+    .update(fingerprintData)
     .digest("hex")
     .substring(0, 32);
   return hash;
@@ -94,7 +101,7 @@ export async function hasPendingVerification(): Promise<{
   }
 }
 
-// Start device verification - send OTP via Supabase
+// Start device verification - send magic link
 export async function startDeviceVerification(
   userId: string,
   email: string
@@ -102,11 +109,15 @@ export async function startDeviceVerification(
   const supabase = await createClient();
   const deviceId = await generateDeviceId();
 
-  // Use Supabase's built-in OTP email system
+  // Get the app URL for redirect
+  // APP_URL is imported from constants
+
+  // Send magic link with redirect to callback that will trust the device
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
       shouldCreateUser: false, // User already exists
+      emailRedirectTo: `${APP_URL}/auth/callback?next=/dashboard&trust_device=true`,
     },
   });
 
@@ -124,7 +135,7 @@ export async function startDeviceVerification(
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 10 * 60, // 10 minutes
+      maxAge: 60 * 60, // 1 hour (magic link validity)
       path: "/",
     }
   );
@@ -132,39 +143,19 @@ export async function startDeviceVerification(
   return { success: true };
 }
 
-// Verify device code and register as trusted
-export async function verifyDeviceCode(
-  code: string
+// Register device as trusted (called from auth callback)
+export async function registerTrustedDevice(
+  userId: string
 ): Promise<{ success: boolean; error?: string }> {
-  const pending = await hasPendingVerification();
-  if (!pending.pending || !pending.userId || !pending.email || !pending.deviceId) {
-    return { success: false, error: "No pending verification" };
-  }
-
-  const supabase = await createClient();
-
-  // Verify OTP with Supabase
-  const { error } = await supabase.auth.verifyOtp({
-    email: pending.email,
-    token: code,
-    type: "email",
-  });
-
-  if (error) {
-    console.error("Failed to verify OTP:", error);
-    return { success: false, error: "Invalid or expired code" };
-  }
-
-  // Get user agent for storing
+  const deviceId = await generateDeviceId();
   const headersList = await headers();
   const userAgent = headersList.get("user-agent") || null;
   const deviceName = await getDeviceName();
 
-  // Register device as trusted
   const adminClient = createAdminClient();
   const { error: deviceError } = await adminClient.from("trusted_devices").insert({
-    user_id: pending.userId,
-    device_id: pending.deviceId,
+    user_id: userId,
+    device_id: deviceId,
     device_name: deviceName,
     user_agent: userAgent,
     is_active: true,
@@ -180,8 +171,8 @@ export async function verifyDeviceCode(
           last_used_at: new Date().toISOString(),
           device_name: deviceName,
         })
-        .eq("user_id", pending.userId)
-        .eq("device_id", pending.deviceId);
+        .eq("user_id", userId)
+        .eq("device_id", deviceId);
     } else {
       console.error("Failed to register trusted device:", deviceError);
       return { success: false, error: "Failed to register device" };
@@ -195,8 +186,8 @@ export async function verifyDeviceCode(
   return { success: true };
 }
 
-// Resend verification code via Supabase OTP
-export async function resendDeviceVerificationCode(): Promise<{
+// Resend verification magic link
+export async function resendDeviceVerificationLink(): Promise<{
   success: boolean;
   error?: string;
 }> {

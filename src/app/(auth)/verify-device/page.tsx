@@ -1,10 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { verifyDevice, resendCode } from "./actions";
+import { useState, useEffect, useTransition } from "react";
+import { resendVerificationLink, getPendingVerificationEmail } from "./actions";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Card,
   CardContent,
@@ -13,44 +11,34 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { toast } from "sonner";
-import { ShieldCheck, RefreshCw, Smartphone } from "lucide-react";
-import {
-  InputOTP,
-  InputOTPGroup,
-  InputOTPSlot,
-} from "@/components/ui/input-otp";
+import { CheckCircle, RefreshCw, Smartphone, ArrowLeft } from "lucide-react";
+import Link from "next/link";
 
 export default function VerifyDevicePage() {
-  const [code, setCode] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState(0);
   const [isResending, startResendTransition] = useTransition();
-  const router = useRouter();
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
+  useEffect(() => {
+    getPendingVerificationEmail().then(setEmail);
+  }, []);
 
-    const result = await verifyDevice(code);
-
-    if (result?.error) {
-      setError(result.error);
-      setLoading(false);
-    } else if (result?.success) {
-      toast.success("Device verified successfully!");
-      router.push("/dashboard");
+  // Countdown timer for resend
+  useEffect(() => {
+    if (countdown > 0) {
+      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+      return () => clearTimeout(timer);
     }
-  }
+  }, [countdown]);
 
   function handleResend() {
     startResendTransition(async () => {
-      const result = await resendCode();
+      const result = await resendVerificationLink();
       if (result.success) {
-        toast.success("New code sent! Check your email.");
-        setCode("");
+        setCountdown(60);
+        toast.success("New magic link sent! Check your email.");
       } else {
-        toast.error(result.error || "Failed to resend code");
+        toast.error(result.error || "Failed to resend link");
       }
     });
   }
@@ -60,83 +48,70 @@ export default function VerifyDevicePage() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-            <Smartphone className="h-6 w-6 text-primary" />
+            <CheckCircle className="h-6 w-6 text-primary" />
           </div>
           <CardTitle className="text-2xl font-bold">
-            Verify your device
+            Check Your Email
           </CardTitle>
           <CardDescription>
-            We sent a verification code to your email. Enter it below to
-            confirm this device.
+            Click the magic link in your email to verify this device
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {error && (
-              <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md text-center">
-                {error}
-              </div>
-            )}
-
-            <div className="flex justify-center">
-              <InputOTP
-                maxLength={6}
-                value={code}
-                onChange={(value) => setCode(value)}
-              >
-                <InputOTPGroup>
-                  <InputOTPSlot index={0} />
-                  <InputOTPSlot index={1} />
-                  <InputOTPSlot index={2} />
-                  <InputOTPSlot index={3} />
-                  <InputOTPSlot index={4} />
-                  <InputOTPSlot index={5} />
-                </InputOTPGroup>
-              </InputOTP>
+        <CardContent className="space-y-6">
+          {email && (
+            <div className="bg-muted/50 rounded-lg p-4 text-center">
+              <p className="text-sm text-muted-foreground mb-2">
+                We sent a magic link to:
+              </p>
+              <p className="font-medium">{email}</p>
             </div>
+          )}
 
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={loading || code.length !== 6}
-            >
-              {loading ? (
-                "Verifying..."
-              ) : (
-                <>
-                  <ShieldCheck className="mr-2 h-4 w-4" />
-                  Verify Device
-                </>
-              )}
-            </Button>
-          </form>
+          <div className="text-center text-sm text-muted-foreground">
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <Smartphone className="h-4 w-4" />
+              <span>New device detected</span>
+            </div>
+            <p>Click the link in your email to verify and trust this device.</p>
+            <p className="mt-1">The link will expire in 1 hour.</p>
+          </div>
 
-          <div className="mt-6 text-center">
-            <p className="text-sm text-muted-foreground mb-2">
-              Didn&apos;t receive the code?
+          <div className="text-center space-y-2">
+            <p className="text-sm text-muted-foreground">
+              Didn&apos;t receive the email?
             </p>
             <Button
-              type="button"
               variant="outline"
-              size="sm"
               onClick={handleResend}
-              disabled={isResending}
+              disabled={countdown > 0 || isResending}
+              className="w-full"
             >
               {isResending ? (
                 <>
                   <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
                   Sending...
                 </>
+              ) : countdown > 0 ? (
+                `Resend in ${countdown}s`
               ) : (
                 <>
                   <RefreshCw className="mr-2 h-4 w-4" />
-                  Resend code
+                  Resend Magic Link
                 </>
               )}
             </Button>
           </div>
 
-          <div className="mt-6 pt-4 border-t">
+          <div className="pt-4 border-t">
+            <Link href="/login">
+              <Button variant="ghost" className="w-full">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to login
+              </Button>
+            </Link>
+          </div>
+
+          <div className="pt-4 border-t">
             <p className="text-xs text-muted-foreground text-center">
               Once verified, this device will be remembered for 30 days. You
               won&apos;t need to verify again unless you clear your browser

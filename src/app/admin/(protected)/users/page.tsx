@@ -1,19 +1,12 @@
-import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isAdminSessionValid } from "@/lib/admin/auth";
 import { Users } from "lucide-react";
 import { AdminPageWrapper } from "@/components/admin/admin-page-wrapper";
 import { UsersList } from "@/components/admin/users-list";
-
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "yengnongxiong@gmail.com";
+import { ADMIN_EMAIL } from "@/lib/constants";
 
 export default async function AdminUsersPage() {
-  const isVerified = await isAdminSessionValid();
-  if (!isVerified) {
-    redirect("/login");
-  }
-
   // Use admin client to bypass RLS and see all users
+  // Note: Admin session validation is handled by the (protected) layout
   const supabase = createAdminClient();
 
   const { data: rawUsers } = await supabase

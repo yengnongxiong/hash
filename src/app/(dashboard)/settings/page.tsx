@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Settings } from "lucide-react";
 import { SystemAlertsManager } from "@/components/settings/system-alerts-manager";
+import { ProfileEditForm } from "@/components/settings/profile-edit-form";
 import { SystemAlert } from "@/types/database";
 
 export default async function SettingsPage() {
@@ -54,26 +55,16 @@ export default async function SettingsPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Profile</CardTitle>
-            <CardDescription>Your personal information</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <label className="text-sm font-medium text-muted-foreground">Name</label>
-              <p className="text-sm">{profile?.name || "Not set"}</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-muted-foreground">Email</label>
-              <p className="text-sm">{profile?.email}</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-muted-foreground">Role</label>
-              <p className="text-sm capitalize">{profile?.role}</p>
-            </div>
-          </CardContent>
-        </Card>
+        {profile && (
+          <ProfileEditForm
+            profile={{
+              id: profile.id,
+              name: profile.name,
+              email: profile.email,
+              role: profile.role,
+            }}
+          />
+        )}
 
         <Card>
           <CardHeader>

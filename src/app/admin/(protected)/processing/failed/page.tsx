@@ -1,14 +1,8 @@
-import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isAdminSessionValid } from "@/lib/admin/auth";
 import { FailedDocumentsManager } from "@/components/admin/failed-documents-manager";
 
 export default async function AdminFailedDocumentsPage() {
-  const isVerified = await isAdminSessionValid();
-  if (!isVerified) {
-    redirect("/login");
-  }
-
+  // Note: Admin session validation is handled by the (protected) layout
   const supabase = createAdminClient();
 
   // Get failed documents with organization info

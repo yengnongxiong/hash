@@ -1,6 +1,4 @@
-import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isAdminSessionValid } from "@/lib/admin/auth";
 import { ExperimentsManager } from "@/components/admin/experiments-manager";
 import { getExperimentResults } from "@/lib/ml/experiment-service";
 import { ModelType } from "@/lib/ml/model-versioning";
@@ -8,11 +6,7 @@ import { ModelType } from "@/lib/ml/model-versioning";
 type ExperimentStatus = "draft" | "running" | "paused" | "completed" | "cancelled";
 
 export default async function AdminExperimentsPage() {
-  const isVerified = await isAdminSessionValid();
-  if (!isVerified) {
-    redirect("/login");
-  }
-
+  // Note: Admin session validation is handled by the (protected) layout
   const supabase = createAdminClient();
 
   // Fetch all experiments

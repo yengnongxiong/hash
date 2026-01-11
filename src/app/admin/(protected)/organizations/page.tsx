@@ -1,18 +1,12 @@
-import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isAdminSessionValid } from "@/lib/admin/auth";
 import { Building2 } from "lucide-react";
 import { AdminPageWrapper } from "@/components/admin/admin-page-wrapper";
 import { CreateOrganizationDialog } from "@/components/admin/create-organization-dialog";
 import { OrganizationsList } from "@/components/admin/organizations-list";
 
 export default async function AdminOrganizationsPage() {
-  const isVerified = await isAdminSessionValid();
-  if (!isVerified) {
-    redirect("/login");
-  }
-
   // Use admin client to bypass RLS and see all organizations
+  // Note: Admin session validation is handled by the (protected) layout
   const supabase = createAdminClient();
 
   // Fetch organizations with counts

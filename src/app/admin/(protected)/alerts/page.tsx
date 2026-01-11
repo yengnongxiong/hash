@@ -1,17 +1,9 @@
-import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isAdminSessionValid } from "@/lib/admin/auth";
 import { AdminAlertsManager } from "@/components/admin/admin-alerts-manager";
 import { SystemAlert, Organization } from "@/types/database";
 
 export default async function AdminAlertsPage() {
-  // Check if admin session is valid
-  const isVerified = await isAdminSessionValid();
-
-  if (!isVerified) {
-    redirect("/admin/verify");
-  }
-
+  // Note: Admin session validation is handled by the (protected) layout
   const supabase = createAdminClient();
 
   // Fetch all alerts

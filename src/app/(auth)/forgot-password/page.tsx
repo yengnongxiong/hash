@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Shield, Mail, RefreshCw, ArrowLeft, CheckCircle } from "lucide-react";
+import { useState } from "react";
+import Link from "next/link";
+import { sendPasswordResetEmail } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,40 +14,34 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { toast } from "sonner";
-import { sendAdminMagicLink, getAdminEmailForLogin } from "./actions";
-import Link from "next/link";
+import { Mail, ArrowLeft, RefreshCw, CheckCircle } from "lucide-react";
 
-export default function AdminLoginPage() {
+export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
-  const [step, setStep] = useState<"email" | "sent">("email");
   const [isLoading, setIsLoading] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
   const [countdown, setCountdown] = useState(0);
-  const [adminEmail, setAdminEmail] = useState("");
-
-  useEffect(() => {
-    getAdminEmailForLogin().then(setAdminEmail);
-  }, []);
 
   // Countdown timer for resend
-  useEffect(() => {
+  useState(() => {
     if (countdown > 0) {
       const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
       return () => clearTimeout(timer);
     }
-  }, [countdown]);
+  });
 
-  async function handleSendMagicLink(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setIsLoading(true);
 
-    const result = await sendAdminMagicLink(email);
+    const result = await sendPasswordResetEmail(email);
 
     if (result.success) {
-      setStep("sent");
+      setEmailSent(true);
       setCountdown(60);
-      toast.success("Magic link sent to your email");
+      toast.success("Password reset email sent");
     } else {
-      toast.error(result.error || "Failed to send magic link");
+      toast.error(result.error || "Failed to send reset email");
     }
 
     setIsLoading(false);
@@ -54,13 +49,13 @@ export default function AdminLoginPage() {
 
   async function handleResend() {
     setIsLoading(true);
-    const result = await sendAdminMagicLink(email);
+    const result = await sendPasswordResetEmail(email);
 
     if (result.success) {
       setCountdown(60);
-      toast.success("New magic link sent to your email");
+      toast.success("Password reset email resent");
     } else {
-      toast.error(result.error || "Failed to send magic link");
+      toast.error(result.error || "Failed to resend email");
     }
 
     setIsLoading(false);
@@ -71,30 +66,30 @@ export default function AdminLoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
           <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-2">
-            {step === "sent" ? (
+            {emailSent ? (
               <CheckCircle className="h-6 w-6 text-primary" />
             ) : (
-              <Shield className="h-6 w-6 text-primary" />
+              <Mail className="h-6 w-6 text-primary" />
             )}
           </div>
           <CardTitle className="text-2xl font-bold">
-            {step === "sent" ? "Check Your Email" : "Admin Login"}
+            {emailSent ? "Check Your Email" : "Reset Password"}
           </CardTitle>
           <CardDescription>
-            {step === "email"
-              ? "Enter your admin email to receive a magic link"
-              : "Click the link in your email to sign in"}
+            {emailSent
+              ? "We sent you a password reset link"
+              : "Enter your email to receive a password reset link"}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {step === "email" ? (
-            <form onSubmit={handleSendMagicLink} className="space-y-4">
+          {!emailSent ? (
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Admin Email</Label>
+                <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder={adminEmail ? `e.g. ${adminEmail.slice(0, 3)}...` : "admin@example.com"}
+                  placeholder="you@company.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={isLoading}
@@ -111,7 +106,7 @@ export default function AdminLoginPage() {
                 ) : (
                   <>
                     <Mail className="mr-2 h-4 w-4" />
-                    Send Magic Link
+                    Send Reset Link
                   </>
                 )}
               </Button>
@@ -120,13 +115,13 @@ export default function AdminLoginPage() {
             <div className="space-y-6">
               <div className="bg-muted/50 rounded-lg p-4 text-center">
                 <p className="text-sm text-muted-foreground mb-2">
-                  We sent a magic link to:
+                  We sent a password reset link to:
                 </p>
                 <p className="font-medium">{email}</p>
               </div>
 
               <div className="text-center text-sm text-muted-foreground">
-                <p>Click the link in your email to sign in.</p>
+                <p>Click the link in your email to reset your password.</p>
                 <p className="mt-1">The link will expire in 1 hour.</p>
               </div>
 
@@ -150,7 +145,7 @@ export default function AdminLoginPage() {
                   ) : (
                     <>
                       <RefreshCw className="mr-2 h-4 w-4" />
-                      Resend Magic Link
+                      Resend Reset Link
                     </>
                   )}
                 </Button>
@@ -159,7 +154,7 @@ export default function AdminLoginPage() {
               <Button
                 variant="ghost"
                 onClick={() => {
-                  setStep("email");
+                  setEmailSent(false);
                   setEmail("");
                 }}
                 className="w-full"
@@ -170,15 +165,12 @@ export default function AdminLoginPage() {
             </div>
           )}
 
-          <div className="pt-4 border-t">
-            <p className="text-xs text-muted-foreground text-center">
-              Admin sessions expire after 60 minutes for security.
-            </p>
-          </div>
-
           <div className="text-center">
-            <Link href="/login" className="text-sm text-muted-foreground hover:underline">
-              Back to regular login
+            <Link
+              href="/login"
+              className="text-sm text-muted-foreground hover:underline"
+            >
+              Back to login
             </Link>
           </div>
         </CardContent>
