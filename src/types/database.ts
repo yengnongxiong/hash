@@ -157,6 +157,39 @@ export type Database = {
           },
         ]
       }
+      admin_activity_log: {
+        Row: {
+          action_type: string
+          actor_email: string
+          created_at: string | null
+          entity_id: string | null
+          entity_name: string | null
+          entity_type: string | null
+          id: string
+          metadata: Json | null
+        }
+        Insert: {
+          action_type: string
+          actor_email: string
+          created_at?: string | null
+          entity_id?: string | null
+          entity_name?: string | null
+          entity_type?: string | null
+          id?: string
+          metadata?: Json | null
+        }
+        Update: {
+          action_type?: string
+          actor_email?: string
+          created_at?: string | null
+          entity_id?: string | null
+          entity_name?: string | null
+          entity_type?: string | null
+          id?: string
+          metadata?: Json | null
+        }
+        Relationships: []
+      }
       admin_sessions: {
         Row: {
           created_at: string
@@ -781,6 +814,60 @@ export type Database = {
           },
         ]
       }
+      document_versions: {
+        Row: {
+          change_summary: string | null
+          changed_fields: string[] | null
+          created_at: string
+          created_by: string | null
+          document_id: string
+          document_type: string | null
+          extracted_data: Json
+          id: string
+          raw_text: string | null
+          version_number: number
+        }
+        Insert: {
+          change_summary?: string | null
+          changed_fields?: string[] | null
+          created_at?: string
+          created_by?: string | null
+          document_id: string
+          document_type?: string | null
+          extracted_data?: Json
+          id?: string
+          raw_text?: string | null
+          version_number: number
+        }
+        Update: {
+          change_summary?: string | null
+          changed_fields?: string[] | null
+          created_at?: string
+          created_by?: string | null
+          document_id?: string
+          document_type?: string | null
+          extracted_data?: Json
+          id?: string
+          raw_text?: string | null
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_versions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_versions_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       documents: {
         Row: {
           approved_at: string | null
@@ -1324,18 +1411,21 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          org_code: string | null
           settings: Json | null
         }
         Insert: {
           created_at?: string
           id?: string
           name: string
+          org_code?: string | null
           settings?: Json | null
         }
         Update: {
           created_at?: string
           id?: string
           name?: string
+          org_code?: string | null
           settings?: Json | null
         }
         Relationships: []
@@ -1949,6 +2039,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_org_code: { Args: never; Returns: string }
       get_user_organization_id: { Args: never; Returns: string }
       match_documents: {
         Args: {
@@ -2137,48 +2228,32 @@ export const Constants = {
   },
 } as const
 
-// Custom type exports for convenience
-export type SystemAlert = Database["public"]["Tables"]["system_alerts"]["Row"]
-export type Customer = Database["public"]["Tables"]["customers"]["Row"]
-export type Organization = Database["public"]["Tables"]["organizations"]["Row"]
-export type User = Database["public"]["Tables"]["users"]["Row"]
-export type Document = Database["public"]["Tables"]["documents"]["Row"]
-export type Appointment = Database["public"]["Tables"]["appointments"]["Row"]
-export type AppointmentType = Database["public"]["Tables"]["appointment_types"]["Row"]
-export type PersonTag = Database["public"]["Tables"]["person_tags"]["Row"]
-export type WhiteboardTask = Database["public"]["Tables"]["whiteboard_tasks"]["Row"]
-export type TaskAttachment = Database["public"]["Tables"]["task_attachments"]["Row"]
-export type TaskSubtask = Database["public"]["Tables"]["task_subtasks"]["Row"]
-export type DocumentAuditLog = Database["public"]["Tables"]["document_audit_log"]["Row"]
+// Custom type aliases for convenience
+export type SystemAlert = Tables<"system_alerts">
+export type Organization = Tables<"organizations">
+export type User = Tables<"users">
+export type Customer = Tables<"customers">
+export type PersonTag = Tables<"person_tags">
+export type Document = Tables<"documents">
+export type DocumentAuditLog = Tables<"document_audit_log">
+export type Appointment = Tables<"appointments">
+export type AppointmentType = Tables<"appointment_types">
+export type WhiteboardTask = Tables<"whiteboard_tasks">
+export type TaskAttachment = Tables<"task_attachments">
+export type TaskSubtask = Tables<"task_subtasks">
 
-// Nested user type for joins (allows more flexible nullable fields)
-type NestedUser = {
-  id: string;
-  name: string | null;
-  email: string | null;
-  avatar_url?: string | null;
-  role?: string | null;
-};
+// Extended types with relations
+export interface CustomerWithUserInfo extends Customer {
+  created_by_user?: { id: string; name: string | null; email: string | null } | null;
+  updated_by_user?: { id: string; name: string | null; email: string | null } | null;
+  tag_list?: PersonTag[];
+}
 
-// Nested appointment type for joins
-type NestedAppointmentType = {
-  id: string;
-  name: string;
-  color: string;
-};
-
-// Composite types with joins
-export type CustomerWithUserInfo = Customer & {
-  users?: NestedUser | null;
-  created_by_user?: NestedUser | null;
-  updated_by_user?: NestedUser | null;
-};
-
-export type AppointmentWithDetails = Appointment & {
-  appointment_types?: NestedAppointmentType | null;
-  notes_user?: NestedUser | null;
-  created_by_user?: NestedUser | null;
-  updated_by_user?: NestedUser | null;
-  assignees?: NestedUser[] | null;
-  customers?: { id?: string; name: string | null; company: string | null; customer_number?: string } | null;
+export interface AppointmentWithDetails extends Appointment {
+  appointment_types?: Partial<AppointmentType> | null;
+  customers?: Partial<Customer> | null;
+  created_by_user?: { id: string; name: string | null; email: string } | null;
+  updated_by_user?: { id: string; name: string | null; email: string } | null;
+  notes_user?: { id: string; name: string | null; email: string } | null;
+  assignees?: { id: string; name: string | null; email: string }[] | null;
 }

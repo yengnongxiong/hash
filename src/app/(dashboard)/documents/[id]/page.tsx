@@ -12,8 +12,10 @@ import { DocumentFlagsWrapper } from "@/components/documents/document-flags-wrap
 import { DocumentApproval } from "@/components/documents/document-approval";
 import { RetryButton } from "@/components/documents/retry-button";
 import { DuplicateWarning } from "@/components/documents/duplicate-warning";
+import { DocumentVersionHistory } from "@/components/documents/document-version-history";
 import { formatDistanceToNow, formatFileSize } from "@/lib/utils/format";
 import { logDocumentView, getDocumentAuditLog, getDocumentFlags } from "../actions";
+import { getDocumentVersions } from "./actions";
 
 interface DocumentDetailPageProps {
   params: Promise<{ id: string }>;
@@ -49,10 +51,11 @@ export default async function DocumentDetailPage({
   // Log document view
   await logDocumentView(id);
 
-  // Fetch audit log and flags
-  const [auditLogData, flags] = await Promise.all([
+  // Fetch audit log, flags, and versions
+  const [auditLogData, flags, versions] = await Promise.all([
     getDocumentAuditLog(id),
     getDocumentFlags(id),
+    getDocumentVersions(id),
   ]);
   const { logs: auditLogs, total: auditLogTotal } = auditLogData;
 
@@ -227,7 +230,7 @@ export default async function DocumentDetailPage({
           </div>
         </div>
 
-        {/* Right: Flags & Activity Log */}
+        {/* Right: Flags, Versions & Activity Log */}
         <div className="overflow-auto rounded-lg border bg-background">
           <div className="p-2 border-b bg-muted/30 flex items-center gap-2">
             <History className="h-4 w-4" />
@@ -235,6 +238,11 @@ export default async function DocumentDetailPage({
           </div>
           <div className="p-4 space-y-4">
             <DocumentFlagsWrapper documentId={document.id} initialFlags={flags} />
+            <DocumentVersionHistory
+              documentId={document.id}
+              versions={versions}
+              currentExtractedData={(document.extracted_data || {}) as Record<string, unknown>}
+            />
             <DocumentAuditLog documentId={document.id} initialLogs={auditLogs} initialTotal={auditLogTotal} />
           </div>
         </div>

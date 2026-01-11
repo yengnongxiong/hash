@@ -2,12 +2,19 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { SystemAlert } from "@/types/database";
+import { isAdminSessionValid } from "@/lib/admin/auth";
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Check if this is an admin session - redirect admin to admin panel
+  const isAdmin = await isAdminSessionValid();
+  if (isAdmin) {
+    redirect("/admin");
+  }
+
   const supabase = await createClient();
 
   const {

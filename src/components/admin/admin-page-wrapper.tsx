@@ -14,6 +14,7 @@ interface AdminPageWrapperProps {
   icon: React.ReactNode;
   iconBg: string;
   children: React.ReactNode;
+  headerAction?: React.ReactNode;
 }
 
 export function AdminPageWrapper({
@@ -22,6 +23,7 @@ export function AdminPageWrapper({
   icon,
   iconBg,
   children,
+  headerAction,
 }: AdminPageWrapperProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -30,7 +32,7 @@ export function AdminPageWrapper({
     startTransition(async () => {
       await logoutAdmin();
       toast.success("Logged out of admin panel");
-      router.push("/dashboard");
+      router.push("/login");
     });
   };
 
@@ -55,11 +57,7 @@ export function AdminPageWrapper({
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <Link href="/dashboard">
-                <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white">
-                  Back to App
-                </Button>
-              </Link>
+              {headerAction}
               <Button
                 variant="ghost"
                 size="sm"

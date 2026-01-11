@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "lucide-react";
+import { Calendar, BarChart3 } from "lucide-react";
 import { DocumentsView } from "@/components/documents/documents-view";
 
 export default async function DocumentsPage() {
@@ -79,12 +79,20 @@ export default async function DocumentsPage() {
             View and manage your uploaded documents
           </p>
         </div>
-        <Link href="/documents/calendar">
-          <Button variant="outline">
-            <Calendar className="mr-2 h-4 w-4" />
-            Calendar
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/documents/quality">
+            <Button variant="outline">
+              <BarChart3 className="mr-2 h-4 w-4" />
+              Quality
+            </Button>
+          </Link>
+          <Link href="/documents/calendar">
+            <Button variant="outline">
+              <Calendar className="mr-2 h-4 w-4" />
+              Calendar
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <DocumentsView documents={documents || []} />

@@ -1,24 +1,18 @@
 import { redirect } from "next/navigation";
-import { isAdminUser, isAdminSessionValid } from "@/lib/admin/auth";
+import { isAdminSessionValid } from "@/lib/admin/auth";
 
 export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // Check if user is the admin
-  const { isAdmin } = await isAdminUser();
+  // Check if admin session is valid (cookie-based)
+  const isValid = await isAdminSessionValid();
 
-  if (!isAdmin) {
-    // Not the admin email - redirect to dashboard
-    redirect("/dashboard");
+  if (!isValid) {
+    // No valid admin session - redirect to login
+    redirect("/login");
   }
-
-  // Check if admin session is valid
-  const isVerified = await isAdminSessionValid();
-
-  // Get current path (we need to allow access to verify page)
-  // The verify page will handle its own auth
 
   return <>{children}</>;
 }

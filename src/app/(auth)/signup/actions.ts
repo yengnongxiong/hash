@@ -9,7 +9,7 @@ const signupSchema = z.object({
   email: z.string().email("Invalid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   name: z.string().min(2, "Name must be at least 2 characters"),
-  organizationName: z.string().min(2, "Organization name must be at least 2 characters"),
+  orgCode: z.string().length(6, "Organization code must be 6 characters"),
 });
 
 export async function signup(formData: FormData) {
@@ -20,7 +20,7 @@ export async function signup(formData: FormData) {
     email: formData.get("email") as string,
     password: formData.get("password") as string,
     name: formData.get("name") as string,
-    organizationName: formData.get("organizationName") as string,
+    orgCode: (formData.get("orgCode") as string)?.toUpperCase().trim(),
   };
 
   const result = signupSchema.safeParse(rawData);
@@ -28,21 +28,29 @@ export async function signup(formData: FormData) {
     return { error: result.error.issues[0].message };
   }
 
-  // 1. Create the organization first (using admin client to bypass RLS)
+  // 1. Validate the organization code and get the organization
   const { data: org, error: orgError } = await adminClient
     .from("organizations")
-    .insert({
-      name: result.data.organizationName,
-      settings: { businessType: "general" },
-    })
-    .select()
+    .select("id, name, org_code")
+    .eq("org_code", result.data.orgCode)
     .single();
 
-  if (orgError) {
-    return { error: "Failed to create organization: " + orgError.message };
+  if (orgError || !org) {
+    return { error: "Invalid organization code. Please check with your administrator." };
   }
 
-  // 2. Sign up the user with Supabase Auth
+  // 2. Check if email is already registered
+  const { data: existingUser } = await adminClient
+    .from("users")
+    .select("id")
+    .eq("email", result.data.email)
+    .single();
+
+  if (existingUser) {
+    return { error: "An account with this email already exists. Please sign in instead." };
+  }
+
+  // 3. Sign up the user with Supabase Auth
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email: result.data.email,
     password: result.data.password,
@@ -55,39 +63,33 @@ export async function signup(formData: FormData) {
   });
 
   if (authError) {
-    // Clean up the organization if auth fails
-    await adminClient.from("organizations").delete().eq("id", org.id);
     return { error: authError.message };
   }
 
   if (!authData.user) {
-    await adminClient.from("organizations").delete().eq("id", org.id);
     return { error: "Failed to create user" };
   }
 
-  // 3. Create the user profile record (using admin to bypass RLS during signup)
+  // 4. Create the user profile record (as member, not owner)
   const { error: userError } = await adminClient.from("users").insert({
     id: authData.user.id,
     organization_id: org.id,
     email: result.data.email,
     name: result.data.name,
-    role: "owner",
+    role: "member",
   });
 
   if (userError) {
-    // Note: Auth user was created but profile failed - this needs manual cleanup
     console.error("Failed to create user profile:", userError);
     return { error: "Account created but profile setup failed. Please contact support." };
   }
 
-  // For development, auto-confirm users (in production, you'd send confirmation email)
+  // User created - redirect to email confirmation page
+  // If no session, email confirmation is required
   if (authData.user && !authData.session) {
-    // User needs to confirm email
-    return {
-      success: true,
-      message: "Please check your email to confirm your account.",
-    };
+    redirect(`/signup/confirm-email?email=${encodeURIComponent(result.data.email)}`);
   }
 
+  // If session exists (email auto-confirmed), go to dashboard
   redirect("/dashboard");
 }

@@ -1,18 +1,13 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Appointment } from "@/types/database";
+import { AppointmentWithDetails } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type CustomerInfo = { id?: string; name: string | null; company: string | null; customer_number?: string };
-type AppointmentWithCustomer = Appointment & {
-  customers?: CustomerInfo | CustomerInfo[] | null;
-};
-
 interface AppointmentsCalendarProps {
-  data: AppointmentWithCustomer[];
+  data: AppointmentWithDetails[];
 }
 
 function getDaysInMonth(year: number, month: number): Date[] {

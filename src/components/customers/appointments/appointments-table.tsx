@@ -1,6 +1,6 @@
 "use client";
 
-import { Appointment } from "@/types/database";
+import { AppointmentWithDetails } from "@/types/database";
 import {
   Table,
   TableBody,
@@ -23,13 +23,8 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
-type CustomerInfo = { id?: string; name: string | null; company: string | null; customer_number?: string };
-type AppointmentWithCustomer = Appointment & {
-  customers?: CustomerInfo | CustomerInfo[] | null;
-};
-
 interface AppointmentsTableProps {
-  data: AppointmentWithCustomer[];
+  data: AppointmentWithDetails[];
 }
 
 function formatDateTime(date: string): string {

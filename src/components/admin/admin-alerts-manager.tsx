@@ -149,7 +149,7 @@ export function AdminAlertsManager({ alerts, organizations }: AdminAlertsManager
     startTransition(async () => {
       await logoutAdmin();
       toast.success("Logged out of admin panel");
-      router.push("/dashboard");
+      router.push("/login");
     });
   };
 
@@ -182,11 +182,6 @@ export function AdminAlertsManager({ alerts, organizations }: AdminAlertsManager
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <Link href="/dashboard">
-                <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white">
-                  Back to App
-                </Button>
-              </Link>
               <Button
                 variant="ghost"
                 size="sm"

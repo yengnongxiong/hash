@@ -8,7 +8,7 @@ export default async function AdminPage() {
   const isVerified = await isAdminSessionValid();
 
   if (!isVerified) {
-    redirect("/admin/verify");
+    redirect("/login");
   }
 
   const supabase = await createClient();
@@ -27,6 +27,39 @@ export default async function AdminPage() {
     supabase.from("documents").select("*", { count: "exact", head: true }),
     supabase.from("system_alerts").select("*", { count: "exact", head: true }).eq("active", true),
   ]);
+
+  // Fetch all organizations with usage stats
+  const { data: organizations } = await supabase
+    .from("organizations")
+    .select("id, name, org_code")
+    .order("created_at", { ascending: false });
+
+  // Build org usage data
+  const orgUsage = await Promise.all(
+    (organizations || []).map(async (org) => {
+      const [
+        { count: userCount },
+        { count: peopleCount },
+        { count: documentCount },
+        { count: taskCount },
+      ] = await Promise.all([
+        supabase.from("users").select("*", { count: "exact", head: true }).eq("organization_id", org.id),
+        supabase.from("customers").select("*", { count: "exact", head: true }).eq("organization_id", org.id),
+        supabase.from("documents").select("*", { count: "exact", head: true }).eq("organization_id", org.id),
+        supabase.from("whiteboard_tasks").select("*", { count: "exact", head: true }).eq("organization_id", org.id),
+      ]);
+
+      return {
+        id: org.id,
+        name: org.name,
+        org_code: org.org_code,
+        userCount: userCount || 0,
+        peopleCount: peopleCount || 0,
+        documentCount: documentCount || 0,
+        taskCount: taskCount || 0,
+      };
+    })
+  );
 
   // Fetch recent activity - users without organization join
   const { data: rawUsers } = await supabase
@@ -86,6 +119,7 @@ export default async function AdminPage() {
       }}
       recentUsers={recentUsers}
       recentDocuments={recentDocuments}
+      orgUsage={orgUsage}
     />
   );
 }

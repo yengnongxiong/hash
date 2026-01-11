@@ -1,26 +1,49 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
-import { login } from "./actions";
+import { login, resendConfirmation } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { toast } from "sonner";
+import { Mail, RefreshCw } from "lucide-react";
 
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [unconfirmedEmail, setUnconfirmedEmail] = useState<string | null>(null);
+  const [isResending, startResendTransition] = useTransition();
 
   async function handleSubmit(formData: FormData) {
     setError(null);
+    setUnconfirmedEmail(null);
     setLoading(true);
 
     const result = await login(formData);
 
-    if (result?.error) {
+    if (result?.error === "EMAIL_NOT_CONFIRMED") {
+      setUnconfirmedEmail(result.email || null);
+      setError(result.message || "Please confirm your email before logging in.");
+      setLoading(false);
+    } else if (result?.error) {
       setError(result.error);
       setLoading(false);
     }
+    // Successful login redirects server-side
+  }
+
+  function handleResend() {
+    if (!unconfirmedEmail) return;
+
+    startResendTransition(async () => {
+      const result = await resendConfirmation(unconfirmedEmail);
+      if (result.success) {
+        toast.success("Confirmation email sent! Check your inbox.");
+      } else {
+        toast.error(result.error || "Failed to resend confirmation email");
+      }
+    });
   }
 
   return (
@@ -35,8 +58,31 @@ export default function LoginPage() {
         <CardContent>
           <form action={handleSubmit} className="space-y-4">
             {error && (
-              <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md">
-                {error}
+              <div className="space-y-3">
+                <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md">
+                  {error}
+                </div>
+                {unconfirmedEmail && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={handleResend}
+                    disabled={isResending}
+                  >
+                    {isResending ? (
+                      <>
+                        <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <Mail className="mr-2 h-4 w-4" />
+                        Resend confirmation email
+                      </>
+                    )}
+                  </Button>
+                )}
               </div>
             )}
 

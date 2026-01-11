@@ -23,4 +23,5 @@ export const FLAG_THRESHOLDS = {
   MISSING_FIELDS_WARNING: 2, // Number of missing fields for warning vs info
 } as const;
 
-export type DetectionMethod = "rule_based" | "ml_model" | "pattern_match" | "manual";
+// Detection methods must match database check constraint: rule, ml, validation
+export type DetectionMethod = "rule" | "ml" | "validation";

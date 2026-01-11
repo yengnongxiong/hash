@@ -40,21 +40,44 @@ First, identify the document type from these categories:
 - SHIPPING: bill_of_lading, packing_list, customs_declaration
 - other (if none match)
 
-Extract all relevant fields based on document type. Include confidence levels for each field.
+CRITICAL: You MUST extract the ACTUAL VALUES for each field, not just confidence scores. Include BOTH the actual value AND a confidence level for each field.
 
-For INVOICES: invoiceNumber, vendorName, invoiceDate, dueDate, totalAmount, currency, paymentTerms, poNumber, lineItems
+For INVOICES, extract these fields with their ACTUAL VALUES:
+- invoiceNumber: The invoice number/ID (e.g., "INV-3337")
+- vendorName: The seller/vendor company name
+- invoiceDate: Date in YYYY-MM-DD format (e.g., "2016-01-25")
+- dueDate: Due date in YYYY-MM-DD format (e.g., "2016-01-31")
+- totalAmount: The total amount as a number (e.g., 93.50)
+- currency: Currency code (e.g., "USD", "AUD")
+- paymentTerms: Payment terms text
+- poNumber: Purchase order number if present
+- lineItems: Array of {description, quantity, unitPrice, amount}
+
 For RECEIPTS: merchantName, transactionDate, subtotal, tax, total, paymentMethod, lineItems
 For CONTRACTS: partyA, partyB, effectiveDate, expirationDate, contractValue, contractType, terms
 For W-2: employeeName, employeeSsnLast4, employerName, employerEin, taxYear, wagesTipsCompensation, federalIncomeTaxWithheld
 For BANK STATEMENTS: accountNumber, bankName, statementPeriodStart, statementPeriodEnd, openingBalance, closingBalance, transactions
 
-Return JSON with this structure:
+Return JSON with this EXACT structure (example for invoice):
 {
-  "documentType": "invoice|receipt|contract|...",
-  "documentTypeConfidence": "high|medium|low",
-  "fieldConfidence": { "fieldName": "high|medium|low", ... },
-  ...extracted fields
+  "documentType": "invoice",
+  "documentTypeConfidence": "high",
+  "invoiceNumber": "INV-3337",
+  "vendorName": "ACME Corp",
+  "invoiceDate": "2016-01-25",
+  "dueDate": "2016-01-31",
+  "totalAmount": 93.50,
+  "currency": "USD",
+  "lineItems": [{"description": "Web Design", "quantity": 1, "unitPrice": 85, "amount": 85}],
+  "fieldConfidence": {
+    "invoiceNumber": "high",
+    "vendorName": "high",
+    "dueDate": "high",
+    "totalAmount": "high"
+  }
 }
+
+IMPORTANT: The field values (invoiceNumber, vendorName, dueDate, totalAmount, etc.) MUST be included at the top level of the JSON, NOT nested inside fieldConfidence.
 
 Focus on accuracy - it's better to leave a field empty than guess incorrectly.
 PII HANDLING: For SSN, only extract the last 4 digits.`;
@@ -111,16 +134,80 @@ export async function extractWithFineTunedModel(
 
     // Parse and normalize to ExtractedDocumentData format
     const parsed = JSON.parse(content);
+
+    // Validate that extraction has actual values, not just confidence scores
+    validateExtraction(parsed, ocrText);
+
     return normalizeToExtractedDocumentData(parsed);
   } catch (error) {
     console.error("Together extraction error:", error);
-    // Return minimal valid ExtractedDocumentData on error
-    return {
-      documentType: "other",
-      pageCount: 1,
-      hasImages: false,
-      hasTables: false,
-    };
+    // Re-throw so Mistral fallback can be triggered
+    throw error;
+  }
+}
+
+/**
+ * Validate that the extraction contains actual field values, not just confidence scores.
+ * Throws an error if the extraction appears incomplete or suspicious.
+ */
+function validateExtraction(parsed: Record<string, unknown>, ocrText: string): void {
+  const documentType = parsed.documentType as string;
+  const fieldConfidence = parsed.fieldConfidence as Record<string, unknown> | undefined;
+
+  // Check if OCR text contains invoice-like content but extraction returned "other"
+  // This catches cases where the model failed to properly classify the document
+  const lowerText = ocrText.toLowerCase();
+  const hasInvoiceKeywords =
+    (lowerText.includes('invoice') || lowerText.includes('inv-')) &&
+    (lowerText.includes('total') || lowerText.includes('amount')) &&
+    (lowerText.includes('due date') || lowerText.includes('due:'));
+
+  if (hasInvoiceKeywords && documentType === 'other') {
+    console.error('Document contains invoice keywords but was classified as "other"');
+    throw new Error('Document appears to be an invoice but was misclassified');
+  }
+
+  // If fieldConfidence is empty but document looks like it should have fields, fail
+  if (!fieldConfidence || Object.keys(fieldConfidence).length === 0) {
+    if (documentType !== 'other' || hasInvoiceKeywords) {
+      console.error(`Empty fieldConfidence for documentType: ${documentType}`);
+      throw new Error(`No fields extracted for document type: ${documentType}`);
+    }
+    return; // Allow "other" documents with no fields if text doesn't look like known types
+  }
+
+  // Check that fields mentioned in fieldConfidence have actual values
+  const fieldsWithConfidence = Object.keys(fieldConfidence);
+  const missingValues: string[] = [];
+
+  for (const field of fieldsWithConfidence) {
+    // Skip confidence-related meta fields
+    if (field === 'documentType' || field === 'documentTypeConfidence') continue;
+
+    // Check if the actual value exists at the top level
+    const value = parsed[field];
+    if (value === undefined || value === null) {
+      missingValues.push(field);
+    }
+  }
+
+  // If more than 50% of fields with confidence scores are missing values,
+  // the extraction is incomplete and should fall back to Mistral
+  if (fieldsWithConfidence.length > 0 && missingValues.length > fieldsWithConfidence.length * 0.5) {
+    console.error(`Incomplete extraction: fields with confidence but no values: ${missingValues.join(', ')}`);
+    throw new Error(`Incomplete extraction: ${missingValues.length}/${fieldsWithConfidence.length} fields missing values`);
+  }
+
+  // For specific document types, ensure critical fields are present
+  if (documentType === 'invoice') {
+    const criticalFields = ['invoiceNumber', 'vendorName', 'totalAmount'];
+    const missingCritical = criticalFields.filter(f =>
+      fieldConfidence[f] && (parsed[f] === undefined || parsed[f] === null)
+    );
+    if (missingCritical.length > 0) {
+      console.error(`Invoice missing critical fields: ${missingCritical.join(', ')}`);
+      throw new Error(`Invoice extraction incomplete: missing ${missingCritical.join(', ')}`);
+    }
   }
 }
 

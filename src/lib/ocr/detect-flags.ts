@@ -42,7 +42,7 @@ export async function detectDocumentFlags(
           daysOverdue,
           threshold: FLAG_THRESHOLDS.PAST_DUE_WARNING,
         },
-        detection_method: "rule_based",
+        detection_method: "rule",
       });
     }
   }
@@ -71,7 +71,7 @@ export async function detectDocumentFlags(
               duplicateDocumentId: doc.id,
               duplicateFileName: doc.file_name,
             },
-            detection_method: "pattern_match",
+            detection_method: "rule",
           });
           break;
         }
@@ -93,7 +93,7 @@ export async function detectDocumentFlags(
           reason: `Amount exceeds $${FLAG_THRESHOLDS.HIGH_AMOUNT_CRITICAL.toLocaleString()}`,
           threshold: FLAG_THRESHOLDS.HIGH_AMOUNT_CRITICAL,
         },
-        detection_method: "rule_based",
+        detection_method: "rule",
       });
     } else if (extractedData.totalAmount > FLAG_THRESHOLDS.HIGH_AMOUNT_WARNING) {
       flags.push({
@@ -106,7 +106,7 @@ export async function detectDocumentFlags(
           reason: `Amount exceeds $${FLAG_THRESHOLDS.HIGH_AMOUNT_WARNING.toLocaleString()}`,
           threshold: FLAG_THRESHOLDS.HIGH_AMOUNT_WARNING,
         },
-        detection_method: "rule_based",
+        detection_method: "rule",
       });
     }
 
@@ -121,7 +121,7 @@ export async function detectDocumentFlags(
           currency: extractedData.currency || "USD",
           reason: "Perfectly round number",
         },
-        detection_method: "rule_based",
+        detection_method: "rule",
       });
     }
   }
@@ -206,7 +206,7 @@ export async function detectDocumentFlags(
         documentType: extractedData.documentType,
         threshold: FLAG_THRESHOLDS.MISSING_FIELDS_WARNING,
       },
-      detection_method: "rule_based",
+      detection_method: "rule",
     });
   }
 
@@ -224,7 +224,7 @@ export async function detectDocumentFlags(
         details: {
           expirationDate: extractedData.expirationDate,
         },
-        detection_method: "rule_based",
+        detection_method: "rule",
       });
     } else if (expirationDate < warningThreshold) {
       const daysUntilExpiration = Math.ceil((expirationDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
@@ -237,7 +237,7 @@ export async function detectDocumentFlags(
           daysUntilExpiration,
           threshold: FLAG_THRESHOLDS.CONTRACT_EXPIRATION_WARNING,
         },
-        detection_method: "rule_based",
+        detection_method: "rule",
       });
     }
   }
