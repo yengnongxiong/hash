@@ -2,7 +2,7 @@
 
 ## Quick Context
 
-**What this is**: B2B SaaS for document/people management with AI OCR. Multi-tenant, Supabase backend.
+**What this is**: B2B SaaS for document/people management with AI OCR, smart automation, and ML-powered extraction. Multi-tenant, Supabase backend.
 
 **User Preferences**:
 - Proactively use MCP tools (Supabase, Playwright, Context7, Shadcn, Semgrep) without asking
@@ -15,8 +15,16 @@
 - "People" (not "Customers") - renamed for professionalism
 - Person and Document IDs are 6-char alphanumeric (e.g., "A3B7K2"), not sequential
 
-
-**Current State**: All MVP + Phase 2 + Phase 3 complete. App is functional.
+**Current State**: All MVP + Phase 2 + Phase 3 + Phase 4 + Phase 5 complete. Features include:
+- Document OCR with confidence scoring and review workflow
+- A/B testing framework for model experiments
+- Dead letter queue (DLQ) for failed document processing
+- PII detection and redaction
+- Retention policies with automated cleanup
+- Document version history
+- Duplicate detection via embeddings
+- Organization join codes
+- Admin 2FA email verification (24-hour sessions)
 
 ---
 
@@ -24,14 +32,53 @@
 
 | Category | Technology |
 |----------|------------|
-| Framework | Next.js 14 (App Router, Server Actions, Turbopack) |
-| Database | Supabase (PostgreSQL + Auth + Storage + Realtime) |
-| UI | shadcn/ui + Tailwind CSS |
+| Framework | Next.js 16 (App Router, Server Actions, Turbopack) |
+| Database | Supabase (PostgreSQL + Auth + Storage + Realtime + pgvector) |
+| UI | shadcn/ui + Tailwind CSS 4 |
 | Tables | TanStack Table v8 |
-| OCR | Mistral AI (pixtral-12b-latest) |
+| OCR/AI | Mistral AI (pixtral-12b-latest), Together AI, OpenAI embeddings |
 | Drag & Drop | @hello-pangea/dnd |
 | Command Palette | cmdk |
 | Email | Resend |
+| Drawing | react-sketch-canvas |
+| Markdown | react-markdown |
+
+---
+
+## Architecture Overview
+
+### Document Processing Pipeline
+
+```
+Upload → Queue → OCR (Mistral) → Extraction → Validation → Embedding → Review/Auto-approve
+                       ↓                          ↓
+                  DLQ (failed)              Anomaly Detection
+```
+
+1. **Queue System** (`document_queue`): Prioritized processing with retry logic
+2. **OCR & Extraction**: Mistral pixtral-12b for OCR, optional Together AI for structured extraction
+3. **Confidence Scoring**: High/medium/low thresholds per organization (`organization_ai_settings`)
+4. **Validation**: Rule-based and cross-field validation (`validation_rules`)
+5. **Embeddings**: OpenAI text-embedding-3-small for duplicate detection and similarity search
+6. **Auto-approval**: Configurable thresholds, requires no flags and high confidence
+
+### ML Training Loop
+
+```
+User Corrections → Field Corrections → Training Batches → Model Versions → A/B Experiments
+```
+
+1. **Field Corrections** (`field_corrections`): Tracks user edits to extracted data
+2. **Training Batches** (`training_batches`): Aggregates corrections for fine-tuning
+3. **Model Versions** (`model_versions`): Version control for extraction models
+4. **Experiments** (`model_experiments`): A/B testing between model versions
+
+### Smart Automation
+
+- **Anomaly Detection**: Statistical outliers, amount deviations, duplicate suspects
+- **Entity Matching**: Known vendors/customers with fuzzy and semantic matching
+- **Accuracy Metrics**: Daily aggregation of extraction quality per document type
+- **Retention Policies**: Automated archival/deletion with notification support
 
 ---
 
@@ -42,30 +89,87 @@ Project ID: hbsmvvxdyvzbhetofnbu
 Region: us-east-2
 ```
 
-### Database Tables
+### Database Tables (Grouped by Feature)
 
+#### Core Tables
 | Table | Purpose |
 |-------|---------|
-| `organizations` | Multi-tenant org data |
+| `organizations` | Multi-tenant org data with `org_code` for joining |
 | `users` | User profiles linked to Supabase Auth |
 | `customers` | People records with 6-char alphanumeric IDs |
-| `documents` | Uploaded docs with auto-incrementing DOC-#### |
+| `activity_log` | Organization-wide activity feed |
+
+#### Documents
+| Table | Purpose |
+|-------|---------|
+| `documents` | Uploaded docs with OCR status, confidence scores, soft delete |
 | `document_audit_log` | Document activity history |
-| `appointments` | Customer appointments (supports multi-person via `customer_ids`) |
-| `whiteboard_tasks` | Realtime kanban tasks |
-| `document_flags` | LLM-detected anomalies |
-| `document_dates` | Extracted important dates |
-| `task_recommendations` | LLM-generated suggestions |
-| `activity_log` | Organization-wide activity |
+| `document_flags` | LLM-detected anomalies (past due, duplicates, suspicious amounts) |
+| `document_dates` | Extracted important dates (due dates, expirations, etc.) |
+| `document_versions` | Version history of extracted data changes |
+| `document_queue` | Processing queue with priority, retry logic, DLQ status |
+| `document_embeddings` | Vector embeddings for similarity search (pgvector) |
+
+#### Appointments & Dates
+| Table | Purpose |
+|-------|---------|
+| `appointments` | Customer appointments with multi-person support (`customer_ids`) |
+| `appointment_types` | Customizable appointment categories with colors |
+
+#### Tasks (Whiteboard)
+| Table | Purpose |
+|-------|---------|
+| `whiteboard_tasks` | Realtime kanban tasks with priority, labels, multi-assignee |
+| `task_subtasks` | Subtasks with completion tracking |
+| `task_attachments` | File attachments for tasks |
+| `task_recommendations` | LLM-generated task suggestions |
+
+#### People & Tags
+| Table | Purpose |
+|-------|---------|
+| `person_tags` | Customizable tags for people with colors |
+| `customer_tag_assignments` | Many-to-many tag assignments |
+
+#### ML & Training
+| Table | Purpose |
+|-------|---------|
+| `field_corrections` | User corrections to extracted fields (training data) |
+| `model_versions` | Extraction model versions with accuracy tracking |
+| `model_experiments` | A/B experiments between model versions |
+| `experiment_results` | Per-document results for experiments |
+| `training_batches` | Aggregated training data batches |
+| `processing_metrics` | Per-document processing duration and confidence |
+
+#### Smart Automation
+| Table | Purpose |
+|-------|---------|
+| `organization_ai_settings` | Confidence thresholds, auto-approval config |
+| `validation_rules` | Custom validation rules per org/document type |
+| `accuracy_metrics` | Daily accuracy aggregation per document type |
+| `anomaly_detections` | Detected anomalies (outliers, mismatches) |
+| `known_entities` | Known vendors/customers with aliases for matching |
+| `entity_matches` | Document-to-entity matches with confidence |
+
+#### Retention & Compliance
+| Table | Purpose |
+|-------|---------|
+| `retention_policies` | Document retention rules (archive/delete/notify) |
+| `retention_jobs` | Execution logs for retention policy runs |
+
+#### System & Admin
+| Table | Purpose |
+|-------|---------|
 | `system_alerts` | Maintenance notices (global + per-org targeting) |
 | `admin_verification_codes` | Email 2FA codes for admin access |
 | `admin_sessions` | Verified admin sessions (24-hour validity) |
+| `admin_activity_log` | Admin action audit trail |
 
 ### Realtime Enabled
 - `whiteboard_tasks` - Live collaboration on kanban board
 
 ### Key Database Functions
 - `user_organization_id()` - Returns current user's org ID for RLS
+- `match_documents()` - Semantic similarity search using pgvector
 
 ---
 
@@ -79,10 +183,12 @@ src/
 │   │   │   └── appointments/  # People appointments
 │   │   ├── dates/             # Unified dates view (appointments + document dates)
 │   │   ├── documents/         # Document management
-│   │   │   ├── [id]/          # Document detail
+│   │   │   ├── [id]/          # Document detail with version history
 │   │   │   ├── calendar/      # Dates calendar view
+│   │   │   ├── review/        # Document review queue
+│   │   │   ├── quality/       # Quality metrics dashboard
 │   │   │   └── upload/        # Upload page
-│   │   ├── tasks/             # Team tasks (kanban + table views)
+│   │   ├── tasks/             # Team tasks (kanban + table + gallery views)
 │   │   ├── settings/          # User settings + read-only system alerts
 │   │   └── page.tsx           # Dashboard home
 │   ├── admin/                 # Developer admin panel (email 2FA protected)
@@ -90,19 +196,22 @@ src/
 │   │   ├── verify/            # 2FA verification page
 │   │   ├── alerts/            # System alerts management
 │   │   ├── users/             # Users overview
-│   │   ├── organizations/     # Organizations overview
-│   │   ├── analytics/         # Platform analytics
+│   │   ├── organizations/     # Organizations overview with join codes
+│   │   ├── processing/        # Document queue & failed processing
+│   │   ├── activity/          # Admin activity log
 │   │   └── actions.ts         # Admin server actions
-│   ├── auth/                  # Auth callbacks
-│   ├── login/                 # Login page
-│   └── signup/                # Signup page
+│   └── (auth)/                # Auth routes
+│       ├── login/             # Login page
+│       └── signup/            # Signup with email confirmation
 ├── components/
 │   ├── customers/             # People components
 │   │   ├── appointments/      # Appointment components
 │   │   ├── customer-gallery.tsx
 │   │   ├── customer-card.tsx
 │   │   ├── customers-view.tsx
-│   │   └── csv-import-dialog.tsx
+│   │   ├── csv-import-dialog.tsx
+│   │   ├── person-tags-dialog.tsx
+│   │   └── tag-selector.tsx
 │   ├── documents/             # Document components
 │   │   ├── documents-view.tsx
 │   │   ├── document-calendar.tsx
@@ -110,36 +219,106 @@ src/
 │   │   ├── document-upload.tsx
 │   │   ├── document-flags.tsx
 │   │   ├── document-audit-log.tsx
+│   │   ├── document-approval.tsx
+│   │   ├── document-preview.tsx
+│   │   ├── document-version-history.tsx
+│   │   ├── duplicate-warning.tsx
+│   │   ├── similar-documents.tsx
+│   │   ├── retry-button.tsx
+│   │   ├── processing-status.tsx
 │   │   └── extracted-data-view.tsx
 │   ├── dates/                 # Dates tab components
+│   │   ├── dates-view.tsx
+│   │   ├── dates-calendar.tsx
+│   │   ├── dates-week-view.tsx
+│   │   ├── appointment-detail-dialog.tsx
+│   │   └── appointment-types-dialog.tsx
 │   ├── dashboard/             # Dashboard components
 │   │   ├── activity-feed.tsx
 │   │   ├── whiteboard.tsx
 │   │   ├── whiteboard-column.tsx
-│   │   └── whiteboard-task.tsx
+│   │   ├── whiteboard-task.tsx
+│   │   ├── whiteboard-gallery.tsx
+│   │   ├── whiteboard-table.tsx
+│   │   ├── task-detail-dialog.tsx
+│   │   ├── task-subtasks.tsx
+│   │   ├── task-attachments.tsx
+│   │   ├── create-task-dialog.tsx
+│   │   └── sketch-canvas-dialog.tsx
 │   ├── layout/                # Layout components
 │   │   ├── sidebar.tsx
 │   │   ├── header.tsx
 │   │   ├── command-palette.tsx
 │   │   ├── keyboard-shortcuts-dialog.tsx
-│   │   └── dashboard-shell.tsx
+│   │   ├── dashboard-shell.tsx
+│   │   └── system-alert-banner.tsx
 │   ├── admin/                 # Admin panel components
+│   │   ├── admin-dashboard.tsx
+│   │   ├── admin-page-wrapper.tsx
+│   │   ├── admin-alerts-manager.tsx
+│   │   ├── ai-settings-manager.tsx
+│   │   ├── experiments-manager.tsx
+│   │   ├── failed-documents-manager.tsx
+│   │   ├── organizations-list.tsx
+│   │   ├── users-list.tsx
+│   │   ├── create-organization-dialog.tsx
+│   │   └── organization-code-actions.tsx
 │   ├── settings/              # Settings components
 │   ├── data-table/            # Reusable table components
+│   ├── shared/                # Shared components (empty-state, error-boundary)
 │   └── ui/                    # shadcn/ui components
 ├── contexts/
 │   ├── theme-context.tsx      # Dark/light mode
 │   └── sidebar-context.tsx    # Collapsed state
 ├── lib/
-│   ├── supabase/              # Supabase clients (client.ts, server.ts, middleware.ts)
+│   ├── supabase/              # Supabase clients (client.ts, server.ts, admin.ts)
 │   ├── admin/                 # Admin 2FA auth utilities
 │   ├── email/                 # Resend email service
-│   ├── ocr/                   # Mistral OCR extraction + flag detection
-│   ├── hooks/                 # Custom hooks (use-debounce, use-keyboard-shortcuts)
+│   ├── ocr/                   # OCR extraction
+│   │   ├── provider.ts        # OCR provider abstraction
+│   │   ├── mistral.ts         # Mistral pixtral integration
+│   │   ├── together-extraction.ts  # Together AI extraction
+│   │   ├── detect-flags.ts    # Anomaly detection in extracted data
+│   │   ├── flag-config.ts     # Flag detection configuration
+│   │   ├── confidence.ts      # Confidence scoring
+│   │   ├── queue.ts           # Document processing queue
+│   │   └── types.ts           # OCR type definitions
+│   ├── embeddings/            # Vector embeddings
+│   │   ├── openai.ts          # OpenAI embedding generation
+│   │   ├── document-embeddings.ts  # Document embedding management
+│   │   ├── duplicate-detection.ts  # Similarity-based duplicate detection
+│   │   ├── entity-service.ts  # Known entity matching
+│   │   └── index.ts
+│   ├── ml/                    # Machine learning
+│   │   ├── correction-service.ts   # Field correction tracking
+│   │   ├── model-versioning.ts     # Model version management
+│   │   ├── experiment-service.ts   # A/B experiment management
+│   │   ├── training-export.ts      # Export training data
+│   │   └── index.ts
+│   ├── smart-automation/      # Smart automation features
+│   │   ├── validation.ts      # Rule-based validation
+│   │   ├── anomaly-detection.ts    # Statistical anomaly detection
+│   │   ├── accuracy-monitoring.ts  # Accuracy metrics tracking
+│   │   ├── auto-approval.ts   # Auto-approval logic
+│   │   ├── learning-loop.ts   # Continuous learning system
+│   │   └── index.ts
+│   ├── pii/                   # PII handling
+│   │   └── detector.ts        # PII detection and redaction
+│   ├── retention/             # Data retention
+│   │   └── policy.ts          # Retention policy execution
+│   ├── errors/                # Error handling
+│   │   ├── index.ts
+│   │   └── document-processing.ts
+│   ├── hooks/                 # Custom hooks
+│   │   ├── use-debounce.ts
+│   │   ├── use-keyboard-shortcuts.ts
+│   │   └── use-document-shortcuts.ts
+│   ├── utils/                 # Utilities
+│   │   └── format.ts          # Formatting helpers
 │   ├── export.ts              # CSV export utility
-│   └── utils/                 # Formatting helpers
+│   └── realtime.ts            # Realtime subscription helpers
 └── types/
-    └── database.ts            # Supabase types
+    └── database.ts            # Supabase generated types
 ```
 
 ---
@@ -148,10 +327,19 @@ src/
 
 Required in `.env.local`:
 ```
+# Supabase
 NEXT_PUBLIC_SUPABASE_URL=https://hbsmvvxdyvzbhetofnbu.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
+
+# AI/ML
 MISTRAL_API_KEY=<mistral-key>
+OPENAI_API_KEY=<openai-key>           # For embeddings
+TOGETHER_API_KEY=<together-key>        # For structured extraction
+
+# Admin
 ADMIN_EMAIL=yengnongxiong@gmail.com
+
+# Email
 RESEND_API_KEY=<resend-key>
 ```
 
@@ -282,14 +470,21 @@ npx supabase gen types typescript --project-id hbsmvvxdyvzbhetofnbu > src/types/
 
 | Path | Description |
 |------|-------------|
-| `/people` | People table with gallery view, CSV import/export |
+| `/people` | People table with gallery view, CSV import/export, tags |
 | `/people/appointments` | People appointments with calendar |
-| `/dates` | Unified dates/appointments view |
-| `/documents` | Document list with filters and OCR status |
+| `/dates` | Unified dates/appointments view with week view |
+| `/documents` | Document list with filters, OCR status, confidence |
+| `/documents/[id]` | Document detail with version history, similar docs |
 | `/documents/calendar` | Document dates calendar view |
-| `/tasks` | Team tasks with kanban board |
+| `/documents/review` | Document review queue (pending review) |
+| `/documents/quality` | Quality metrics dashboard |
+| `/tasks` | Team tasks with kanban, table, and gallery views |
 | `/settings` | User profile + system alerts |
 | `/admin` | Admin dashboard (email 2FA, ADMIN_EMAIL only) |
+| `/admin/verify` | 2FA verification page (6-digit code entry) |
+| `/admin/processing` | Document queue and failed processing |
+| `/admin/activity` | Admin activity log |
+| `/admin/organizations` | Manage organizations with join codes |
 
 ---
 
@@ -319,6 +514,11 @@ npx supabase gen types typescript --project-id hbsmvvxdyvzbhetofnbu > src/types/
 ### Realtime Not Working
 - Add table to publication: `ALTER PUBLICATION supabase_realtime ADD TABLE <table>`
 
+### Document Processing Failures
+- Check `document_queue` for DLQ items (status = 'dead_letter')
+- View processing metrics in admin panel
+- Check Mistral/Together API key validity
+
 ---
 
 ## Future Ideas
@@ -329,3 +529,5 @@ npx supabase gen types typescript --project-id hbsmvvxdyvzbhetofnbu > src/types/
 - API integrations (QuickBooks, Xero)
 - Recommendations bar with LLM suggestions
 - Dashboard widgets
+- Mobile app
+- Webhook integrations for external systems

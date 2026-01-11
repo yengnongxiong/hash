@@ -1,12 +1,21 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy-load Resend client to avoid build-time API key validation
+let resendClient: Resend | null = null;
+
+function getResendClient(): Resend {
+  if (!resendClient) {
+    resendClient = new Resend(process.env.RESEND_API_KEY);
+  }
+  return resendClient;
+}
 
 // Admin email from environment variable
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "yengnongxiong@gmail.com";
 
 export async function sendAdminVerificationCode(code: string): Promise<{ success: boolean; error?: string }> {
   try {
+    const resend = getResendClient();
     const { error } = await resend.emails.send({
       from: "Hash Admin <noreply@resend.dev>", // Use your own domain after verifying with Resend
       to: ADMIN_EMAIL,

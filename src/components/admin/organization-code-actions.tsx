@@ -20,18 +20,30 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Copy, Check, RefreshCw } from "lucide-react";
+import { Copy, Check, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { regenerateOrganizationCodeAdmin } from "@/app/admin/actions";
+import { regenerateOrganizationCodeAdmin, deleteOrganizationAdmin } from "@/app/admin/actions";
 
 interface OrganizationCodeActionsProps {
   orgId: string;
   orgCode: string | null;
+  orgName: string;
+  userCount: number;
+  customerCount: number;
+  documentCount: number;
 }
 
-export function OrganizationCodeActions({ orgId, orgCode }: OrganizationCodeActionsProps) {
+export function OrganizationCodeActions({
+  orgId,
+  orgCode,
+  orgName,
+  userCount,
+  customerCount,
+  documentCount
+}: OrganizationCodeActionsProps) {
   const [copied, setCopied] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [isDeleting, setIsDeleting] = useState(false);
   const router = useRouter();
 
   const handleCopy = async () => {
@@ -56,6 +68,24 @@ export function OrganizationCodeActions({ orgId, orgCode }: OrganizationCodeActi
       }
     });
   };
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    try {
+      const result = await deleteOrganizationAdmin(orgId);
+
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success(`Organization "${orgName}" and all its data deleted`);
+        router.refresh();
+      }
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const totalDataCount = userCount + customerCount + documentCount;
 
   return (
     <TooltipProvider>
@@ -114,6 +144,57 @@ export function OrganizationCodeActions({ orgId, orgCode }: OrganizationCodeActi
                 onClick={handleRegenerate}
               >
                 Regenerate Code
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-slate-400 hover:text-red-400"
+                  disabled={isDeleting}
+                >
+                  <Trash2 className={`h-4 w-4 ${isDeleting ? "animate-pulse" : ""}`} />
+                </Button>
+              </AlertDialogTrigger>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Delete organization</p>
+            </TooltipContent>
+          </Tooltip>
+          <AlertDialogContent className="bg-slate-800 border-slate-700">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-red-400">Delete Organization?</AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="text-slate-400 space-y-3">
+                  <p>
+                    This will permanently delete <span className="font-semibold text-white">{orgName}</span> and all associated data:
+                  </p>
+                  <ul className="list-disc list-inside space-y-1 text-sm">
+                    <li>{userCount} user{userCount !== 1 ? "s" : ""} (including their auth accounts)</li>
+                    <li>{customerCount} people record{customerCount !== 1 ? "s" : ""}</li>
+                    <li>{documentCount} document{documentCount !== 1 ? "s" : ""}</li>
+                    <li>All tasks, appointments, and related data</li>
+                  </ul>
+                  <p className="text-red-400 font-medium">
+                    This action cannot be undone.
+                  </p>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="border-slate-600">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-red-600 hover:bg-red-700"
+                onClick={handleDelete}
+                disabled={isDeleting}
+              >
+                {isDeleting ? "Deleting..." : "Delete Organization"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

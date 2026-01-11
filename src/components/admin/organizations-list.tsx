@@ -83,7 +83,14 @@ export function OrganizationsList({ organizations }: OrganizationsListProps) {
                       {org.org_code || "N/A"}
                     </p>
                   </div>
-                  <OrganizationCodeActions orgId={org.id} orgCode={org.org_code} />
+                  <OrganizationCodeActions
+                    orgId={org.id}
+                    orgCode={org.org_code}
+                    orgName={org.name}
+                    userCount={org.userCount}
+                    customerCount={org.customerCount}
+                    documentCount={org.documentCount}
+                  />
                 </div>
               </div>
 

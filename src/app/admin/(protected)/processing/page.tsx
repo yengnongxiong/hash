@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { isAdminSessionValid } from "@/lib/admin/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +13,7 @@ export default async function AdminProcessingPage() {
     redirect("/login");
   }
 
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   // Get document processing stats
   const [

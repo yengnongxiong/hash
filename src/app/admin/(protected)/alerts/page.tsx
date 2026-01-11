@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { isAdminSessionValid } from "@/lib/admin/auth";
 import { AdminAlertsManager } from "@/components/admin/admin-alerts-manager";
 import { SystemAlert, Organization } from "@/types/database";
@@ -12,7 +12,7 @@ export default async function AdminAlertsPage() {
     redirect("/admin/verify");
   }
 
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   // Fetch all alerts
   const { data: alerts } = await supabase

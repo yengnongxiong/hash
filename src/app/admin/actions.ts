@@ -177,7 +177,6 @@ export async function createSystemAlertAdmin(formData: FormData) {
     .from("system_alerts")
     .insert({
       organization_id: null, // Admin creates org-independent alerts
-      created_by: null, // System admin (no Supabase user)
       alert_type: alertTypeValue,
       title,
       message,
@@ -500,6 +499,121 @@ export async function getAdminActivityLog(limit: number = 50) {
   }
 
   return { activities: data };
+}
+
+// Delete organization and all its data (admin only) - DANGEROUS
+export async function deleteOrganizationAdmin(
+  organizationId: string
+): Promise<{ success: boolean; error?: string }> {
+  const isValid = await isAdminSessionValid();
+  if (!isValid) {
+    return { success: false, error: "Admin session expired" };
+  }
+
+  const adminClient = createAdminClient();
+
+  // Get organization info for logging
+  const { data: org } = await adminClient
+    .from("organizations")
+    .select("name")
+    .eq("id", organizationId)
+    .single();
+
+  if (!org) {
+    return { success: false, error: "Organization not found" };
+  }
+
+  const orgName = org.name;
+
+  try {
+    // Get all users in this organization
+    const { data: orgUsers } = await adminClient
+      .from("users")
+      .select("id, email")
+      .eq("organization_id", organizationId);
+
+    const userIds = orgUsers?.map(u => u.id) || [];
+
+    // 1. Delete document-related data for this org
+    await adminClient.from("document_audit_log").delete().eq("organization_id", organizationId);
+    await adminClient.from("document_flags").delete().eq("organization_id", organizationId);
+    await adminClient.from("document_dates").delete().eq("organization_id", organizationId);
+    await adminClient.from("document_versions").delete().eq("organization_id", organizationId);
+    await adminClient.from("document_embeddings").delete().eq("organization_id", organizationId);
+    await adminClient.from("document_queue").delete().eq("organization_id", organizationId);
+    await adminClient.from("field_corrections").delete().eq("organization_id", organizationId);
+    await adminClient.from("anomaly_detections").delete().eq("organization_id", organizationId);
+    await adminClient.from("entity_matches").delete().eq("organization_id", organizationId);
+    await adminClient.from("experiment_results").delete().eq("organization_id", organizationId);
+    await adminClient.from("processing_metrics").delete().eq("organization_id", organizationId);
+    await adminClient.from("documents").delete().eq("organization_id", organizationId);
+
+    // 2. Delete task-related data for this org
+    await adminClient.from("task_subtasks").delete().eq("organization_id", organizationId);
+    await adminClient.from("task_attachments").delete().eq("organization_id", organizationId);
+    await adminClient.from("whiteboard_tasks").delete().eq("organization_id", organizationId);
+    await adminClient.from("task_recommendations").delete().eq("organization_id", organizationId);
+
+    // 3. Delete people/customer data for this org
+    await adminClient.from("customer_tag_assignments").delete().eq("organization_id", organizationId);
+    await adminClient.from("appointments").delete().eq("organization_id", organizationId);
+    await adminClient.from("customers").delete().eq("organization_id", organizationId);
+    await adminClient.from("person_tags").delete().eq("organization_id", organizationId);
+    await adminClient.from("appointment_types").delete().eq("organization_id", organizationId);
+
+    // 4. Delete activity and org-specific data
+    await adminClient.from("activity_log").delete().eq("organization_id", organizationId);
+
+    // 5. Delete settings and policies for this org
+    await adminClient.from("organization_ai_settings").delete().eq("organization_id", organizationId);
+    await adminClient.from("retention_jobs").delete().eq("organization_id", organizationId);
+    await adminClient.from("retention_policies").delete().eq("organization_id", organizationId);
+    await adminClient.from("validation_rules").delete().eq("organization_id", organizationId);
+    await adminClient.from("known_entities").delete().eq("organization_id", organizationId);
+    await adminClient.from("accuracy_metrics").delete().eq("organization_id", organizationId);
+
+    // 6. Delete ML/training data for this org
+    await adminClient.from("model_experiments").delete().eq("organization_id", organizationId);
+    await adminClient.from("training_batches").delete().eq("organization_id", organizationId);
+    await adminClient.from("model_versions").delete().eq("organization_id", organizationId);
+
+    // 7. Delete users from users table
+    await adminClient.from("users").delete().eq("organization_id", organizationId);
+
+    // 8. Delete users from Supabase Auth
+    for (const userId of userIds) {
+      try {
+        await adminClient.auth.admin.deleteUser(userId);
+      } catch (authError) {
+        console.error(`Error deleting user ${userId} from auth:`, authError);
+        // Continue with other users
+      }
+    }
+
+    // 9. Delete the organization itself
+    const { error: orgDeleteError } = await adminClient
+      .from("organizations")
+      .delete()
+      .eq("id", organizationId);
+
+    if (orgDeleteError) {
+      console.error("Error deleting organization:", orgDeleteError);
+      return { success: false, error: orgDeleteError.message };
+    }
+
+    // Log the action
+    await logAdminActivity("org_deleted", "organization", organizationId, orgName, {
+      deleted_users_count: userIds.length,
+    });
+
+    revalidatePath("/admin");
+    revalidatePath("/admin/organizations");
+    revalidatePath("/admin/users");
+    return { success: true };
+  } catch (error) {
+    console.error("Error deleting organization:", error);
+    return { success: false, error: "Failed to delete organization and its data" };
+  }
 }
 
 // Update organization AI settings (admin only)

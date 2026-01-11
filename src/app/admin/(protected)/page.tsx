@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { isAdminSessionValid } from "@/lib/admin/auth";
 import { AdminDashboard } from "@/components/admin/admin-dashboard";
 
@@ -11,7 +11,8 @@ export default async function AdminPage() {
     redirect("/login");
   }
 
-  const supabase = await createClient();
+  // Use admin client to bypass RLS and see all data
+  const supabase = createAdminClient();
 
   // Fetch stats
   const [

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
+import { AuthGuard } from "@/components/layout/auth-guard";
 import { SystemAlert } from "@/types/database";
 import { isAdminSessionValid } from "@/lib/admin/auth";
 
@@ -60,8 +61,11 @@ export default async function DashboardLayout({
   const alerts = (alertsData as SystemAlert[]) || [];
 
   return (
-    <DashboardShell user={profile} alerts={alerts} userId={user.id}>
-      {children}
-    </DashboardShell>
+    <>
+      <AuthGuard />
+      <DashboardShell user={profile} alerts={alerts} userId={user.id}>
+        {children}
+      </DashboardShell>
+    </>
   );
 }

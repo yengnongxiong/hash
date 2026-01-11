@@ -42,26 +42,61 @@ export default async function proxy(request: NextRequest) {
     pathname.startsWith(route)
   );
 
+  // Admin routes are handled separately with their own 2FA
+  const isAdminRoute = pathname.startsWith("/admin");
+
   // If user is not authenticated and trying to access protected route
-  if (!user && !isPublicRoute && pathname !== "/") {
+  // Admin routes have their own 2FA auth, so they handle redirection themselves
+  if (!user && !isPublicRoute && !isAdminRoute && pathname !== "/") {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
-  // If user is authenticated and trying to access auth pages, redirect to dashboard
-  if (user && (pathname === "/login" || pathname === "/signup")) {
+  // If admin user is trying to access dashboard routes, redirect to admin panel
+  const adminEmail = process.env.ADMIN_EMAIL || "";
+  const isDashboardRoute = !isPublicRoute && !isAdminRoute && pathname !== "/";
+  if (user && isDashboardRoute && user.email?.toLowerCase() === adminEmail.toLowerCase()) {
     const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    url.pathname = "/admin";
     return NextResponse.redirect(url);
   }
 
-  // Redirect root to dashboard if authenticated, login if not
-  if (pathname === "/") {
+  // If user is authenticated and trying to access auth pages
+  if (user && (pathname === "/login" || pathname === "/signup")) {
     const url = request.nextUrl.clone();
-    url.pathname = user ? "/dashboard" : "/login";
+    // Check if this is the admin user - redirect to admin panel instead
+    const adminEmail = process.env.ADMIN_EMAIL || "";
+    if (user.email?.toLowerCase() === adminEmail.toLowerCase()) {
+      url.pathname = "/admin";
+    } else {
+      url.pathname = "/dashboard";
+    }
     return NextResponse.redirect(url);
   }
+
+  // Redirect root to appropriate location based on auth status
+  if (pathname === "/") {
+    const url = request.nextUrl.clone();
+    if (user) {
+      // Check if admin user
+      const adminEmail = process.env.ADMIN_EMAIL || "";
+      url.pathname = user.email?.toLowerCase() === adminEmail.toLowerCase() ? "/admin" : "/dashboard";
+    } else {
+      url.pathname = "/login";
+    }
+    return NextResponse.redirect(url);
+  }
+
+  // Add cache-control headers to prevent bfcache on all app routes
+  // This ensures the browser doesn't show cached versions when using back button
+  // Critical for security: prevents unauthenticated users from seeing cached dashboard
+  supabaseResponse.headers.set(
+    "Cache-Control",
+    "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
+  );
+  supabaseResponse.headers.set("Pragma", "no-cache");
+  supabaseResponse.headers.set("Expires", "0");
 
   return supabaseResponse;
 }

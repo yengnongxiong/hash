@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { isAdminSessionValid } from "@/lib/admin/auth";
 import { Building2 } from "lucide-react";
 import { AdminPageWrapper } from "@/components/admin/admin-page-wrapper";
@@ -12,7 +12,8 @@ export default async function AdminOrganizationsPage() {
     redirect("/login");
   }
 
-  const supabase = await createClient();
+  // Use admin client to bypass RLS and see all organizations
+  const supabase = createAdminClient();
 
   // Fetch organizations with counts
   const { data: organizations } = await supabase

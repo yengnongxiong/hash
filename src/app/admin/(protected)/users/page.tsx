@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { isAdminSessionValid } from "@/lib/admin/auth";
 import { Users } from "lucide-react";
 import { AdminPageWrapper } from "@/components/admin/admin-page-wrapper";
@@ -13,7 +13,8 @@ export default async function AdminUsersPage() {
     redirect("/login");
   }
 
-  const supabase = await createClient();
+  // Use admin client to bypass RLS and see all users
+  const supabase = createAdminClient();
 
   const { data: rawUsers } = await supabase
     .from("users")

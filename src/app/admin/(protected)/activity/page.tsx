@@ -9,8 +9,11 @@ import { AdminPageWrapper } from "@/components/admin/admin-page-wrapper";
 import type { Json } from "@/types/database";
 
 const ACTION_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
+  admin_login: { label: "Admin Login", icon: <User className="h-4 w-4" />, color: "bg-green-500/10 text-green-400" },
+  admin_logout: { label: "Admin Logout", icon: <User className="h-4 w-4" />, color: "bg-slate-500/10 text-slate-400" },
   user_deleted: { label: "User Deleted", icon: <Trash2 className="h-4 w-4" />, color: "bg-red-500/10 text-red-400" },
   org_created: { label: "Org Created", icon: <Building2 className="h-4 w-4" />, color: "bg-purple-500/10 text-purple-400" },
+  org_deleted: { label: "Org Deleted", icon: <Trash2 className="h-4 w-4" />, color: "bg-red-500/10 text-red-400" },
   code_regenerated: { label: "Code Regenerated", icon: <RefreshCw className="h-4 w-4" />, color: "bg-cyan-500/10 text-cyan-400" },
   alert_created: { label: "Alert Created", icon: <Bell className="h-4 w-4" />, color: "bg-orange-500/10 text-orange-400" },
   alert_deleted: { label: "Alert Deleted", icon: <Bell className="h-4 w-4" />, color: "bg-red-500/10 text-red-400" },

@@ -1,16 +1,16 @@
 import { redirect } from "next/navigation";
-import { isAdminSessionValid } from "@/lib/admin/auth";
+import { isAdminEmail } from "@/lib/admin/auth";
 
 export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // Check if admin session is valid (cookie-based)
-  const isValid = await isAdminSessionValid();
+  // Check if user is logged in as admin email
+  const isAdmin = await isAdminEmail();
 
-  if (!isValid) {
-    // No valid admin session - redirect to login
+  if (!isAdmin) {
+    // Not the admin user - redirect to login
     redirect("/login");
   }
 
