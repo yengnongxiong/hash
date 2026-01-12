@@ -163,7 +163,13 @@ export class MistralOCRProvider implements OCRProvider {
   private useTogetherExtraction: boolean;
 
   constructor(apiKey?: string, model?: string, useTogetherExtraction?: boolean) {
-    this.apiKey = apiKey || process.env.MISTRAL_API_KEY || "";
+    const key = apiKey || process.env.MISTRAL_API_KEY;
+    if (!key) {
+      throw new Error(
+        "MISTRAL_API_KEY is required. Set it in environment variables or pass as constructor argument."
+      );
+    }
+    this.apiKey = key;
     this.model = model || "pixtral-12b-2409";
     // Use Together.ai fine-tuned model for extraction if configured
     // Falls back to Mistral if Together API key is not set

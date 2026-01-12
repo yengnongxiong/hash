@@ -879,6 +879,7 @@ export type Database = {
           deleted_reason: string | null
           document_number: string | null
           document_type: string | null
+          embedding_status: string | null
           extracted_data: Json | null
           extraction_confidence: number | null
           file_name: string
@@ -904,6 +905,7 @@ export type Database = {
           deleted_reason?: string | null
           document_number?: string | null
           document_type?: string | null
+          embedding_status?: string | null
           extracted_data?: Json | null
           extraction_confidence?: number | null
           file_name: string
@@ -929,6 +931,7 @@ export type Database = {
           deleted_reason?: string | null
           document_number?: string | null
           document_type?: string | null
+          embedding_status?: string | null
           extracted_data?: Json | null
           extraction_confidence?: number | null
           file_name?: string
@@ -1346,14 +1349,19 @@ export type Database = {
           auto_approval_min_confidence: number | null
           auto_approval_require_no_flags: boolean | null
           auto_retrain_enabled: boolean | null
+          contract_expiration_warning_days: number | null
           created_at: string | null
           duplicate_similarity_threshold: number | null
           enable_duplicate_detection: boolean | null
+          high_amount_critical: number | null
+          high_amount_warning: number | null
           high_confidence_threshold: number | null
           id: string
           low_confidence_threshold: number | null
           medium_confidence_threshold: number | null
           organization_id: string | null
+          past_due_critical_days: number | null
+          past_due_warning_days: number | null
           retrain_accuracy_threshold: number | null
           retrain_correction_threshold: number | null
           updated_at: string | null
@@ -1365,14 +1373,19 @@ export type Database = {
           auto_approval_min_confidence?: number | null
           auto_approval_require_no_flags?: boolean | null
           auto_retrain_enabled?: boolean | null
+          contract_expiration_warning_days?: number | null
           created_at?: string | null
           duplicate_similarity_threshold?: number | null
           enable_duplicate_detection?: boolean | null
+          high_amount_critical?: number | null
+          high_amount_warning?: number | null
           high_confidence_threshold?: number | null
           id?: string
           low_confidence_threshold?: number | null
           medium_confidence_threshold?: number | null
           organization_id?: string | null
+          past_due_critical_days?: number | null
+          past_due_warning_days?: number | null
           retrain_accuracy_threshold?: number | null
           retrain_correction_threshold?: number | null
           updated_at?: string | null
@@ -1384,14 +1397,19 @@ export type Database = {
           auto_approval_min_confidence?: number | null
           auto_approval_require_no_flags?: boolean | null
           auto_retrain_enabled?: boolean | null
+          contract_expiration_warning_days?: number | null
           created_at?: string | null
           duplicate_similarity_threshold?: number | null
           enable_duplicate_detection?: boolean | null
+          high_amount_critical?: number | null
+          high_amount_warning?: number | null
           high_confidence_threshold?: number | null
           id?: string
           low_confidence_threshold?: number | null
           medium_confidence_threshold?: number | null
           organization_id?: string | null
+          past_due_critical_days?: number | null
+          past_due_warning_days?: number | null
           retrain_accuracy_threshold?: number | null
           retrain_correction_threshold?: number | null
           updated_at?: string | null
@@ -2306,43 +2324,43 @@ export const Constants = {
   },
 } as const
 
-// Custom type aliases for convenience
-export type SystemAlert = Database["public"]["Tables"]["system_alerts"]["Row"]
-export type Organization = Database["public"]["Tables"]["organizations"]["Row"]
-export type User = Database["public"]["Tables"]["users"]["Row"]
-export type Customer = Database["public"]["Tables"]["customers"]["Row"]
-export type PersonTag = Database["public"]["Tables"]["person_tags"]["Row"]
-export type Document = Database["public"]["Tables"]["documents"]["Row"]
-export type DocumentAuditLog = Database["public"]["Tables"]["document_audit_log"]["Row"]
+// Convenience type aliases
+export type Document = Tables<"documents">;
+export type SystemAlert = Tables<"system_alerts">;
+export type Organization = Tables<"organizations">;
+export type DocumentAuditLog = Tables<"document_audit_log">;
+export type TaskAttachment = Tables<"task_attachments">;
+export type TaskSubtask = Tables<"task_subtasks">;
+export type Customer = Tables<"customers">;
+export type User = Tables<"users">;
+export type PersonTag = Tables<"person_tags">;
+export type AppointmentType = Tables<"date_types">;
 
-// Task types (renamed from whiteboard_tasks to tasks)
-export type Task = Database["public"]["Tables"]["tasks"]["Row"]
-export type WhiteboardTask = Task // Backwards compatibility alias
-export type TaskSubtask = Database["public"]["Tables"]["task_subtasks"]["Row"]
-export type TaskAttachment = Database["public"]["Tables"]["task_attachments"]["Row"]
+// Extended types with relations
+export type WhiteboardTask = Tables<"tasks"> & {
+  creator?: { name: string | null; email: string } | null;
+  assignees?: { name: string | null; email: string }[];
+  subtasks?: Tables<"task_subtasks">[];
+  attachments?: Tables<"task_attachments">[];
+};
 
-// Appointment/Date types (renamed from appointments to dates)
-export type DateType = Database["public"]["Tables"]["date_types"]["Row"]
-export type AppointmentType = DateType // Backwards compatibility alias
-export type DateEntry = Database["public"]["Tables"]["dates"]["Row"]
+export type CustomerWithUserInfo = Tables<"customers"> & {
+  created_by_user?: { id?: string; name: string | null; email: string | null } | null;
+  updated_by_user?: { id?: string; name: string | null; email: string | null } | null;
+};
 
-// Device/Auth types
-export type TrustedDevice = Database["public"]["Tables"]["trusted_devices"]["Row"]
-export type UserVerificationCode = Database["public"]["Tables"]["user_verification_codes"]["Row"]
+// AppointmentWithDetails renamed to DateWithDetails but keeping alias for backwards compatibility
+export type DateWithDetails = Tables<"dates"> & {
+  date_type?: Tables<"date_types"> | null;
+  appointment_types?: { id: string; name: string; color: string } | null;
+  customer_details?: { id: string; name: string; company: string | null }[];
+  assignee_details?: { id: string; name: string | null; email: string }[];
+  customers?: { id?: string; name: string; company: string | null }[] | { id?: string; name: string; company: string | null } | null;
+  assignees?: { id: string; name: string | null; email: string }[] | null;
+  notes_user?: { id: string; name: string | null; email: string } | null;
+  created_by_user?: { id: string; name: string | null; email: string } | null;
+  updated_by_user?: { id: string; name: string | null; email: string } | null;
+};
 
-// Extended types with joins
-export type CustomerWithUserInfo = Customer & {
-  created_by_user?: { id: string; name: string | null; email: string | null } | null
-  updated_by_user?: { id: string; name: string | null; email: string | null } | null
-}
-
-export type AppointmentWithDetails = DateEntry & {
-  customer?: Customer | null
-  customers?: { name: string; company: string | null } | null
-  date_type?: DateType | null
-  appointment_types?: { id: string; name: string; color: string } | null
-  created_by_user?: { id: string; name: string | null; email: string } | null
-  updated_by_user?: { id: string; name: string | null; email: string } | null
-  notes_user?: { id: string; name: string | null; email: string } | null
-  assignees?: { id: string; name: string | null; email: string }[] | null
-}
+// Backwards compatibility alias
+export type AppointmentWithDetails = DateWithDetails;

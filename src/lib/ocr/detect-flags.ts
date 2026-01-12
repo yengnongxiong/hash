@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { ExtractedDocumentData } from "./types";
-import { FLAG_THRESHOLDS, type DetectionMethod } from "./flag-config";
+import { getFlagThresholds, type DetectionMethod } from "./flag-config";
 
 export interface DetectedFlag {
   flag_type: "past_due" | "duplicate_invoice" | "suspicious_amount" | "missing_data" | "expiring_soon" | "other";
@@ -21,6 +21,9 @@ export async function detectDocumentFlags(
   const flags: DetectedFlag[] = [];
   const supabase = await createClient();
 
+  // Get organization-specific thresholds from database
+  const thresholds = await getFlagThresholds(organizationId);
+
   // Check for past due dates
   if (extractedData.dueDate) {
     const dueDate = new Date(extractedData.dueDate);
@@ -29,9 +32,9 @@ export async function detectDocumentFlags(
 
     if (dueDate < today) {
       const daysOverdue = Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
-      const severity = daysOverdue > FLAG_THRESHOLDS.PAST_DUE_CRITICAL
+      const severity = daysOverdue > thresholds.PAST_DUE_CRITICAL
         ? "critical"
-        : daysOverdue > FLAG_THRESHOLDS.PAST_DUE_WARNING
+        : daysOverdue > thresholds.PAST_DUE_WARNING
         ? "warning"
         : "info";
       flags.push({
@@ -41,7 +44,7 @@ export async function detectDocumentFlags(
         details: {
           dueDate: extractedData.dueDate,
           daysOverdue,
-          threshold: FLAG_THRESHOLDS.PAST_DUE_WARNING,
+          threshold: thresholds.PAST_DUE_WARNING,
         },
         detection_method: "rule",
       });
@@ -85,7 +88,7 @@ export async function detectDocumentFlags(
   // Check for suspicious amounts
   if (extractedData.totalAmount !== undefined && extractedData.totalAmount !== null) {
     // Flag unusually high amounts
-    if (extractedData.totalAmount > FLAG_THRESHOLDS.HIGH_AMOUNT_CRITICAL) {
+    if (extractedData.totalAmount > thresholds.HIGH_AMOUNT_CRITICAL) {
       flags.push({
         flag_type: "suspicious_amount",
         severity: "critical",
@@ -93,12 +96,12 @@ export async function detectDocumentFlags(
         details: {
           amount: extractedData.totalAmount,
           currency: extractedData.currency || "USD",
-          reason: `Amount exceeds $${FLAG_THRESHOLDS.HIGH_AMOUNT_CRITICAL.toLocaleString()}`,
-          threshold: FLAG_THRESHOLDS.HIGH_AMOUNT_CRITICAL,
+          reason: `Amount exceeds $${thresholds.HIGH_AMOUNT_CRITICAL.toLocaleString()}`,
+          threshold: thresholds.HIGH_AMOUNT_CRITICAL,
         },
         detection_method: "rule",
       });
-    } else if (extractedData.totalAmount > FLAG_THRESHOLDS.HIGH_AMOUNT_WARNING) {
+    } else if (extractedData.totalAmount > thresholds.HIGH_AMOUNT_WARNING) {
       flags.push({
         flag_type: "suspicious_amount",
         severity: "warning",
@@ -106,15 +109,15 @@ export async function detectDocumentFlags(
         details: {
           amount: extractedData.totalAmount,
           currency: extractedData.currency || "USD",
-          reason: `Amount exceeds $${FLAG_THRESHOLDS.HIGH_AMOUNT_WARNING.toLocaleString()}`,
-          threshold: FLAG_THRESHOLDS.HIGH_AMOUNT_WARNING,
+          reason: `Amount exceeds $${thresholds.HIGH_AMOUNT_WARNING.toLocaleString()}`,
+          threshold: thresholds.HIGH_AMOUNT_WARNING,
         },
         detection_method: "rule",
       });
     }
 
     // Flag round numbers that might indicate estimates
-    if (extractedData.totalAmount >= FLAG_THRESHOLDS.ROUND_NUMBER_MIN && extractedData.totalAmount % 1000 === 0) {
+    if (extractedData.totalAmount >= thresholds.ROUND_NUMBER_MIN && extractedData.totalAmount % 1000 === 0) {
       flags.push({
         flag_type: "suspicious_amount",
         severity: "info",
@@ -202,12 +205,12 @@ export async function detectDocumentFlags(
   if (missingFields.length > 0) {
     flags.push({
       flag_type: "missing_data",
-      severity: missingFields.length > FLAG_THRESHOLDS.MISSING_FIELDS_WARNING ? "warning" : "info",
+      severity: missingFields.length > thresholds.MISSING_FIELDS_WARNING ? "warning" : "info",
       message: `Missing ${missingFields.length} required field(s): ${missingFields.join(", ")}`,
       details: {
         missingFields,
         documentType: extractedData.documentType,
-        threshold: FLAG_THRESHOLDS.MISSING_FIELDS_WARNING,
+        threshold: thresholds.MISSING_FIELDS_WARNING,
       },
       detection_method: "rule",
     });
@@ -217,7 +220,7 @@ export async function detectDocumentFlags(
   if (extractedData.expirationDate) {
     const expirationDate = new Date(extractedData.expirationDate);
     const today = new Date();
-    const warningThreshold = new Date(today.getTime() + FLAG_THRESHOLDS.CONTRACT_EXPIRATION_WARNING * 24 * 60 * 60 * 1000);
+    const warningThreshold = new Date(today.getTime() + thresholds.CONTRACT_EXPIRATION_WARNING * 24 * 60 * 60 * 1000);
 
     if (expirationDate < today) {
       flags.push({
@@ -238,7 +241,7 @@ export async function detectDocumentFlags(
         details: {
           expirationDate: extractedData.expirationDate,
           daysUntilExpiration,
-          threshold: FLAG_THRESHOLDS.CONTRACT_EXPIRATION_WARNING,
+          threshold: thresholds.CONTRACT_EXPIRATION_WARNING,
         },
         detection_method: "rule",
       });

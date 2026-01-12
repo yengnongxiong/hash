@@ -10,3 +10,10 @@ export {
   formatErrorForUser,
   logProcessingError,
 } from "./document-processing";
+
+// Alert Service
+export {
+  alertOnProcessingError,
+  createSystemAlert,
+  dismissSystemAlert,
+} from "./alert-service";

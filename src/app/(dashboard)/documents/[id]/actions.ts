@@ -106,7 +106,7 @@ export async function getDocumentVersions(documentId: string): Promise<DocumentV
     return [];
   }
 
-  return (data || []) as DocumentVersion[];
+  return (data || []) as unknown as DocumentVersion[];
 }
 
 /**
@@ -142,7 +142,7 @@ export async function getDocumentVersion(
     return null;
   }
 
-  return data as DocumentVersion;
+  return data as unknown as DocumentVersion;
 }
 
 /**
@@ -210,22 +210,37 @@ export async function restoreDocumentVersion(
 
 // ============ Document Field Updates ============
 
-export async function updateDocumentExtractedData(
+/**
+ * Update a single field in document's extracted_data with version history.
+ * Different from bulk updateDocumentExtractedData in documents/actions.ts.
+ * Uses optimistic locking to prevent concurrent edit conflicts.
+ */
+export async function updateDocumentField(
   documentId: string,
   field: string,
-  value: string | number | null
+  value: string | number | null,
+  expectedUpdatedAt?: string // Optional optimistic lock timestamp
 ) {
   const supabase = await createClient();
 
   // Get current document
   const { data: document, error: fetchError } = await supabase
     .from("documents")
-    .select("extracted_data, raw_text, document_type")
+    .select("extracted_data, raw_text, document_type, updated_at")
     .eq("id", documentId)
     .single();
 
   if (fetchError || !document) {
     return { error: "Document not found" };
+  }
+
+  // Check optimistic lock if provided
+  if (expectedUpdatedAt && document.updated_at !== expectedUpdatedAt) {
+    return {
+      error: "Document was modified by another user. Please refresh and try again.",
+      conflictDetected: true,
+      currentUpdatedAt: document.updated_at,
+    };
   }
 
   // Save current state as a version before modifying
@@ -248,17 +263,40 @@ export async function updateDocumentExtractedData(
     [field]: value,
   };
 
-  // Save to database
-  const { error: updateError } = await supabase
+  const newUpdatedAt = new Date().toISOString();
+
+  // Save to database with optimistic lock check
+  let query = supabase
     .from("documents")
     .update({
       extracted_data: JSON.parse(JSON.stringify(updatedData)),
-      updated_at: new Date().toISOString(),
+      updated_at: newUpdatedAt,
     })
     .eq("id", documentId);
 
+  // If expectedUpdatedAt provided, add optimistic lock condition
+  if (expectedUpdatedAt) {
+    query = query.eq("updated_at", expectedUpdatedAt);
+  }
+
+  const { data: updateResult, error: updateError } = await query.select("id").single();
+
   if (updateError) {
+    // PGRST116 = no rows returned, means optimistic lock failed
+    if (updateError.code === "PGRST116") {
+      return {
+        error: "Document was modified by another user. Please refresh and try again.",
+        conflictDetected: true,
+      };
+    }
     return { error: updateError.message };
+  }
+
+  if (!updateResult) {
+    return {
+      error: "Document was modified by another user. Please refresh and try again.",
+      conflictDetected: true,
+    };
   }
 
   // Create audit log

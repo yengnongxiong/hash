@@ -79,8 +79,15 @@ function generateSearchableContent(
   }
 
   // Add raw text (truncated for embedding)
+  // OpenAI text-embedding-3-small has ~8191 token limit, ~10k chars is safe
   if (rawText) {
-    parts.push(rawText.slice(0, 10000));
+    const maxLength = 10000;
+    if (rawText.length > maxLength) {
+      console.warn(
+        `[Embedding] Document text truncated: ${rawText.length} -> ${maxLength} chars`
+      );
+    }
+    parts.push(rawText.slice(0, maxLength));
   }
 
   return parts.join("\n");

@@ -72,7 +72,7 @@ export default async function AdminFailedDocumentsPage() {
       created_at: doc.created_at,
       updated_at: doc.updated_at,
       organization_id: doc.organization_id,
-      organizations: doc.organizations as { name: string } | null,
+      organizations: doc.organizations as unknown as { name: string } | null,
       retryCount: retryCountMap[doc.id] || 0,
       errorInfo: extractedData ? {
         error: extractedData.error as string | undefined,

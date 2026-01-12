@@ -70,6 +70,7 @@ import { useDebounce } from "@/lib/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 import type { Document } from "@/types/database";
 import { useTransition } from "react";
+import { subscribeToDocuments } from "@/lib/realtime";
 
 type DocumentStatus = "pending" | "processing" | "pending_review" | "completed" | "failed" | "rejected";
 
@@ -79,8 +80,16 @@ interface DocumentWithCustomer extends Document {
   unresolved_flag_count?: number;
 }
 
+interface PaginationInfo {
+  page: number;
+  totalPages: number;
+  total: number;
+  limit: number;
+}
+
 interface DocumentsViewProps {
   documents: DocumentWithCustomer[];
+  pagination?: PaginationInfo;
 }
 
 type StatusFilter = "all" | "pending" | "processing" | "pending_review" | "completed" | "failed" | "rejected";
@@ -150,12 +159,46 @@ function getConfidenceBadge(confidence?: string) {
   );
 }
 
-export function DocumentsView({ documents }: DocumentsViewProps) {
+export function DocumentsView({ documents: initialDocuments, pagination }: DocumentsViewProps) {
+  // Local state for documents to enable realtime updates
+  const [documents, setDocuments] = useState<DocumentWithCustomer[]>(initialDocuments);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const searchParams = useSearchParams();
   const router = useRouter();
+
+  // Sync documents when initialDocuments prop changes (e.g., on pagination)
+  useEffect(() => {
+    setDocuments(initialDocuments);
+  }, [initialDocuments]);
+
+  // Subscribe to realtime document updates
+  useEffect(() => {
+    const unsubscribe = subscribeToDocuments<Record<string, unknown>>((payload) => {
+      if (payload.eventType === "UPDATE" && payload.new && typeof payload.new.id === "string") {
+        const updatedDoc = payload.new as Partial<DocumentWithCustomer>;
+        setDocuments((prev) =>
+          prev.map((doc) =>
+            doc.id === updatedDoc.id
+              ? { ...doc, ...updatedDoc }
+              : doc
+          )
+        );
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  // Handle page navigation
+  const handlePageChange = useCallback((newPage: number) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("page", newPage.toString());
+    router.push(`/documents?${params.toString()}`);
+  }, [router, searchParams]);
 
   // Open upload dialog if URL param is present
   useEffect(() => {
@@ -622,6 +665,7 @@ export function DocumentsView({ documents }: DocumentsViewProps) {
                 <th className="text-left p-3 text-sm font-medium">Person</th>
                 <th className="text-left p-3 text-sm font-medium">Type</th>
                 <th className="text-left p-3 text-sm font-medium">Status</th>
+                <th className="text-left p-3 text-sm font-medium">Confidence</th>
                 <th className="text-left p-3 text-sm font-medium">Flags</th>
                 <th className="text-left p-3 text-sm font-medium">Uploaded</th>
                 <th className="w-20 p-3"></th>
@@ -677,6 +721,57 @@ export function DocumentsView({ documents }: DocumentsViewProps) {
                   </td>
                   <td className="p-3">
                     <ProcessingStatus status={(doc.status || "pending") as DocumentStatus} />
+                  </td>
+                  <td className="p-3">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex gap-2 text-xs">
+                            <div className="flex flex-col items-center">
+                              <span className="text-[10px] text-muted-foreground">Class</span>
+                              <span className={cn(
+                                "font-mono",
+                                doc.classification_confidence && doc.classification_confidence >= 0.9
+                                  ? "text-green-600 dark:text-green-400"
+                                  : doc.classification_confidence && doc.classification_confidence >= 0.7
+                                  ? "text-yellow-600 dark:text-yellow-400"
+                                  : doc.classification_confidence
+                                  ? "text-red-600 dark:text-red-400"
+                                  : "text-muted-foreground"
+                              )}>
+                                {doc.classification_confidence
+                                  ? `${Math.round(doc.classification_confidence * 100)}%`
+                                  : "—"}
+                              </span>
+                            </div>
+                            <div className="flex flex-col items-center">
+                              <span className="text-[10px] text-muted-foreground">Extr</span>
+                              <span className={cn(
+                                "font-mono",
+                                doc.extraction_confidence && doc.extraction_confidence >= 0.9
+                                  ? "text-green-600 dark:text-green-400"
+                                  : doc.extraction_confidence && doc.extraction_confidence >= 0.7
+                                  ? "text-yellow-600 dark:text-yellow-400"
+                                  : doc.extraction_confidence
+                                  ? "text-red-600 dark:text-red-400"
+                                  : "text-muted-foreground"
+                              )}>
+                                {doc.extraction_confidence
+                                  ? `${Math.round(doc.extraction_confidence * 100)}%`
+                                  : "—"}
+                              </span>
+                            </div>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="text-xs">
+                            Classification: {doc.classification_confidence ? `${Math.round(doc.classification_confidence * 100)}%` : "N/A"}
+                            <br />
+                            Extraction: {doc.extraction_confidence ? `${Math.round(doc.extraction_confidence * 100)}%` : "N/A"}
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </td>
                   <td className="p-3">
                     <TooltipProvider>
@@ -768,6 +863,54 @@ export function DocumentsView({ documents }: DocumentsViewProps) {
           </table>
         )}
       </div>
+
+      {/* Server-side Pagination */}
+      {pagination && pagination.totalPages > 1 && (
+        <div className="flex items-center justify-between border-t pt-4">
+          <div className="text-sm text-muted-foreground">
+            Showing {((pagination.page - 1) * pagination.limit) + 1} to{" "}
+            {Math.min(pagination.page * pagination.limit, pagination.total)} of{" "}
+            {pagination.total} documents
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(1)}
+              disabled={pagination.page === 1}
+            >
+              First
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(pagination.page - 1)}
+              disabled={pagination.page === 1}
+            >
+              Previous
+            </Button>
+            <span className="text-sm px-2">
+              Page {pagination.page} of {pagination.totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(pagination.page + 1)}
+              disabled={pagination.page === pagination.totalPages}
+            >
+              Next
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(pagination.totalPages)}
+              disabled={pagination.page === pagination.totalPages}
+            >
+              Last
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

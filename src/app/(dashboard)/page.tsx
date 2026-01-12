@@ -29,19 +29,22 @@ async function DashboardStats() {
   const [customersResult, documentsResult, processingResult, failedResult, completedTodayResult] =
     await Promise.all([
       supabase.from("customers").select("id", { count: "exact", head: true }),
-      supabase.from("documents").select("id", { count: "exact", head: true }),
+      supabase.from("documents").select("id", { count: "exact", head: true }).is("deleted_at", null),
       supabase
         .from("documents")
         .select("id", { count: "exact", head: true })
-        .eq("status", "processing"),
+        .eq("status", "processing")
+        .is("deleted_at", null),
       supabase
         .from("documents")
         .select("id", { count: "exact", head: true })
-        .eq("status", "failed"),
+        .eq("status", "failed")
+        .is("deleted_at", null),
       supabase
         .from("documents")
         .select("id", { count: "exact", head: true })
         .eq("status", "completed")
+        .is("deleted_at", null)
         .gte("updated_at", todayStart)
         .lte("updated_at", todayEnd),
     ]);
@@ -110,6 +113,7 @@ async function RecentDocuments() {
   const { data: rawDocuments } = await supabase
     .from("documents")
     .select("id, file_name, status, document_type, created_at, customer_id")
+    .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(5);
 
@@ -415,6 +419,7 @@ async function UpcomingDueDates() {
     .from("documents")
     .select("id, file_name, document_number, extracted_data")
     .eq("status", "completed")
+    .is("deleted_at", null)
     .not("extracted_data", "is", null);
 
   // Extract upcoming due dates

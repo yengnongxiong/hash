@@ -61,6 +61,12 @@ export async function getOrganizationAISettings(organizationId?: string): Promis
     autoRetrainEnabled: boolean;
     retrainCorrectionThreshold: number;
     retrainAccuracyThreshold: number;
+    // Flag detection thresholds
+    pastDueCriticalDays: number;
+    pastDueWarningDays: number;
+    highAmountWarning: number;
+    highAmountCritical: number;
+    contractExpirationWarningDays: number;
   };
   error?: string;
 }> {
@@ -109,6 +115,12 @@ export async function getOrganizationAISettings(organizationId?: string): Promis
     autoRetrainEnabled: data?.auto_retrain_enabled ?? false,
     retrainCorrectionThreshold: data?.retrain_correction_threshold ?? 1000,
     retrainAccuracyThreshold: data?.retrain_accuracy_threshold ?? 0.95,
+    // Flag detection thresholds (with defaults matching FLAG_THRESHOLDS)
+    pastDueCriticalDays: data?.past_due_critical_days ?? 30,
+    pastDueWarningDays: data?.past_due_warning_days ?? 7,
+    highAmountWarning: data?.high_amount_warning ?? 100000,
+    highAmountCritical: data?.high_amount_critical ?? 500000,
+    contractExpirationWarningDays: data?.contract_expiration_warning_days ?? 30,
   };
 
   return { success: true, settings };

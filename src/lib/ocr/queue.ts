@@ -2,16 +2,15 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { processDocumentOCR } from "@/app/(dashboard)/documents/actions";
-
-// Re-export confidence utilities for convenience
-export { CONFIDENCE_THRESHOLDS, getReviewPriority, confidenceLevelToNumber } from "./confidence";
+import { generateDocumentEmbedding } from "@/lib/embeddings/document-embeddings";
+import { learnEntitiesFromDocument, validateDocumentEntities } from "@/lib/embeddings/entity-service";
 
 interface QueueItem {
   id: string;
   document_id: string;
   status: "pending" | "processing" | "completed" | "failed" | "dead_letter";
   priority: number;
-  processor: "ocr" | "extraction" | "validation" | "embedding";
+  processor: "ocr" | "extraction" | "validation" | "embedding" | "entity_learning";
   attempts: number;
   max_attempts: number;
   last_error: string | null;
@@ -118,6 +117,36 @@ export async function processNextInQueue(): Promise<{
 
     if (item.processor === "ocr" && item.document_id) {
       await processDocumentOCR(item.document_id);
+    } else if (item.processor === "embedding" && item.document_id) {
+      // Generate document embedding for semantic search
+      const result = await generateDocumentEmbedding(item.document_id);
+      if (!result.success) {
+        throw new Error(result.error || "Failed to generate embedding");
+      }
+    } else if (item.processor === "entity_learning" && item.document_id) {
+      // Fetch document's extracted_data
+      const { data: doc } = await supabase
+        .from("documents")
+        .select("extracted_data")
+        .eq("id", item.document_id)
+        .single();
+
+      if (doc?.extracted_data) {
+        // Learn entities from the document
+        const learnResult = await learnEntitiesFromDocument(
+          item.document_id,
+          doc.extracted_data as Record<string, unknown>
+        );
+        if (!learnResult.success) {
+          throw new Error(learnResult.error || "Failed to learn entities");
+        }
+
+        // Also validate entities
+        await validateDocumentEntities(
+          item.document_id,
+          doc.extracted_data as Record<string, unknown>
+        );
+      }
     }
 
     const duration = Date.now() - startTime;

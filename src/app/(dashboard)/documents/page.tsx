@@ -3,56 +3,37 @@ import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Calendar, BarChart3 } from "lucide-react";
 import { DocumentsView } from "@/components/documents/documents-view";
+import { getDocuments } from "./actions";
 
-export default async function DocumentsPage() {
+interface SearchParams {
+  page?: string;
+}
+
+export default async function DocumentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
+  const params = await searchParams;
+  const page = parseInt(params.page || "1", 10);
+  const limit = 50;
+
   const supabase = await createClient();
 
-  // Fetch documents and flags in parallel
-  // Filter out soft-deleted documents (deleted_at is NULL)
-  const [documentsResult, flagsResult] = await Promise.all([
-    supabase
-      .from("documents")
-      .select("*")
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("document_flags")
-      .select("document_id, resolved")
-  ]);
+  // Fetch paginated documents using the action
+  const documentsResult = await getDocuments(page, limit);
 
-  if (documentsResult.error) {
-    return (
-      <div className="p-6">
-        <p className="text-destructive">Error loading documents: {documentsResult.error.message}</p>
-      </div>
-    );
-  }
-
-  // Fetch customers for documents that have customer_id
-  const customerIds = [...new Set(
-    (documentsResult.data || [])
-      .filter(doc => doc.customer_id)
-      .map(doc => doc.customer_id as string)
-  )];
-
-  let customersMap: Record<string, { name: string; company: string | null }> = {};
-  if (customerIds.length > 0) {
-    const { data: customers } = await supabase
-      .from("customers")
-      .select("id, name, company")
-      .in("id", customerIds);
-
-    if (customers) {
-      customersMap = Object.fromEntries(
-        customers.map(c => [c.id, { name: c.name, company: c.company }])
-      );
-    }
-  }
+  // Fetch flags for the current page's documents
+  const documentIds = documentsResult.data.map((doc) => doc.id);
+  const { data: flagsData } = await supabase
+    .from("document_flags")
+    .select("document_id, resolved")
+    .in("document_id", documentIds);
 
   // Calculate flag counts per document
   const flagCountsByDocument = new Map<string, { total: number; unresolved: number }>();
-  if (flagsResult.data) {
-    for (const flag of flagsResult.data) {
+  if (flagsData) {
+    for (const flag of flagsData) {
       const existing = flagCountsByDocument.get(flag.document_id) || { total: 0, unresolved: 0 };
       existing.total++;
       if (!flag.resolved) {
@@ -62,13 +43,12 @@ export default async function DocumentsPage() {
     }
   }
 
-  // Merge flag counts and customers into documents
-  const documents = (documentsResult.data || []).map(doc => ({
+  // Merge flag counts into documents
+  const documents = documentsResult.data.map((doc) => ({
     ...doc,
-    customers: doc.customer_id ? customersMap[doc.customer_id] || null : null,
     flag_count: flagCountsByDocument.get(doc.id)?.total || 0,
     unresolved_flag_count: flagCountsByDocument.get(doc.id)?.unresolved || 0,
-  }));
+  })) as unknown as Parameters<typeof DocumentsView>[0]["documents"];
 
   return (
     <div className="space-y-6">
@@ -95,7 +75,15 @@ export default async function DocumentsPage() {
         </div>
       </div>
 
-      <DocumentsView documents={documents || []} />
+      <DocumentsView
+        documents={documents}
+        pagination={{
+          page: documentsResult.page,
+          totalPages: documentsResult.totalPages,
+          total: documentsResult.total,
+          limit: documentsResult.limit,
+        }}
+      />
     </div>
   );
 }

@@ -34,6 +34,7 @@ export default async function DocumentCalendarPage() {
     .from("documents")
     .select("id, file_name, document_number, extracted_data, document_type")
     .eq("status", "completed")
+    .is("deleted_at", null)
     .not("extracted_data", "is", null);
 
   if (error) {

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Download, History, CheckCircle, User } from "lucide-react";
+import { ArrowLeft, Download, History, CheckCircle, User, Bot } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -107,11 +107,25 @@ export default async function DocumentDetailPage({
           {isPendingReview && (
             <DocumentApproval documentId={document.id} hasUnresolvedFlags={hasUnresolvedFlags} unresolvedFlagCount={unresolvedFlags.length} />
           )}
-          {isCompleted && document.approved_by && document.approved_at && (
-            <span className="text-xs text-muted-foreground flex items-center gap-1">
-              <CheckCircle className="h-3 w-3 text-green-600" />
-              Approved {formatDistanceToNow(new Date(document.approved_at))}
-            </span>
+          {isCompleted && (
+            <Badge variant={document.approved_by ? "default" : "secondary"} className="flex items-center gap-1">
+              {document.approved_by ? (
+                <>
+                  <User className="h-3 w-3" />
+                  Manually Approved
+                </>
+              ) : (
+                <>
+                  <Bot className="h-3 w-3" />
+                  Auto-Approved
+                </>
+              )}
+              {document.approved_at && (
+                <span className="ml-1 opacity-70">
+                  {formatDistanceToNow(new Date(document.approved_at))}
+                </span>
+              )}
+            </Badge>
           )}
           <a href={document.file_url} download={document.file_name}>
             <Button variant="outline" size="sm">

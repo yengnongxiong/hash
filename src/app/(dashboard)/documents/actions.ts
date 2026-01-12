@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { detectDocumentFlags, saveDocumentFlags } from "@/lib/ocr/detect-flags";
 import { ExtractedDocumentData } from "@/lib/ocr/types";
 import { confidenceLevelToNumber, getReviewPriority } from "@/lib/ocr/confidence";
+import { queueDocument } from "@/lib/ocr/queue";
 import { processAutoApproval, runAnomalyDetection } from "@/lib/smart-automation";
 import { generateDocumentEmbedding } from "@/lib/embeddings/document-embeddings";
 import { learnEntitiesFromDocument, validateDocumentEntities } from "@/lib/embeddings/entity-service";
@@ -402,19 +403,28 @@ export async function processDocumentOCR(documentId: string) {
   }
 }
 
-export async function getDocuments() {
+export async function getDocuments(page: number = 1, limit: number = 50) {
   const supabase = await createClient();
+  const offset = (page - 1) * limit;
 
-  const { data, error } = await supabase
+  const { data, error, count } = await supabase
     .from("documents")
-    .select("*, customers(name, company)")
-    .order("created_at", { ascending: false });
+    .select("*, customers(name, company)", { count: "exact" })
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
 
   if (error) {
     throw new Error(error.message);
   }
 
-  return data;
+  return {
+    data: data ?? [],
+    total: count ?? 0,
+    page,
+    limit,
+    totalPages: Math.ceil((count ?? 0) / limit),
+  };
 }
 
 export async function deleteDocuments(documentIds: string[], permanent = false) {
@@ -606,29 +616,9 @@ export async function approveDocument(documentId: string) {
     details: {},
   });
 
-  // Generate document embedding for semantic search (async, don't block)
-  generateDocumentEmbedding(documentId).catch(err => {
-    console.error("Error generating document embedding:", err);
-  });
-
-  // Get extracted data for entity learning
-  const { data: docData } = await supabase
-    .from("documents")
-    .select("extracted_data")
-    .eq("id", documentId)
-    .single();
-
-  if (docData?.extracted_data) {
-    // Learn entities from approved document (async, don't block)
-    learnEntitiesFromDocument(documentId, docData.extracted_data as Record<string, unknown>).catch(err => {
-      console.error("Error learning entities:", err);
-    });
-
-    // Validate entities for this document (async, don't block)
-    validateDocumentEntities(documentId, docData.extracted_data as Record<string, unknown>).catch(err => {
-      console.error("Error validating entities:", err);
-    });
-  }
+  // Queue embedding generation and entity learning (tracked, with retry)
+  await queueDocument(documentId, "embedding", 5);
+  await queueDocument(documentId, "entity_learning", 5);
 
   revalidatePath("/documents");
   revalidatePath(`/documents/${documentId}`);
@@ -746,32 +736,11 @@ export async function bulkApproveDocuments(documentIds: string[]) {
 
   await supabase.from("document_audit_log").insert(auditEntries);
 
-  // Get extracted data for all approved documents for embedding/entity learning
-  const { data: docsData } = await supabase
-    .from("documents")
-    .select("id, extracted_data")
-    .in("id", pendingIds);
-
-  // Generate embeddings and learn entities for each approved document (async, don't block)
-  if (docsData) {
-    for (const doc of docsData) {
-      // Generate document embedding for semantic search
-      generateDocumentEmbedding(doc.id).catch(err => {
-        console.error(`Error generating embedding for doc ${doc.id}:`, err);
-      });
-
-      // Learn entities from approved document
-      if (doc.extracted_data) {
-        learnEntitiesFromDocument(doc.id, doc.extracted_data as Record<string, unknown>).catch(err => {
-          console.error(`Error learning entities for doc ${doc.id}:`, err);
-        });
-
-        // Validate entities for this document
-        validateDocumentEntities(doc.id, doc.extracted_data as Record<string, unknown>).catch(err => {
-          console.error(`Error validating entities for doc ${doc.id}:`, err);
-        });
-      }
-    }
+  // Queue embedding generation and entity learning for each approved document
+  // Uses lower priority (3) for bulk operations to not block single approvals
+  for (const docId of pendingIds) {
+    await queueDocument(docId, "embedding", 3);
+    await queueDocument(docId, "entity_learning", 3);
   }
 
   revalidatePath("/documents");
@@ -824,9 +793,13 @@ export async function logDocumentView(documentId: string) {
   }
 }
 
-export async function getDocumentAuditLog(documentId: string) {
+export async function getDocumentAuditLog(
+  documentId: string,
+  page: number = 1,
+  limit: number = 20
+) {
   const supabase = await createClient();
-  const PAGE_SIZE = 20;
+  const offset = (page - 1) * limit;
 
   // Get total count
   const { count } = await supabase
@@ -834,16 +807,22 @@ export async function getDocumentAuditLog(documentId: string) {
     .select("*", { count: "exact", head: true })
     .eq("document_id", documentId);
 
-  // Get initial batch of logs (without relationship join to avoid TypeScript issues)
+  // Get paginated logs (without relationship join to avoid TypeScript issues)
   const { data: logs, error } = await supabase
     .from("document_audit_log")
     .select("*")
     .eq("document_id", documentId)
     .order("created_at", { ascending: false })
-    .limit(PAGE_SIZE);
+    .range(offset, offset + limit - 1);
 
   if (error || !logs) {
-    return { logs: [], total: 0 };
+    return {
+      logs: [],
+      total: 0,
+      page,
+      limit,
+      totalPages: 0,
+    };
   }
 
   // Fetch users separately for logs that have user_id
@@ -867,7 +846,14 @@ export async function getDocumentAuditLog(documentId: string) {
     users: log.user_id ? usersMap[log.user_id] || null : null,
   }));
 
-  return { logs: logsWithUsers, total: count || 0 };
+  const totalCount = count || 0;
+  return {
+    logs: logsWithUsers,
+    total: totalCount,
+    page,
+    limit,
+    totalPages: Math.ceil(totalCount / limit),
+  };
 }
 
 export async function getDocumentFlags(documentId: string) {

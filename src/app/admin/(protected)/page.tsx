@@ -17,7 +17,7 @@ export default async function AdminPage() {
     supabase.from("users").select("*", { count: "exact", head: true }),
     supabase.from("organizations").select("*", { count: "exact", head: true }),
     supabase.from("customers").select("*", { count: "exact", head: true }),
-    supabase.from("documents").select("*", { count: "exact", head: true }),
+    supabase.from("documents").select("*", { count: "exact", head: true }).is("deleted_at", null),
     supabase.from("system_alerts").select("*", { count: "exact", head: true }).eq("active", true),
   ]);
 
@@ -38,7 +38,7 @@ export default async function AdminPage() {
       ] = await Promise.all([
         supabase.from("users").select("*", { count: "exact", head: true }).eq("organization_id", org.id),
         supabase.from("customers").select("*", { count: "exact", head: true }).eq("organization_id", org.id),
-        supabase.from("documents").select("*", { count: "exact", head: true }).eq("organization_id", org.id),
+        supabase.from("documents").select("*", { count: "exact", head: true }).eq("organization_id", org.id).is("deleted_at", null),
         supabase.from("tasks").select("*", { count: "exact", head: true }).eq("organization_id", org.id),
       ]);
 
@@ -89,6 +89,7 @@ export default async function AdminPage() {
   const { data: rawDocuments } = await supabase
     .from("documents")
     .select("id, file_name, status, document_type, created_at")
+    .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(5);
 

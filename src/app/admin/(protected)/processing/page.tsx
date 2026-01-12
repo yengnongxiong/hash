@@ -18,10 +18,10 @@ export default async function AdminProcessingPage() {
     { count: completedCount },
     { count: failedCount },
   ] = await Promise.all([
-    supabase.from("documents").select("*", { count: "exact", head: true }).eq("status", "pending"),
-    supabase.from("documents").select("*", { count: "exact", head: true }).eq("status", "processing"),
-    supabase.from("documents").select("*", { count: "exact", head: true }).eq("status", "completed"),
-    supabase.from("documents").select("*", { count: "exact", head: true }).eq("status", "failed"),
+    supabase.from("documents").select("*", { count: "exact", head: true }).eq("status", "pending").is("deleted_at", null),
+    supabase.from("documents").select("*", { count: "exact", head: true }).eq("status", "processing").is("deleted_at", null),
+    supabase.from("documents").select("*", { count: "exact", head: true }).eq("status", "completed").is("deleted_at", null),
+    supabase.from("documents").select("*", { count: "exact", head: true }).eq("status", "failed").is("deleted_at", null),
   ]);
 
   // Get recent failed documents
@@ -29,6 +29,7 @@ export default async function AdminProcessingPage() {
     .from("documents")
     .select("id, file_name, document_type, status, created_at, updated_at")
     .eq("status", "failed")
+    .is("deleted_at", null)
     .order("updated_at", { ascending: false })
     .limit(20);
 
@@ -37,6 +38,7 @@ export default async function AdminProcessingPage() {
     .from("documents")
     .select("id, file_name, document_type, status, created_at")
     .in("status", ["pending", "processing"])
+    .is("deleted_at", null)
     .order("created_at", { ascending: true })
     .limit(10);
 
@@ -46,11 +48,13 @@ export default async function AdminProcessingPage() {
     .from("documents")
     .select("*", { count: "exact", head: true })
     .eq("status", "completed")
+    .is("deleted_at", null)
     .gte("updated_at", oneDayAgo);
   const { count: recentFailed } = await supabase
     .from("documents")
     .select("*", { count: "exact", head: true })
     .eq("status", "failed")
+    .is("deleted_at", null)
     .gte("updated_at", oneDayAgo);
 
   const totalRecent = (recentCompleted || 0) + (recentFailed || 0);

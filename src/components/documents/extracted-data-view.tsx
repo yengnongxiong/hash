@@ -13,7 +13,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { updateDocumentExtractedData } from "@/app/(dashboard)/documents/[id]/actions";
+import { updateDocumentField } from "@/app/(dashboard)/documents/[id]/actions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { Json } from "@/types/database";
@@ -199,7 +199,7 @@ export function ExtractedDataView({
 
   const handleSave = async (field: string, value: string | number | null) => {
     startTransition(async () => {
-      const result = await updateDocumentExtractedData(documentId, field, value);
+      const result = await updateDocumentField(documentId, field, value);
       if (result.error) {
         toast.error("Failed to update", { description: result.error });
       } else {

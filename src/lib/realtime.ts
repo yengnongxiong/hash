@@ -44,3 +44,13 @@ export function subscribeToActivityLog<T extends Record<string, unknown>>(
 ) {
   return subscribeToTable<T>("activity_log", callback);
 }
+
+/**
+ * Subscribe to document updates (status, confidence, etc.)
+ * Useful for real-time processing status updates
+ */
+export function subscribeToDocuments<T extends Record<string, unknown>>(
+  callback: ChangeCallback<T>
+) {
+  return subscribeToTable<T>("documents", callback);
+}
